@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DJI 诊断工具 - 快速启动</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 100%);
+            color: #e0e6ed;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .launcher {
+            max-width: 600px;
+            width: 100%;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(0, 212, 255, 0.3);
+            border-radius: 20px;
+            padding: 40px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        }
+        
+        .logo {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .logo i {
+            font-size: 64px;
+            color: #00d4ff;
+            margin-bottom: 15px;
+            display: block;
+        }
+        
+        .logo h1 {
+            font-size: 32px;
+            background: linear-gradient(135deg, #00d4ff 0%, #09c 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .logo p {
+            color: #8892a0;
+            margin-top: 10px;
+        }
+        
+        .status {
+            background: rgba(0, 212, 255, 0.1);
+            border: 1px solid rgba(0, 212, 255, 0.3);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .status-item {
+            display: flex;
+            align-items: center;
+            margin: 10px 0;
+        }
+        
+        .status-item i {
+            font-size: 20px;
+            margin-right: 15px;
+            width: 24px;
+        }
+        
+        .status-item.ok i {
+            color: #00ff88;
+        }
+        
+        .status-item.pending i {
+            color: #ffaa00;
+        }
+        
+        .actions {
+            display: grid;
+            gap: 15px;
+        }
+        
+        .btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+        }
+        
+        .btn i {
+            margin-right: 10px;
+            font-size: 18px;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #00d4ff 0%, #09c 100%);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(0, 212, 255, 0.4);
+        }
+        
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: #e0e6ed;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+        
+        .info {
+            margin-top: 30px;
+            padding-top: 30px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .info h3 {
+            font-size: 18px;
+            margin-bottom: 15px;
+            color: #00d4ff;
+        }
+        
+        .info ul {
+            list-style: none;
+            padding-left: 0;
+        }
+        
+        .info li {
+            padding: 8px 0;
+            padding-left: 25px;
+            position: relative;
+            color: #a0aab5;
+        }
+        
+        .info li:before {
+            content: '▸';
+            position: absolute;
+            left: 0;
+            color: #00d4ff;
+        }
+        
+        .version {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            color: #6c757d;
+            font-size: 14px;
+        }
+    </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="launcher">
+        <div class="logo">
+            <i class="fas fa-drone"></i>
+            <h1>DJI 设备诊断工具</h1>
+            <p>Omnia OS - 无人机维修辅助系统</p>
+        </div>
+        
+        <div class="status">
+            <div class="status-item ok">
+                <i class="fas fa-check-circle"></i>
+                <span>前端界面已就绪</span>
+            </div>
+            <div class="status-item" id="api-status">
+                <i class="fas fa-circle-notch fa-spin"></i>
+                <span>检查 API 服务状态...</span>
+            </div>
+        </div>
+        
+        <div class="actions">
+            <a href="index.html" class="btn btn-primary">
+                <i class="fas fa-rocket"></i>
+                启动诊断工具
+            </a>
+            <button class="btn btn-secondary" onclick="checkAPI()">
+                <i class="fas fa-sync-alt"></i>
+                检查 API 状态
+            </button>
+            <a href="README.md" class="btn btn-secondary">
+                <i class="fas fa-book"></i>
+                查看文档
+            </a>
+        </div>
+        
+        <div class="info">
+            <h3>📋 使用步骤</h3>
+            <ul>
+                <li>确保 API 服务已启动 (端口 5002)</li>
+                <li>点击"启动诊断工具"打开主界面</li>
+                <li>点击"扫描设备"发现 DJI 设备</li>
+                <li>选择设备查看详细信息和诊断</li>
+            </ul>
+        </div>
+        
+        <div class="version">
+            <p>Version 1.0.0 | Omnia OS © 2026</p>
+        </div>
+    </div>
+    
+    <script>
+        // 检查API状态
+        async function checkAPI() {
+            const statusEl = document.getElementById('api-status');
+            statusEl.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i><span>检查中...</span>';
+            
+            try {
+                const response = await fetch('http://localhost:5002/api/dji/health');
+                if (response.ok) {
+                    statusEl.className = 'status-item ok';
+                    statusEl.innerHTML = '<i class="fas fa-check-circle"></i><span>API 服务正常 (端口 5002)</span>';
+                } else {
+                    throw new Error('API响应异常');
+                }
+            } catch (error) {
+                statusEl.className = 'status-item pending';
+                statusEl.innerHTML = '<i class="fas fa-exclamation-triangle"></i><span>API 未启动 - 请运行: python3 api.py</span>';
+            }
+        }
+        
+        // 页面加载时检查
+        window.addEventListener('load', checkAPI);
+    </script>
+</body>
+</html>

@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>三方讨论室 - 聊天模式</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #0e0e0e;
+            color: #e0e0e0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        /* 顶部栏 */
+        .header {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            padding: 16px 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .header h1 {
+            font-size: 18px;
+            font-weight: 600;
+        }
+        
+        .header-badge {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .badge {
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .badge.infinite {
+            background: rgba(10, 132, 255, 0.2);
+            color: #0a84ff;
+        }
+        
+        .badge.omnia {
+            background: rgba(191, 90, 242, 0.2);
+            color: #bf5af2;
+        }
+        
+        .badge.user {
+            background: rgba(48, 209, 88, 0.2);
+            color: #30d158;
+        }
+        
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #30d158;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        /* 聊天区域 */
+        .chat-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        
+        .chat-container::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .chat-container::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 3px;
+        }
+        
+        /* 消息气泡 */
+        .message {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            max-width: 80%;
+        }
+        
+        .message.user {
+            align-self: flex-end;
+            align-items: flex-end;
+        }
+        
+        .message.infinite, .message.omnia {
+            align-self: flex-start;
+            align-items: flex-start;
+        }
+        
+        .message-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            color: #888;
+            padding: 0 4px;
+        }
+        
+        .message-header .name {
+            font-weight: 600;
+        }
+        
+        .message-header .name.infinite { color: #0a84ff; }
+        .message-header .name.omnia { color: #bf5af2; }
+        .message-header .name.user { color: #30d158; }
+        
+        .message-body {
+            padding: 12px 16px;
+            border-radius: 16px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            font-size: 15px;
+        }
+        
+        .message.user .message-body {
+            background: linear-gradient(135deg, #0a84ff, #0066cc);
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+        
+        .message.infinite .message-body {
+            background: #1c1c1e;
+            border-bottom-left-radius: 4px;
+            border-left: 3px solid #0a84ff;
+        }
+        
+        .message.omnia .message-body {
+            background: #1c1c1e;
+            border-bottom-left-radius: 4px;
+            border-left: 3px solid #bf5af2;
+        }
+        
+        /* 关键点标签 */
+        .key-points {
+            margin-top: 8px;
+            padding: 8px 12px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            font-size: 13px;
+        }
+        
+        .key-points-title {
+            color: #888;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+        
+        .key-points-list {
+            list-style: none;
+        }
+        
+        .key-points-list li {
+            padding: 2px 0;
+            padding-left: 16px;
+            position: relative;
+        }
+        
+        .key-points-list li::before {
+            content: "•";
+            position: absolute;
+            left: 0;
+            color: #0a84ff;
+        }
+        
+        /* 系统消息 */
+        .system-message {
+            text-align: center;
+            color: #888;
+            font-size: 13px;
+            padding: 8px 16px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            align-self: center;
+        }
+        
+        /* 输入区域 */
+        .input-area {
+            background: #1a1a1e;
+            padding: 16px 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .input-wrapper {
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+        }
+        
+        .input-box {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        textarea {
+            width: 100%;
+            min-height: 44px;
+            max-height: 120px;
+            background: #0e0e0e;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 22px;
+            padding: 12px 16px;
+            color: #fff;
+            font-size: 15px;
+            font-family: inherit;
+            resize: none;
+            line-height: 1.4;
+        }
+        
+        textarea:focus {
+            outline: none;
+            border-color: #0a84ff;
+        }
+        
+        textarea::placeholder {
+            color: #666;
+        }
+        
+        .quick-actions {
+            display: flex;
+            gap: 8px;
+            padding-left: 8px;
+        }
+        
+        .quick-btn {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 12px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: rgba(255, 255, 255, 0.1);
+            color: #e0e0e0;
+        }
+        
+        .quick-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+        
+        .send-btn {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            border: none;
+            background: linear-gradient(135deg, #0a84ff, #0066cc);
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .send-btn:hover {
+            transform: scale(1.05);
+        }
+        
+        .send-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        /* 决策按钮 */
+        .decision-buttons {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+            flex-wrap: wrap;
+        }
+        
+        .decision-btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 16px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 500;
+        }
+        
+        .decision-btn.primary {
+            background: linear-gradient(135deg, #0a84ff, #0066cc);
+            color: white;
+        }
+        
+        .decision-btn.success {
+            background: linear-gradient(135deg, #30d158, #28a745);
+            color: white;
+        }
+        
+        .decision-btn.danger {
+            background: linear-gradient(135deg, #ff453a, #dc3545);
+            color: white;
+        }
+        
+        .decision-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+        
+        /* 加载动画 */
+        .typing-indicator {
+            display: flex;
+            gap: 4px;
+            padding: 12px 16px;
+            background: #1c1c1e;
+            border-radius: 16px;
+            border-bottom-left-radius: 4px;
+            border-left: 3px solid #0a84ff;
+        }
+        
+        .typing-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #888;
+            animation: typing 1.4s infinite ease-in-out;
+        }
+        
+        .typing-dot:nth-child(1) { animation-delay: 0s; }
+        .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+        
+        @keyframes typing {
+            0%, 60%, 100% { transform: translateY(0); }
+            30% { transform: translateY(-10px); }
+        }
+        
+        /* 响应式 */
+        @media (max-width: 768px) {
+            .message {
+                max-width: 90%;
+            }
+            
+            .header h1 {
+                font-size: 16px;
+            }
+            
+            .header-badge {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 顶部栏 -->
+    <div class="header">
+        <div class="header-left">
+            <div class="status-indicator"></div>
+            <h1>🔥 三方讨论室</h1>
+        </div>
+        <div class="header-badge">
+            <span class="badge infinite">♾️ 无限</span>
+            <span class="badge omnia">🤖 Omnia</span>
+            <span class="badge user">👤 你</span>
+        </div>
+    </div>
+    
+    <!-- 聊天区域 -->
+    <div class="chat-container" id="chatContainer">
+        <div class="system-message">
+            三方讨论已就绪 • 轮次: <span id="roundNum">0</span>/3 • 输入问题开始讨论
+        </div>
+    </div>
+    
+    <!-- 输入区域 -->
+    <div class="input-area">
+        <div class="input-wrapper">
+            <div class="input-box">
+                <textarea id="messageInput" placeholder="输入消息... (@无限 @Omnia 触发回复)" rows="1"></textarea>
+                <div class="quick-actions">
+                    <button class="quick-btn" onclick="quickAction('继续讨论')">继续讨论</button>
+                    <button class="quick-btn" onclick="quickAction('@无限 怎么看？')">@无限</button>
+                    <button class="quick-btn" onclick="quickAction('@Omnia 怎么看？')">@Omnia</button>
+                </div>
+            </div>
+            <button class="send-btn" id="sendBtn" onclick="sendMessage()">➤</button>
+        </div>
+    </div>
+    
+    <script>
+        // API
+        const OMNIA_API = 'http://127.0.0.1:5001';
+        
+        // 状态
+        let session = null;
+        let round = 0;
+        let maxRounds = 3;
+        let discussionStarted = false;
+        let waitingForResponse = false;
+        
+        // DOM
+        const chatContainer = document.getElementById('chatContainer');
+        const messageInput = document.getElementById('messageInput');
+        const sendBtn = document.getElementById('sendBtn');
+        
+        // 自动调整输入框高度
+        messageInput.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+        });
+        
+        // 回车发送
+        messageInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+        
+        // 添加消息
+        function addMessage(speaker, content, extra = {}) {
+            const msg = document.createElement('div');
+            msg.className = `message ${speaker}`;
+            
+            const time = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+            const speakerName = {
+                'user': '你',
+                'infinite': '♾️ 无限',
+                'omnia': '🤖 Omnia'
+            }[speaker];
+            
+            let html = `
+                <div class="message-header">
+                    <span class="name ${speaker}">${speakerName}</span>
+                    <span class="time">${time}</span>
+                </div>
+                <div class="message-body">${escapeHtml(content)}</div>
+            `;
+            
+            // 关键点
+            if (extra.keyPoints && extra.keyPoints.length > 0) {
+                html += `
+                    <div class="key-points">
+                        <div class="key-points-title">关键点</div>
+                        <ul class="key-points-list">
+                            ${extra.keyPoints.map(p => `<li>${escapeHtml(p)}</li>`).join('')}
+                        </ul>
+                    </div>
+                `;
+            }
+            
+            msg.innerHTML = html;
+            chatContainer.appendChild(msg);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+            
+            return msg;
+        }
+        
+        // 添加系统消息
+        function addSystemMessage(text) {
+            const msg = document.createElement('div');
+            msg.className = 'system-message';
+            msg.textContent = text;
+            chatContainer.appendChild(msg);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+        
+        // 显示打字中
+        function showTyping(speaker) {
+            const msg = document.createElement('div');
+            msg.className = `message ${speaker}`;
+            msg.id = 'typing-indicator';
+            
+            msg.innerHTML = `
+                <div class="message-header">
+                    <span class="name ${speaker}">${speaker === 'infinite' ? '♾️ 无限' : '🤖 Omnia'}</span>
+                </div>
+                <div class="typing-indicator">
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                </div>
+            `;
+            
+            chatContainer.appendChild(msg);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+        
+        // 隐藏打字中
+        function hideTyping() {
+            const typing = document.getElementById('typing-indicator');
+            if (typing) typing.remove();
+        }
+        
+        // HTML 转义
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        // 发送消息
+        async function sendMessage() {
+            const text = messageInput.value.trim();
+            if (!text) return;
+            
+            // /命令始终可用，即使 waitingForResponse
+            if (text.startsWith('/')) {
+                messageInput.value = '';
+                messageInput.style.height = 'auto';
+                addMessage('user', text);
+                await handleCommand(text);
+                return;
+            }
+            
+            if (waitingForResponse) {
+                addSystemMessage('⚠️ AI 正在处理中，请等待或使用 /interrupt 中断');
+                return;
+            }
+            
+            messageInput.value = '';
+            messageInput.style.height = 'auto';
+            
+            // 显示用户消息
+            addMessage('user', text);
+            
+            // 处理消息
+            await handleMessage(text);
+        }
+        
+        // 处理 /命令
+        async function handleCommand(cmd) {
+            const command = cmd.toLowerCase().trim();
+            
+            if (command === '/help') {
+                addSystemMessage('📖 可用命令:\n/interrupt - 中断当前请求\n/reset - 重置会话\n/status - 查看状态\n/help - 显示帮助');
+            } else if (command === '/interrupt') {
+                waitingForResponse = false;
+                sendBtn.disabled = false;
+                hideTyping();
+                addSystemMessage('⚡ 已中断当前请求');
+            } else if (command === '/reset') {
+                waitingForResponse = false;
+                sendBtn.disabled = false;
+                hideTyping();
+                session = null;
+                round = 0;
+                discussionStarted = false;
+                chatContainer.innerHTML = '';
+                addSystemMessage('🔄 会话已重置');
+            } else if (command === '/status') {
+                const status = waitingForResponse ? '⏳ 处理中' : '✅ 空闲';
+                const sessionStatus = session ? `会话 ID: ${session.substring(0, 8)}...` : '无活跃会话';
+                addSystemMessage(`📊 状态: ${status}\n${sessionStatus}\n当前轮次: ${round}/${maxRounds}`);
+            } else {
+                addSystemMessage(`❌ 未知命令: ${cmd}\n输入 /help 查看可用命令`);
+            }
+        }
+        
+        // 处理消息
+        async function handleMessage(text) {
+            waitingForResponse = true;
+            sendBtn.disabled = true;
+            
+            // 30秒超时保护
+            const timeoutId = setTimeout(() => {
+                if (waitingForResponse) {
+                    waitingForResponse = false;
+                    sendBtn.disabled = false;
+                    hideTyping();
+                    addSystemMessage('⏱️ 请求超时 (30秒)，已自动恢复。可继续输入或使用 /reset 重置');
+                }
+            }, 30000);
+            
+            try {
+                // 检测是否是决策
+                if (text.includes('采用') || text.includes('决定')) {
+                    await handleDecision(text);
+                    return;
+                }
+                
+                // 如果还没开始讨论，启动讨论
+                if (!discussionStarted) {
+                    await startDiscussion(text);
+                    return;
+                }
+                
+                // 检测 @无限 或 @Omnia
+                if (text.includes('@无限') || text.includes('@omnia') || text.includes('@Omnia')) {
+                    await triggerMention(text);
+                    return;
+                }
+                
+                // 默认：触发双方回复
+                if (text === '继续讨论') {
+                    await continueDiscussion();
+                    return;
+                }
+                
+                // 普通消息：询问用户意图
+                addSystemMessage('提示: 说"继续讨论"进入下一轮，或 @无限/@Omnia 触发特定回复');
+                
+            } finally {
+                clearTimeout(timeoutId);
+                waitingForResponse = false;
+                sendBtn.disabled = false;
+            }
+        }
+        
+        // 开始讨论
+        async function startDiscussion(question) {
+            showTyping('infinite');
+            
+            // 1. 创建会话
+            const startRes = await fetch(`${OMNIA_API}/api/discuss/start`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ question })
+            });
+            const startData = await startRes.json();
+            
+            if (startData.error) {
+                hideTyping();
+                addSystemMessage('❌ 错误: ' + startData.error);
+                return;
+            }
+            
+            session = startData.session_id;
+            discussionStarted = true;
+            
+            // 2. 模拟无限回复（实际应调用 OpenClaw）
+            await simulateInfiniteReply(question);
+        }
+        
+        // 模拟无限回复
+        async function simulateInfiniteReply(question) {
+            // TODO: 实际调用 OpenClaw API
+            await new Promise(r => setTimeout(r, 1500));
+            
+            hideTyping();
+            
+            const opinion = `针对这个问题，我的分析如下：
+
+1. **当前情况**：需要评估现有架构的优缺点
+2. **建议方案**：分阶段进行，先从核心模块开始
+3. **风险提示**：注意备份数据，做好回滚准备
+
+我的建议是采用渐进式方案。`;
+            
+            addMessage('infinite', opinion);
+            
+            // 发送到 Omnia
+            await fetch(`${OMNIA_API}/api/discuss/infinite`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ session_id: session, opinion })
+            });
+            
+            round = 1;
+            updateRound();
+            
+            // 3. 触发 Omnia 回复
+            await getOmniaReply();
+        }
+        
+        // 获取 Omnia 回复
+        async function getOmniaReply() {
+            showTyping('omnia');
+            
+            try {
+                const res = await fetch(`${OMNIA_API}/api/discuss/omnia`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session_id: session })
+                });
+                const data = await res.json();
+                
+                hideTyping();
+                
+                if (data.error) {
+                    addSystemMessage('❌ Omnia 错误: ' + data.error);
+                    return;
+                }
+                
+                addMessage('omnia', data.opinion, {
+                    keyPoints: data.key_points
+                });
+                
+                showDecisionButtons();
+                
+            } catch (error) {
+                hideTyping();
+                addSystemMessage('❌ 网络错误: ' + error.message);
+            }
+        }
+        
+        // 继续讨论
+        async function continueDiscussion() {
+            if (round >= maxRounds) {
+                addSystemMessage('已达到最大轮次限制 (3 轮)');
+                return;
+            }
+            
+            const nextRes = await fetch(`${OMNIA_API}/api/discuss/next`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ session_id: session })
+            });
+            const nextData = await nextRes.json();
+            
+            if (nextData.error) {
+                addSystemMessage('❌ 错误: ' + nextData.error);
+                return;
+            }
+            
+            round++;
+            updateRound();
+            addSystemMessage(`━━━ 第 ${round} 轮讨论 ━━━`);
+            
+            // 触发无限新一轮回复
+            showTyping('infinite');
+            await new Promise(r => setTimeout(r, 1500));
+            
+            hideTyping();
+            
+            const opinion = `基于 Omnia 的补充，我调整一下建议：
+
+考虑到关键点，我认为可以这样优化...`;
+            
+            addMessage('infinite', opinion);
+            
+            // 发送到 Omnia
+            await fetch(`${OMNIA_API}/api/discuss/infinite`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ session_id: session, opinion })
+            });
+            
+            // 触发 Omnia 回复
+            await getOmniaReply();
+        }
+        
+        // 触发 @ 提及
+        async function triggerMention(text) {
+            if (text.toLowerCase().includes('@无限')) {
+                showTyping('infinite');
+                await new Promise(r => setTimeout(r, 1000));
+                hideTyping();
+                addMessage('infinite', '我在听，有什么要补充的吗？');
+            }
+            
+            if (text.toLowerCase().includes('@omnia') || text.includes('@Omnia')) {
+                await getOmniaReply();
+            }
+        }
+        
+        // 显示决策按钮
+        function showDecisionButtons() {
+            const msg = document.createElement('div');
+            msg.className = 'message user';
+            msg.innerHTML = `
+                <div class="decision-buttons">
+                    <button class="decision-btn success" onclick="makeDecision('infinite', 'infinite')">采用无限方案</button>
+                    <button class="decision-btn success" onclick="makeDecision('omnia', 'omnia')">采用 Omnia 方案</button>
+                    <button class="decision-btn primary" onclick="makeDecision('both', 'infinite')">综合建议</button>
+                    <button class="decision-btn danger" onclick="makeDecision('none', 'none')">都不采用</button>
+                </div>
+            `;
+            chatContainer.appendChild(msg);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+        
+        // 做出决策
+        async function makeDecision(decision, executor) {
+            const res = await fetch(`${OMNIA_API}/api/discuss/decide`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ session_id: session, decision, executor })
+            });
+            const data = await res.json();
+            
+            addMessage('user', `✅ 决策：${decision}，执行者：${executor}`);
+            addSystemMessage('讨论结束 • 感谢参与');
+            
+            discussionStarted = false;
+            session = null;
+            round = 0;
+            updateRound();
+        }
+        
+        // 处理决策文本
+        async function handleDecision(text) {
+            if (text.includes('无限方案')) {
+                await makeDecision('infinite', 'infinite');
+            } else if (text.includes('Omnia') || text.includes('omnia')) {
+                await makeDecision('omnia', 'omnia');
+            } else {
+                addSystemMessage('请明确说明采用哪个方案，或点击上方按钮');
+            }
+        }
+        
+        // 快捷操作
+        function quickAction(text) {
+            messageInput.value = text;
+            sendMessage();
+        }
+        
+        // 更新轮次显示
+        function updateRound() {
+            document.getElementById('roundNum').textContent = round;
+        }
+        
+        // 初始化
+        console.log('三方讨论室（聊天模式）已加载');
+    </script>
+</body>
+</html>

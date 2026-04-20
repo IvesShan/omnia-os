@@ -1,0 +1,46 @@
+[
+  {
+    "url": "https://platform.deepseek.com/api/v0/client/settings?did=8bc90985-3220-4fe0-bdf1-e5d22c544366",
+    "method": "GET",
+    "headers": {
+      "sec-ch-ua-platform": "\"Windows\"",
+      "referer": "https://platform.deepseek.com/sign_in",
+      "accept-language": "zh-CN",
+      "sec-ch-ua": "\"Not:A-Brand\";v=\"99\", \"HeadlessChrome\";v=\"145\", \"Chromium\";v=\"145\"",
+      "sec-ch-ua-mobile": "?0",
+      "x-app-version": "20240425.0",
+      "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      "accept": "*/*"
+    },
+    "postData": null
+  },
+  {
+    "url": "https://platform.deepseek.com/api/v0/client/settings?scope=banner",
+    "method": "GET",
+    "headers": {
+      "sec-ch-ua-platform": "\"Windows\"",
+      "referer": "https://platform.deepseek.com/sign_in",
+      "accept-language": "zh-CN",
+      "sec-ch-ua": "\"Not:A-Brand\";v=\"99\", \"HeadlessChrome\";v=\"145\", \"Chromium\";v=\"145\"",
+      "sec-ch-ua-mobile": "?0",
+      "x-app-version": "20240425.0",
+      "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      "accept": "*/*"
+    },
+    "postData": null
+  },
+  {
+    "url": "https://open.weixin.qq.com/connect/qrconnect?appid=wx335255e1b73f9e52&scope=snsapi_login&redirect_uri=https%3A%2F%2Fplatform.deepseek.com%2Fauth-api%2Fv0%2Fusers%2Foauth%2Fwechat%2Fcallback&state=&login_type=jssdk&self_redirect=false&styletype=&sizetype=&bgcolor=&rst=&ts=1772621646575&stylelite=1&fast_login=0",
+    "method": "GET",
+    "headers": {
+      "accept-language": "zh-CN",
+      "referer": "https://platform.deepseek.com/",
+      "upgrade-insecure-requests": "1",
+      "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      "sec-ch-ua": "\"Not:A-Brand\";v=\"99\", \"HeadlessChrome\";v=\"145\", \"Chromium\";v=\"145\"",
+      "sec-ch-ua-mobile": "?0",
+      "sec-ch-ua-platform": "\"Windows\""
+    },
+    "postData": null
+  }
+]

@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Omnia · 设置</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      background: #0a0a0f;
+      color: #e0e0e0;
+      min-height: 100vh;
+      padding: 40px;
+    }
+    .container { max-width: 800px; margin: 0 auto; }
+    h1 { font-size: 28px; font-weight: 600; margin-bottom: 32px; background: linear-gradient(135deg, #22d3ee, #a855f7); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .section { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 24px; margin-bottom: 24px; }
+    .section-title { font-size: 16px; font-weight: 600; margin-bottom: 20px; color: #22d3ee; text-transform: uppercase; letter-spacing: 1px; }
+    .form-group { margin-bottom: 20px; }
+    .form-label { display: block; font-size: 13px; color: #888; margin-bottom: 8px; }
+    .form-input { width: 100%; padding: 12px 16px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #fff; font-family: 'JetBrains Mono', monospace; font-size: 14px; }
+    .form-input:focus { outline: none; border-color: #22d3ee; }
+    .form-select { width: 100%; padding: 12px 16px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #fff; font-size: 14px; }
+    .btn { padding: 12px 24px; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.2s; border: none; }
+    .btn-primary { background: linear-gradient(135deg, #22d3ee, #a855f7); color: #000; }
+    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(34,211,238,0.3); }
+    .btn-secondary { background: rgba(255,255,255,0.1); color: #fff; }
+    .btn-secondary:hover { background: rgba(255,255,255,0.15); }
+    .status-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    .status-dot { width: 10px; height: 10px; border-radius: 50%; }
+    .status-dot.online { background: #22c55e; box-shadow: 0 0 10px #22c55e; }
+    .status-dot.offline { background: #ef4444; }
+    .status-label { flex: 1; font-size: 14px; }
+    .status-value { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #888; }
+    .log-viewer { background: #000; border-radius: 8px; padding: 16px; height: 300px; overflow-y: auto; font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 1.6; }
+    .log-line { color: #888; }
+    .log-line.error { color: #ef4444; }
+    .log-line.info { color: #22d3ee; }
+    .log-line.warn { color: #f59e0b; }
+    .btn-group { display: flex; gap: 12px; margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>⚙️ Omnia 设置</h1>
+    
+    <div class="section">
+      <div class="section-title">服务状态</div>
+      <div class="status-row">
+        <div class="status-dot" id="backend-status"></div>
+        <span class="status-label">后端服务</span>
+        <span class="status-value" id="backend-pid">—</span>
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-primary" id="btn-start">启动后端</button>
+        <button class="btn btn-secondary" id="btn-stop">停止后端</button>
+        <button class="btn btn-secondary" id="btn-restart">重启后端</button>
+      </div>
+    </div>
+    
+    <div class="section">
+      <div class="section-title">API 配置</div>
+      <div class="form-group">
+        <label class="form-label">API 提供商</label>
+        <select class="form-select" id="api-provider">
+          <option value="kimi">Kimi (Moonshot)</option>
+          <option value="baidu">百度千帆</option>
+          <option value="openai">OpenAI</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">API Key</label>
+        <input type="password" class="form-input" id="api-key" placeholder="sk-...">
+      </div>
+      <div class="form-group">
+        <label class="form-label">模型</label>
+        <select class="form-select" id="model-name">
+          <option value="moonshot-v1-8k">Moonshot V1 8K</option>
+          <option value="moonshot-v1-32k">Moonshot V1 32K</option>
+          <option value="moonshot-v1-128k">Moonshot V1 128K</option>
+        </select>
+      </div>
+    </div>
+    
+    <div class="section">
+      <div class="section-title">后端配置</div>
+      <div class="form-group">
+        <label class="form-label">端口</label>
+        <input type="number" class="form-input" id="backend-port" value="5001">
+      </div>
+      <div class="form-group">
+        <label class="form-label">日志级别</label>
+        <select class="form-select" id="log-level">
+          <option value="debug">Debug</option>
+          <option value="info" selected>Info</option>
+          <option value="warn">Warn</option>
+          <option value="error">Error</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+          <input type="checkbox" id="auto-start" checked>
+          <span>启动时自动运行后端</span>
+        </label>
+      </div>
+    </div>
+    
+    <div class="section">
+      <div class="section-title">日志查看</div>
+      <div class="log-viewer" id="log-viewer">
+        <div class="log-line">等待日志...</div>
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-secondary" id="btn-refresh-logs">刷新日志</button>
+        <button class="btn btn-secondary" id="btn-clear-logs">清空日志</button>
+      </div>
+    </div>
+    
+    <div class="btn-group" style="justify-content: flex-end;">
+      <button class="btn btn-secondary" id="btn-cancel">取消</button>
+      <button class="btn btn-primary" id="btn-save">保存配置</button>
+    </div>
+  </div>
+  
+  <script>
+    const { invoke } = window.__TAURI__;
+    
+    async function loadConfig() {
+      try {
+        const config = await invoke('read_config');
+        document.getElementById('api-provider').value = config.api_provider || 'kimi';
+        document.getElementById('api-key').value = config.api_key || '';
+        document.getElementById('model-name').value = config.model_name || 'moonshot-v1-8k';
+        document.getElementById('backend-port').value = config.backend_port || 5001;
+        document.getElementById('log-level').value = config.log_level || 'info';
+        document.getElementById('auto-start').checked = config.auto_start_backend !== false;
+      } catch (e) {
+        console.error('Failed to load config:', e);
+      }
+    }
+    
+    async function saveConfig() {
+      const config = {
+        api_provider: document.getElementById('api-provider').value,
+        api_key: document.getElementById('api-key').value,
+        model_name: document.getElementById('model-name').value,
+        backend_port: parseInt(document.getElementById('backend-port').value),
+        log_level: document.getElementById('log-level').value,
+        auto_start_backend: document.getElementById('auto-start').checked
+      };
+      
+      try {
+        await invoke('save_config', { config });
+        alert('配置已保存');
+      } catch (e) {
+        alert('保存失败: ' + e);
+      }
+    }
+    
+    async function checkBackendStatus() {
+      try {
+        const status = await invoke('get_backend_status');
+        const dot = document.getElementById('backend-status');
+        const pid = document.getElementById('backend-pid');
+        
+        if (status.running) {
+          dot.className = 'status-dot online';
+          pid.textContent = 'PID: ' + status.pid;
+        } else {
+          dot.className = 'status-dot offline';
+          pid.textContent = '未运行';
+        }
+      } catch (e) {
+        console.error('Failed to check status:', e);
+      }
+    }
+    
+    async function startBackend() {
+      try {
+        await invoke('start_backend');
+        setTimeout(checkBackendStatus, 2000);
+      } catch (e) {
+        alert('启动失败: ' + e);
+      }
+    }
+    
+    async function stopBackend() {
+      try {
+        await invoke('stop_backend');
+        setTimeout(checkBackendStatus, 500);
+      } catch (e) {
+        alert('停止失败: ' + e);
+      }
+    }
+    
+    async function loadLogs() {
+      try {
+        const logs = await invoke('read_logs', { lines: 100 });
+        const viewer = document.getElementById('log-viewer');
+        viewer.innerHTML = logs.map(line => {
+          let cls = 'log-line';
+          if (line.includes('ERROR')) cls += ' error';
+          else if (line.includes('WARN')) cls += ' warn';
+          else if (line.includes('INFO')) cls += ' info';
+          return '<div class="' + cls + '">' + line + '</div>';
+        }).join('');
+        viewer.scrollTop = viewer.scrollHeight;
+      } catch (e) {
+        console.error('Failed to load logs:', e);
+      }
+    }
+    
+    document.getElementById('btn-save').addEventListener('click', saveConfig);
+    document.getElementById('btn-start').addEventListener('click', startBackend);
+    document.getElementById('btn-stop').addEventListener('click', stopBackend);
+    document.getElementById('btn-restart').addEventListener('click', async () => {
+      await stopBackend();
+      await startBackend();
+    });
+    document.getElementById('btn-refresh-logs').addEventListener('click', loadLogs);
+    
+    loadConfig();
+    checkBackendStatus();
+    loadLogs();
+    setInterval(checkBackendStatus, 5000);
+  </script>
+</body>
+</html>

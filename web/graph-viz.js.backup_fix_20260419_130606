@@ -1,0 +1,209 @@
+// 神经图谱可视化 - 简化可靠版本
+const GraphViz = {
+  graph: null,
+  
+  init() {
+    console.log('[GraphViz] 初始化');
+    this.loadStats();
+    
+    // 默认自动加载图谱
+    this.loadGraph();
+  },
+  
+  async loadStats() {
+    try {
+      console.log('[GraphViz] loadStats 开始执行...');
+      
+      const res = await fetch('/api/graph/stats');
+      const stats = await res.json();
+      
+      console.log('[GraphViz] 统计数据:', stats);
+      
+      const nodesEl = document.getElementById('gs-nodes');
+      const edgesEl = document.getElementById('gs-edges');
+      
+      console.log('[GraphViz] nodesEl:', nodesEl, 'edgesEl:', edgesEl);
+      
+      if (nodesEl) {
+        nodesEl.textContent = stats.nodes || 0;
+        console.log('[GraphViz] 设置节点数:', stats.nodes);
+      } else {
+        console.error('[GraphViz] 找不到 gs-nodes 元素!');
+      }
+      
+      if (edgesEl) {
+        edgesEl.textContent = stats.edges || 0;
+        console.log('[GraphViz] 设置关系数:', stats.edges);
+      } else {
+        console.error('[GraphViz] 找不到 gs-edges 元素!');
+      }
+      
+      // 更新图例统计
+      this.updateLegend(stats.by_type || {});
+      
+    } catch (err) {
+      console.error('[GraphViz] 加载统计失败:', err);
+    }
+  },
+  
+  updateLegend(byType) {
+    // 更新图例中的数量显示
+    const legendItems = {
+      'PERSON': byType.PERSON || 0,
+      'PROJECT': byType.PROJECT || 0,
+      'FILE': byType.FILE || 0,
+      'CONCEPT': byType.CONCEPT || 0,
+      'DATE': byType.DATE || 0
+    };
+    
+    console.log('[GraphViz] 图例统计:', legendItems);
+  },
+  
+  async loadGraph() {
+    const canvas = document.getElementById('graph-canvas');
+    if (!canvas) return;
+    
+    // 显示加载状态
+    canvas.innerHTML = '<div class="graph-loading"><div class="loading-spinner"></div>正在唤醒记忆...</div>';
+    
+    try {
+      // 加载 force-graph
+      if (typeof ForceGraph === 'undefined') {
+        await this.loadScript('https://unpkg.com/force-graph@1.43.4/dist/force-graph.min.js');
+      }
+      
+      // 获取数据
+      const res = await fetch('/api/graph?limit=150');
+      const data = await res.json();
+      
+      console.log('[GraphViz] 获取到节点:', data.nodes?.length, '边:', data.edges?.length);
+      
+      // 转换数据格式
+      const graphData = {
+        nodes: (data.nodes || []).map(n => ({
+          id: n.id,
+          name: n.name || n.label,
+          type: n.type,
+          access_count: n.access_count || 0
+        })),
+        links: (data.edges || []).map(e => ({
+          source: e.source,
+          target: e.target,
+          weight: e.weight || 0.5
+        }))
+      };
+      
+      // 清空容器
+      canvas.innerHTML = '';
+      
+      // 创建图谱
+      this.graph = ForceGraph()(canvas)
+        .graphData(graphData)
+        .nodeId('id')
+        .nodeLabel(node => `${node.name}\n类型: ${node.type}\n访问: ${node.access_count}`)
+        .nodeVal(node => Math.sqrt(node.access_count + 1) * 2)
+        .nodeColor(node => this.getNodeColor(node.type))
+        .nodeCanvasObject((node, ctx, globalScale) => {
+          // 自定义节点渲染 - 带发光效果
+          const size = Math.sqrt(node.access_count + 1) * 3;
+          const color = this.getNodeColor(node.type);
+          
+          // 外发光
+          ctx.beginPath();
+          ctx.arc(node.x, node.y, size * 1.5, 0, 2 * Math.PI);
+          ctx.fillStyle = color + '33'; // 20% 透明度
+          ctx.fill();
+          
+          // 主体
+          ctx.beginPath();
+          ctx.arc(node.x, node.y, size, 0, 2 * Math.PI);
+          ctx.fillStyle = color;
+          ctx.fill();
+          
+          // 高亮边框
+          ctx.beginPath();
+          ctx.arc(node.x, node.y, size, 0, 2 * Math.PI);
+          ctx.strokeStyle = color;
+          ctx.lineWidth = 1;
+          ctx.stroke();
+        })
+        .linkColor(() => 'rgba(34, 211, 238, 0.25)')
+        .linkWidth(link => (link.weight || 0.5) * 1.5)
+        .linkDirectionalParticles(2)
+        .linkDirectionalParticleSpeed(0.005)
+        .backgroundColor('transparent')
+        .width(canvas.offsetWidth || 280)
+        .height(280)
+        .cooldownTicks(100)
+        .d3AlphaDecay(0.02)
+        .d3VelocityDecay(0.3);
+      
+      console.log('[GraphViz] 图谱加载完成');
+      
+    } catch (err) {
+      console.error('[GraphViz] 加载失败:', err);
+      canvas.innerHTML = `<div style="color: #ff453a; padding: 20px; text-align: center;">加载失败: ${err.message}</div>`;
+    }
+  },
+  
+  getNodeColor(type) {
+    // 与图例完全一致的配色方案
+    const colors = {
+      'PROJECT': '#a855f7',  // 紫色 - 项目
+      'PERSON': '#22d3ee',   // 青色 - 人物
+      'FILE': '#30d158',     // 绿色 - 文件
+      'CONCEPT': '#ff9f0a',  // 橙色 - 概念
+      'DATE': '#0a84ff',     // 蓝色 - 日期
+      'LOCATION': '#ff453a', // 红色 - 地点
+      'UNKNOWN': '#8e8e93'   // 灰色 - 未知
+    };
+    return colors[type] || colors['UNKNOWN'];
+  },
+  
+  loadScript(src) {
+    return new Promise((resolve, reject) => {
+      if (document.querySelector(`script[src="${src}"]`)) {
+        resolve();
+        return;
+      }
+      const script = document.createElement('script');
+      script.src = src;
+      script.onload = resolve;
+      script.onerror = reject;
+      document.head.appendChild(script);
+    });
+  },
+  
+  highlightNode(query) {
+    if (!query || !this.graph) return;
+    
+    const graphData = this.graph.graphData();
+    const found = graphData.nodes.find(n => 
+      (n.name || '').toLowerCase().includes(query.toLowerCase())
+    );
+    
+    if (found) {
+      this.graph.centerAt(found.x, found.y, 1000);
+      this.graph.zoom(3, 1000);
+    }
+  }
+};
+
+// 初始化 - 兼容 DOMContentLoaded 已触发的情况
+(function() {
+  console.log('[GraphViz] 脚本加载, document.readyState:', document.readyState);
+  
+  if (document.readyState === 'loading') {
+    // DOM 还在加载中，等待 DOMContentLoaded
+    document.addEventListener('DOMContentLoaded', () => {
+      console.log('[GraphViz] DOMContentLoaded 触发，开始初始化');
+      GraphViz.init();
+    });
+  } else {
+    // DOM 已经加载完成，立即初始化
+    console.log('[GraphViz] DOM 已就绪，立即初始化');
+    GraphViz.init();
+  }
+})();
+
+window.GraphViz = GraphViz;

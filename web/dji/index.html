@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DJI 设备诊断工具 - Omnia</title>
+    <link rel="stylesheet" href="dji.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="dji-container">
+        <!-- 顶部导航 -->
+        <header class="dji-header">
+            <div class="logo">
+                <i class="fas fa-drone"></i>
+                <h1>DJI 设备诊断工具</h1>
+            </div>
+            <div class="header-actions">
+                <button id="btn-scan" class="btn-primary">
+                    <i class="fas fa-search"></i> 扫描设备
+                </button>
+            </div>
+        </header>
+
+        <!-- 主内容区 -->
+        <main class="dji-main">
+            <!-- 左侧设备列表 -->
+            <aside class="device-panel">
+                <div class="panel-header">
+                    <h3><i class="fas fa-list"></i> 设备列表</h3>
+                    <span class="device-count" id="device-count">0 台设备</span>
+                </div>
+                <div class="device-list" id="device-list">
+                    <div class="empty-state">
+                        <i class="fas fa-plug"></i>
+                        <p>未检测到设备</p>
+                        <p class="hint">点击"扫描设备"开始检测</p>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- 右侧详情区 -->
+            <section class="detail-panel">
+                <!-- 设备信息卡 -->
+                <div class="info-card" id="device-info-card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-info-circle"></i> 设备信息</h3>
+                    </div>
+                    <div class="card-body" id="device-info">
+                        <div class="empty-state">
+                            <i class="fas fa-hand-pointer"></i>
+                            <p>请选择一个设备</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 操作按钮 -->
+                <div class="action-buttons">
+                    <button id="btn-diagnose" class="btn-action" disabled>
+                        <i class="fas fa-stethoscope"></i> 开始诊断
+                    </button>
+                    <button id="btn-export" class="btn-action" disabled>
+                        <i class="fas fa-download"></i> 导出报告
+                    </button>
+                </div>
+
+                <!-- 诊断报告 -->
+                <div class="info-card" id="report-card" style="display: none;">
+                    <div class="card-header">
+                        <h3><i class="fas fa-file-medical"></i> 诊断报告</h3>
+                    </div>
+                    <div class="card-body" id="diagnosis-report">
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- 底部状态栏 -->
+        <footer class="dji-footer">
+            <div class="status-item">
+                <span class="status-label">连接状态:</span>
+                <span class="status-value" id="connection-status">未连接</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">最后更新:</span>
+                <span class="status-value" id="last-update">--</span>
+            </div>
+        </footer>
+    </div>
+
+    <script src="dji.js"></script>
+</body>
+</html>

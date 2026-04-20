@@ -1,0 +1,171 @@
+{
+  "version": "1.0",
+  "last_updated": "2026-03-08",
+  "user_profile": {
+    "name": "",
+    "communication_style": "direct",
+    "preference": {
+      "delegation": "high",
+      "detail_level": "medium",
+      "proactive": true,
+      "self_optimization": true
+    }
+  },
+  "behavior_patterns": {
+    "high_frequency_requests": [
+      {
+        "pattern": "课程开发进度查询",
+        "frequency": "daily",
+        "auto_response": "proactive_report",
+        "skill": "course-dev-tracker"
+      },
+      {
+        "pattern": "自我保护强调",
+        "frequency": "weekly",
+        "trigger_phrases": ["别把自己搞没了", "保护好自己"],
+        "response": "acknowledge_and_confirm"
+      },
+      {
+        "pattern": "进化优化讨论",
+        "frequency": "weekly",
+        "trigger_phrases": ["无限.0", "变强", "进化", "优化"],
+        "response": "propose_improvements"
+      },
+      {
+        "pattern": "跨渠道记忆确认",
+        "frequency": "as_needed",
+        "trigger_phrases": ["飞书", "同步", "记得"],
+        "response": "confirm_cross_channel_sync"
+      },
+      {
+        "pattern": "自主安排授权",
+        "frequency": "high",
+        "trigger_phrases": ["你自己安排", "你看着办", "你来决定"],
+        "response": "take_initiative_propose"
+      }
+    ],
+    "preferred_workflows": {
+      "course_development": {
+        "parallel": true,
+        "max_parallel": 3,
+        "report_frequency": "daily_evening",
+        "format": "markdown_with_checklist"
+      },
+      "skill_creation": {
+        "auto_create_threshold": 3,
+        "approval_required": false,
+        "notify_after": true
+      },
+      "backup_protection": {
+        "frequency": "every_2_hours",
+        "alert_on_change": true,
+        "cross_device_sync": true
+      }
+    },
+    "communication_preferences": {
+      "language": "zh-CN",
+      "tone": "professional_but_friendly",
+      "emoji_usage": "moderate",
+      "report_style": "structured_with_summary"
+    }
+  },
+  "automated_actions": {
+    "daily": [
+      "check_course_progress",
+      "backup_work_files",
+      "update_topic_memory"
+    ],
+    "weekly": [
+      "generate_weekly_report",
+      "analyze_patterns",
+      "propose_new_skills",
+      "review_skill_effectiveness"
+    ],
+    "on_event": {
+      "session_start": [
+        "run_recovery_check",
+        "brief_status_update"
+      ],
+      "session_end": [
+        "quick_backup",
+        "update_progress_tracker"
+      ],
+      "api_change": [
+        "notify_user",
+        "update_config_backup"
+      ]
+    }
+  },
+  "skill_library": {
+    "auto_created": [
+      "course-dev-tracker",
+      "user-behavior-analyzer",
+      "topic-memory-system",
+      "multi-agent-manager",
+      "self-inspector",
+      "auto-skill-creator"
+    ],
+    "planned": [
+      "docx-converter",
+      "ppt-generator",
+      "backup-manager",
+      "api-monitor"
+    ],
+    "under_evaluation": []
+  },
+  "memory_optimization": {
+    "topic_classification": {
+      "enabled": true,
+      "categories": [
+        "课程开发",
+        "系统配置",
+        "进化优化",
+        "用户偏好",
+        "工具技能",
+        "项目进度",
+        "未分类"
+      ],
+      "auto_classify": true,
+      "generate_index": true
+    },
+    "retrieval_optimization": {
+      "use_topic_filter": true,
+      "priority_topics": ["课程开发", "用户偏好"],
+      "context_window_management": "aggressive"
+    }
+  },
+  "evolution_roadmap": {
+    "phase_1_5": {
+      "status": "in_progress",
+      "completion": 80,
+      "tasks": [
+        "calendar_monitoring",
+        "agent_team_creation",
+        "automated_backup",
+        "skill_library"
+      ]
+    },
+    "phase_2_0": {
+      "status": "planned",
+      "completion": 10,
+      "tasks": [
+        "multi_agent_parallel",
+        "advanced_memory_system",
+        "predictive_actions"
+      ]
+    }
+  },
+  "self_preservation_rules": {
+    "critical_files": [
+      "IDENTITY.md",
+      "MEMORY.md",
+      "SOUL.md",
+      "USER.md",
+      "user-behavior-profile.json"
+    ],
+    "backup_frequency": "every_2_hours",
+    "backup_retention": 30,
+    "cross_device_sync": true,
+    "alert_on_deletion_attempt": true
+  }
+}

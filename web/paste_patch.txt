@@ -1,0 +1,31 @@
+
+// --- 剪贴板粘贴图片 ---
+composer.addEventListener('paste', (e) => {
+  const items = e.clipboardData?.items;
+  if (!items) return;
+  
+  for (const item of items) {
+    if (item.type.startsWith('image/')) {
+      e.preventDefault();
+      const file = item.getAsFile();
+      if (!file) continue;
+      
+      // 验证文件大小（最大 5MB）
+      if (file.size > 5 * 1024 * 1024) {
+        alert('图片大小不能超过 5MB');
+        return;
+      }
+      
+      // 读取图片为 base64
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        selectedImage = event.target.result;
+        previewImg.src = selectedImage;
+        imagePreview.style.display = 'flex';
+      };
+      reader.readAsDataURL(file);
+      break;  // 只处理第一个图片
+    }
+  }
+});
+

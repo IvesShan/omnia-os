@@ -1,0 +1,8 @@
+{
+  "name": "enterprise-query",
+  "version": "1.0.0",
+  "description": "查询企业工商信息、股东结构、变更记录等",
+  "author": "无限",
+  "tools": ["enterprise_search", "enterprise_detail", "enterprise_shareholders"],
+  "entry": "index.js"
+}

@@ -1,0 +1,11 @@
+{
+  "ownerId": "forrestchang",
+  "slug": "andrej-karpathy-skills",
+  "version": "1.0.0",
+  "publishedAt": 1745088000000,
+  "source": "https://github.com/forrestchang/andrej-karpathy-skills",
+  "author": "Forrest Chang (based on Andrej Karpathy's observations)",
+  "tags": ["coding", "best-practices", "llm", "simplicity", "refactoring"],
+  "priority": "high",
+  "autoActivate": true
+}

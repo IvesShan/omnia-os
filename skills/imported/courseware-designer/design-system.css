@@ -1,0 +1,494 @@
+/**
+ * Courseware Design System v1.0
+ * 课件设计系统 - 基于 Apple Keynote + Stripe 风格
+ * 
+ * 使用方法:
+ * 1. 在HTML中引入此CSS文件
+ * 2. 使用CSS变量定义颜色和间距
+ * 3. 复制需要的组件样式
+ */
+
+/* ============================================
+   1. 设计令牌 (Design Tokens)
+   ============================================ */
+
+:root {
+    /* 色彩系统 - 深色主题 */
+    --bg-primary: #000000;
+    --bg-secondary: #1a1a2e;
+    --bg-tertiary: #1c1c1e;
+    --bg-elevated: #2c2c3a;
+    --bg-hover: rgba(255, 255, 255, 0.05);
+    
+    --text-primary: #ffffff;
+    --text-secondary: rgba(255, 255, 255, 0.9);
+    --text-tertiary: rgba(255, 255, 255, 0.7);
+    --text-muted: rgba(255, 255, 255, 0.5);
+    --text-disabled: rgba(255, 255, 255, 0.3);
+    
+    --accent-blue: #0a84ff;
+    --accent-cyan: #00d4ff;
+    --accent-purple: #bf5af2;
+    --accent-green: #30d158;
+    --accent-orange: #ff9f0a;
+    --accent-red: #ff453a;
+    
+    --border-primary: rgba(255, 255, 255, 0.2);
+    --border-secondary: rgba(255, 255, 255, 0.1);
+    
+    /* 字体系统 */
+    --font-primary: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    
+    --text-xs: 13px;
+    --text-sm: 15px;
+    --text-base: 17px;
+    --text-lg: 20px;
+    --text-xl: 24px;
+    --text-2xl: 32px;
+    --text-3xl: 48px;
+    --text-4xl: 56px;
+    --text-5xl: 72px;
+    --text-6xl: 80px;
+    
+    --font-normal: 400;
+    --font-medium: 500;
+    --font-semibold: 600;
+    --font-bold: 700;
+    
+    --leading-tight: 1.2;
+    --leading-snug: 1.4;
+    --leading-normal: 1.6;
+    
+    --tracking-tight: -0.02em;
+    --tracking-normal: 0;
+    --tracking-wide: 0.08em;
+    
+    /* 间距系统 */
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 20px;
+    --space-6: 24px;
+    --space-8: 32px;
+    --space-10: 40px;
+    --space-12: 48px;
+    --space-16: 64px;
+    --space-20: 80px;
+    --space-24: 96px;
+    
+    --page-padding-x: 80px;
+    --page-padding-y: 60px;
+    --content-max-width: 1200px;
+    
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 16px;
+    --radius-xl: 24px;
+    
+    /* 动效 */
+    --duration-fast: 150ms;
+    --duration-normal: 300ms;
+    --duration-slow: 500ms;
+    --ease-default: cubic-bezier(0.4, 0, 0.2, 1);
+    
+    /* 阴影 */
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
+    --shadow-glow-blue: 0 0 20px rgba(10, 132, 255, 0.3);
+}
+
+/* ============================================
+   2. 基础样式
+   ============================================ */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html, body {
+    height: 100%;
+    overflow: hidden;
+}
+
+body {
+    font-family: var(--font-primary);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    line-height: var(--leading-normal);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* ============================================
+   3. 幻灯片容器
+   ============================================ */
+
+.slides-container {
+    height: 100vh;
+    width: 100vw;
+    position: relative;
+    overflow: hidden;
+}
+
+.slide {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    padding: var(--space-20);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity var(--duration-normal) var(--ease-default),
+                visibility var(--duration-normal) var(--ease-default);
+}
+
+.slide.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+.slide-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+/* ============================================
+   4. UI组件
+   ============================================ */
+
+/* 进度条 */
+.progress-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    height: 3px;
+    background: var(--accent-blue);
+    transition: width var(--duration-normal) var(--ease-default);
+    z-index: 1000;
+}
+
+/* 页码 */
+.page-number {
+    position: fixed;
+    bottom: var(--space-6);
+    right: var(--space-8);
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+    z-index: 1000;
+}
+
+/* 导航提示 */
+.nav-hint {
+    position: fixed;
+    bottom: var(--space-6);
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    z-index: 1000;
+    display: flex;
+    gap: var(--space-4);
+    align-items: center;
+}
+
+/* Logo */
+.logo {
+    position: fixed;
+    top: var(--space-8);
+    right: var(--space-8);
+    width: 120px;
+    z-index: 1000;
+}
+
+/* 章节标签 */
+.section-label {
+    font-size: var(--text-xs);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-wide);
+    color: var(--accent-blue);
+    margin-bottom: var(--space-6);
+}
+
+/* 标题层级 */
+.title-xl {
+    font-size: var(--text-6xl);
+    font-weight: 700;
+    letter-spacing: var(--tracking-tight);
+    line-height: var(--leading-tight);
+    margin-bottom: var(--space-8);
+}
+
+.title-lg {
+    font-size: var(--text-4xl);
+    font-weight: 700;
+    letter-spacing: var(--tracking-tight);
+    line-height: 1.2;
+    margin-bottom: var(--space-6);
+}
+
+.title-md {
+    font-size: var(--text-3xl);
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    line-height: 1.2;
+    margin-bottom: var(--space-6);
+}
+
+/* 正文 */
+.body-lg {
+    font-size: var(--text-xl);
+    font-weight: var(--font-normal);
+    line-height: var(--leading-normal);
+    color: var(--text-secondary);
+}
+
+.body-md {
+    font-size: var(--text-lg);
+    font-weight: var(--font-normal);
+    line-height: var(--leading-normal);
+    color: var(--text-tertiary);
+}
+
+/* 强调文字 */
+.highlight {
+    color: var(--accent-blue);
+    font-weight: 600;
+}
+
+.highlight-green {
+    color: var(--accent-green);
+    font-weight: 600;
+}
+
+/* ============================================
+   5. 卡片组件
+   ============================================ */
+
+.card {
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-lg);
+    padding: var(--space-6);
+    border: 1px solid var(--border-secondary);
+    transition: all var(--duration-normal) var(--ease-default);
+}
+
+.card:hover {
+    background: var(--bg-elevated);
+    border-color: var(--border-primary);
+}
+
+.card h3 {
+    font-size: var(--text-xl);
+    font-weight: 600;
+    margin-bottom: var(--space-4);
+    color: var(--text-primary);
+}
+
+.card p {
+    font-size: var(--text-base);
+    color: var(--text-tertiary);
+    line-height: 1.5;
+}
+
+/* 卡片网格 */
+.card-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-6);
+    margin-top: var(--space-8);
+}
+
+.card-grid.cols-3 {
+    grid-template-columns: repeat(3, 1fr);
+}
+
+.card-grid.cols-4 {
+    grid-template-columns: repeat(4, 1fr);
+}
+
+/* ============================================
+   6. 表格组件
+   ============================================ */
+
+.price-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: var(--space-8);
+}
+
+.price-table th,
+.price-table td {
+    padding: var(--space-4) var(--space-6);
+    text-align: left;
+    border-bottom: 1px solid var(--border-secondary);
+}
+
+.price-table th {
+    font-size: var(--text-sm);
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.price-table td {
+    font-size: var(--text-base);
+    color: var(--text-secondary);
+}
+
+.price-table .highlight {
+    color: var(--accent-green);
+    font-weight: 600;
+}
+
+/* ============================================
+   7. 引用框
+   ============================================ */
+
+.quote-box {
+    background: var(--bg-secondary);
+    border-left: 4px solid var(--accent-blue);
+    padding: var(--space-6) var(--space-8);
+    margin: var(--space-8) 0;
+    font-size: var(--text-lg);
+    color: var(--text-secondary);
+    font-style: italic;
+    border-radius: 0 var(--radius-md) var(--radius-md) 0;
+}
+
+.quote-box.accent-green {
+    border-left-color: var(--accent-green);
+}
+
+.quote-box.accent-purple {
+    border-left-color: var(--accent-purple);
+}
+
+.quote-box.accent-orange {
+    border-left-color: var(--accent-orange);
+}
+
+/* ============================================
+   8. 列表组件
+   ============================================ */
+
+.feature-list {
+    list-style: none;
+    margin-top: var(--space-6);
+}
+
+.feature-list li {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-4);
+    margin-bottom: var(--space-4);
+    font-size: var(--text-base);
+    color: var(--text-secondary);
+}
+
+.feature-list .icon {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--accent-blue);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    flex-shrink: 0;
+    margin-top: 2px;
+    color: white;
+    font-weight: 600;
+}
+
+/* ============================================
+   9. 响应式适配
+   ============================================ */
+
+@media (max-width: 1024px) {
+    :root {
+        --page-padding-x: 40px;
+        --page-padding-y: 40px;
+    }
+    
+    .slide {
+        padding: var(--space-12);
+    }
+    
+    .title-xl {
+        font-size: var(--text-5xl);
+    }
+    
+    .title-lg {
+        font-size: var(--text-3xl);
+    }
+    
+    .card-grid,
+    .card-grid.cols-3,
+    .card-grid.cols-4 {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 768px) {
+    :root {
+        --page-padding-x: 20px;
+        --page-padding-y: 24px;
+    }
+    
+    .slide {
+        padding: var(--space-6);
+    }
+    
+    .title-xl {
+        font-size: var(--text-4xl);
+    }
+    
+    .title-lg {
+        font-size: 36px;
+    }
+    
+    .logo {
+        width: 80px;
+    }
+}
+
+/* ============================================
+   10. 工具类
+   ============================================ */
+
+.text-center { text-align: center; }
+.text-left { text-align: left; }
+.text-right { text-align: right; }
+
+.mt-4 { margin-top: var(--space-4); }
+.mt-6 { margin-top: var(--space-6); }
+.mt-8 { margin-top: var(--space-8); }
+
+.mb-4 { margin-bottom: var(--space-4); }
+.mb-6 { margin-bottom: var(--space-6); }
+.mb-8 { margin-bottom: var(--space-8); }
+
+.flex { display: flex; }
+.flex-col { flex-direction: column; }
+.items-center { align-items: center; }
+.justify-center { justify-content: center; }
+.gap-4 { gap: var(--space-4); }
+.gap-6 { gap: var(--space-6); }
+
+/* 颜色变体 */
+.text-blue { color: var(--accent-blue); }
+.text-green { color: var(--accent-green); }
+.text-purple { color: var(--accent-purple); }
+.text-orange { color: var(--accent-orange); }
+.text-red { color: var(--accent-red); }
+.text-muted { color: var(--text-muted); }

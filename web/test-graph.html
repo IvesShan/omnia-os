@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>神经图谱诊断</title>
+  <style>
+    body {
+      background: #0a0a1a;
+      color: #22d3ee;
+      font-family: 'JetBrains Mono', monospace;
+      padding: 20px;
+    }
+    .section {
+      margin: 20px 0;
+      padding: 15px;
+      border: 1px solid rgba(34, 211, 238, 0.3);
+      border-radius: 8px;
+    }
+    h2 { color: #a855f7; }
+    pre {
+      background: rgba(0,0,0,0.5);
+      padding: 10px;
+      overflow-x: auto;
+      white-space: pre-wrap;
+    }
+    .ok { color: #30d158; }
+    .err { color: #ff453a; }
+    #graph-test {
+      width: 100%;
+      height: 400px;
+      background: #000;
+      border: 1px solid #22d3ee;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+<body>
+  <h1>🔮 神经图谱诊断</h1>
+  
+  <div class="section">
+    <h2>1. API 连接测试</h2>
+    <div id="api-test">测试中...</div>
+  </div>
+  
+  <div class="section">
+    <h2>2. 数据检查</h2>
+    <pre id="data-check">加载中...</pre>
+  </div>
+  
+  <div class="section">
+    <h2>3. ForceGraph 加载</h2>
+    <div id="fg-check">检查中...</div>
+  </div>
+  
+  <div class="section">
+    <h2>4. 图谱渲染测试</h2>
+    <div id="graph-test"></div>
+  </div>
+
+  <script>
+    // 1. API 测试
+    async function testAPI() {
+      const el = document.getElementById('api-test');
+      try {
+        const res = await fetch('/api/graph/stats');
+        const data = await res.json();
+        el.innerHTML = `<span class="ok">✓ API 正常</span><br>
+          <pre>${JSON.stringify(data, null, 2)}</pre>`;
+        return data;
+      } catch (e) {
+        el.innerHTML = `<span class="err">✗ API 错误: ${e.message}</span>`;
+        return null;
+      }
+    }
+    
+    // 2. 数据检查
+    async function checkData() {
+      const el = document.getElementById('data-check');
+      try {
+        const res = await fetch('/api/graph?limit=10');
+        const data = await res.json();
+        el.textContent = `节点: ${data.nodes?.length || 0}\n边: ${data.edges?.length || 0}\n\n` +
+          `示例节点:\n${JSON.stringify(data.nodes?.slice(0, 3), null, 2)}\n\n` +
+          `示例边:\n${JSON.stringify(data.edges?.slice(0, 3), null, 2)}`;
+        return data;
+      } catch (e) {
+        el.textContent = `错误: ${e.message}`;
+        return null;
+      }
+    }
+    
+    // 3. ForceGraph 检查
+    async function checkForceGraph() {
+      const el = document.getElementById('fg-check');
+      
+      if (typeof ForceGraph !== 'undefined') {
+        el.innerHTML = '<span class="ok">✓ ForceGraph 已加载</span>';
+        return true;
+      }
+      
+      try {
+        const script = document.createElement('script');
+        script.src = 'https://unpkg.com/force-graph@1.43.4/dist/force-graph.min.js';
+        document.head.appendChild(script);
+        
+        await new Promise((resolve, reject) => {
+          script.onload = resolve;
+          script.onerror = reject;
+        });
+        
+        el.innerHTML = '<span class="ok">✓ ForceGraph 加载成功</span>';
+        return true;
+      } catch (e) {
+        el.innerHTML = `<span class="err">✗ ForceGraph 加载失败: ${e.message}</span>`;
+        return false;
+      }
+    }
+    
+    // 4. 渲染测试
+    async function testRender(data) {
+      const canvas = document.getElementById('graph-test');
+      
+      if (!data || !data.nodes || data.nodes.length === 0) {
+        canvas.innerHTML = '<div style="padding:20px;color:#ff453a">无数据</div>';
+        return;
+      }
+      
+      if (typeof ForceGraph === 'undefined') {
+        canvas.innerHTML = '<div style="padding:20px;color:#ff453a">ForceGraph 未加载</div>';
+        return;
+      }
+      
+      try {
+        const graphData = {
+          nodes: data.nodes.map(n => ({
+            id: n.id,
+            name: n.name || n.label,
+            type: n.type
+          })),
+          links: data.edges.map(e => ({
+            source: e.source,
+            target: e.target
+          }))
+        };
+        
+        const colors = {
+          'PROJECT': '#a855f7',
+          'PERSON': '#22d3ee',
+          'FILE': '#30d158',
+          'CONCEPT': '#ff9f0a',
+          'DATE': '#0a84ff',
+          'ENTITY': '#8e8e93'
+        };
+        
+        ForceGraph()(canvas)
+          .graphData(graphData)
+          .nodeId('id')
+          .nodeLabel('name')
+          .nodeColor(n => colors[n.type] || '#8e8e93')
+          .linkColor(() => 'rgba(34,211,238,0.3)')
+          .cooldownTicks(100);
+          
+        canvas.insertAdjacentHTML('afterbegin', 
+          '<div style="position:absolute;top:10px;left:10px;color:#30d158">✓ 渲染成功</div>');
+      } catch (e) {
+        canvas.innerHTML = `<div style="padding:20px;color:#ff453a">渲染错误: ${e.message}</div>`;
+      }
+    }
+    
+    // 运行诊断
+    (async () => {
+      const stats = await testAPI();
+      const data = await checkData();
+      await checkForceGraph();
+      await testRender(data);
+    })();
+  </script>
+</body>
+</html>

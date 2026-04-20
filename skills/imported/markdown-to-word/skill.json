@@ -1,0 +1,8 @@
+{
+  "name": "markdown-to-word",
+  "version": "1.0.0",
+  "description": "将 Markdown 文件转换为 Word 文档 (.docx)",
+  "author": "无限",
+  "tools": ["md_to_docx", "install_deps"],
+  "entry": "convert.js"
+}

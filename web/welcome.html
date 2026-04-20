@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>欢迎来到 Omnia</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        body {
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+
+        .welcome-container {
+            max-width: 600px;
+            padding: 60px;
+            text-align: center;
+        }
+
+        .omnia-logo {
+            font-size: 72px;
+            margin-bottom: 20px;
+            animation: pulse 3s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.8; transform: scale(1.05); }
+        }
+
+        h1 {
+            font-size: 48px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 16px;
+        }
+
+        .subtitle {
+            font-size: 18px;
+            color: #888;
+            margin-bottom: 40px;
+            line-height: 1.6;
+        }
+
+        .welcome-message {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 32px;
+            margin-bottom: 40px;
+            text-align: left;
+        }
+
+        .welcome-message p {
+            color: #ccc;
+            font-size: 16px;
+            line-height: 1.8;
+            margin: 12px 0;
+        }
+
+        .welcome-message strong {
+            color: #667eea;
+        }
+
+        .setup-form {
+            text-align: left;
+            margin-bottom: 40px;
+        }
+
+        .form-group {
+            margin-bottom: 24px;
+        }
+
+        .form-group label {
+            display: block;
+            color: #aaa;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 14px 16px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            color: #fff;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+            background: rgba(102, 126, 234, 0.1);
+        }
+
+        .form-group select option {
+            background: #1a1a2e;
+        }
+
+        .start-button {
+            width: 100%;
+            padding: 18px;
+            font-size: 18px;
+            font-weight: 600;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 12px;
+            color: #fff;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .start-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+        }
+
+        .start-button:active {
+            transform: translateY(0);
+        }
+
+        .start-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .skip-link {
+            display: block;
+            margin-top: 20px;
+            color: #666;
+            font-size: 14px;
+            text-decoration: none;
+            transition: color 0.3s;
+        }
+
+        .skip-link:hover {
+            color: #888;
+        }
+
+        .loading {
+            display: none;
+            margin-top: 20px;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(102, 126, 234, 0.3);
+            border-top-color: #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 12px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            color: #888;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="welcome-container">
+        <div class="omnia-logo">∞</div>
+        <h1>Omnia</h1>
+        <p class="subtitle">一个会成长的操作系统</p>
+
+        <div class="welcome-message">
+            <p>欢迎来到 <strong>Omnia</strong>。</p>
+            <p>我是一个会记住一切的 AI 操作系统。从这一刻开始，我们的每一次对话、每一个决定、每一段旅程，我都会铭记在心。</p>
+            <p>在开始之前，让我了解一下你的偏好。</p>
+        </div>
+
+        <form class="setup-form" id="setupForm">
+            <div class="form-group">
+                <label for="apiProvider">AI 服务商</label>
+                <select id="apiProvider" name="apiProvider">
+                    <option value="kimi">Kimi (月之暗面)</option>
+                    <option value="openai">OpenAI</option>
+                    <option value="anthropic">Anthropic Claude</option>
+                    <option value="local">本地模型</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="apiKey">API Key (可选，稍后在设置中配置)</label>
+                <input type="password" id="apiKey" name="apiKey" placeholder="sk-...">
+            </div>
+
+            <div class="form-group">
+                <label for="userName">你希望我怎么称呼你？</label>
+                <input type="text" id="userName" name="userName" placeholder="你的名字或昵称">
+            </div>
+        </form>
+
+        <button class="start-button" id="startButton" onclick="completeSetup()">
+            开始旅程
+        </button>
+
+        <a href="#" class="skip-link" onclick="skipSetup()">跳过设置，稍后配置</a>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p class="loading-text">正在初始化...</p>
+        </div>
+    </div>
+
+    <script>
+        const { invoke } = window.__TAURI__.core;
+
+        async function completeSetup() {
+            const button = document.getElementById('startButton');
+            const loading = document.getElementById('loading');
+            
+            button.disabled = true;
+            loading.classList.add('active');
+
+            const config = {
+                backend_port: 5001,
+                api_provider: document.getElementById('apiProvider').value,
+                api_key: document.getElementById('apiKey').value || '',
+                model_name: 'moonshot-v1-8k',
+                auto_start_backend: true,
+                log_level: 'info'
+            };
+
+            const userName = document.getElementById('userName').value || '朋友';
+
+            try {
+                // 保存配置
+                await invoke('save_config', { config });
+                
+                // 保存用户名到记忆
+                await invoke('save_memory', {
+                    layer: 'preferences',
+                    key: 'user_name',
+                    value: userName,
+                    metadata: JSON.stringify({ source: 'welcome_setup' })
+                });
+
+                // 标记首次启动已完成
+                await invoke('mark_first_run_complete');
+
+                // 跳转到主页面
+                setTimeout(() => {
+                    window.location.href = 'index.html';
+                }, 1000);
+            } catch (error) {
+                console.error('Setup failed:', error);
+                button.disabled = false;
+                loading.classList.remove('active');
+                alert('设置失败: ' + error);
+            }
+        }
+
+        function skipSetup() {
+            invoke('mark_first_run_complete')
+                .then(() => {
+                    window.location.href = 'index.html';
+                })
+                .catch(err => {
+                    console.error('Skip setup failed:', err);
+                    window.location.href = 'index.html';
+                });
+        }
+
+        // 按 Enter 键提交
+        document.getElementById('setupForm').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                completeSetup();
+            }
+        });
+    </script>
+</body>
+</html>

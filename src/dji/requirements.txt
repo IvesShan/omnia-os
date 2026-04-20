@@ -1,0 +1,17 @@
+# DJI 通信模块依赖
+
+# USB通信
+pyusb>=1.2.1
+
+# 串口通信
+pyserial>=3.5
+
+# 日志和调试
+colorlog>=6.7.0
+
+# 数据处理
+dataclasses>=0.6; python_version < "3.7"
+
+# 测试
+pytest>=7.0.0
+pytest-asyncio>=0.21.0

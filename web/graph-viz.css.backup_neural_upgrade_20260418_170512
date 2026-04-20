@@ -1,0 +1,102 @@
+/* === 神经图谱 - 极简静态版本 === */
+
+.graph-simple-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.graph-edges-svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.graph-node-simple {
+  position: absolute;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  border: 2px solid;
+}
+
+.graph-node-simple:hover {
+  transform: scale(1.3);
+  z-index: 100;
+}
+
+.graph-node-simple.highlighted {
+  transform: scale(1.5);
+  box-shadow: 0 0 20px rgba(34, 211, 238, 0.8);
+}
+
+/* 节点类型颜色 - Omnia HUD 青色系 */
+.graph-node-simple.project {
+  background: rgba(34, 211, 238, 0.2);
+  border-color: #22d3ee;
+  color: #22d3ee;
+}
+
+.graph-node-simple.person {
+  background: rgba(6, 182, 212, 0.2);
+  border-color: #06b6d4;
+  color: #06b6d4;
+}
+
+.graph-node-simple.file {
+  background: rgba(14, 116, 144, 0.2);
+  border-color: #0e7490;
+  color: #0e7490;
+}
+
+.graph-node-simple.concept {
+  background: rgba(21, 94, 117, 0.2);
+  border-color: #155e75;
+  color: #155e75;
+}
+
+.graph-node-simple.date {
+  background: rgba(22, 78, 99, 0.2);
+  border-color: #164e63;
+  color: #164e63;
+}
+
+.graph-node-simple.location {
+  background: rgba(8, 145, 178, 0.2);
+  border-color: #0891b2;
+  color: #0891b2;
+}
+
+.graph-node-simple.unknown {
+  background: rgba(30, 58, 95, 0.2);
+  border-color: #1e3a5f;
+  color: #1e3a5f;
+}
+
+.node-label {
+  font-size: 9px;
+  font-weight: 600;
+  text-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
+}
+
+.graph-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #22d3ee;
+}
+
+.graph-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #ff453a;
+}
