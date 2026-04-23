@@ -1,25 +1,19 @@
-// 神经图谱可视化 - 增强版（支持缩放和平移）
+// 神经图谱可视化 - vis-network 版本
 const GraphViz = {
-  graph: null,
-  simulation: null,
-  zoom: null,
+  network: null,
+  nodes: null,
+  edges: null,
   
   init() {
-    console.log('[GraphViz] 初始化');
+    console.log('[GraphViz] 初始化 vis-network');
     this.loadStats();
-    
-    // 默认自动加载图谱
     this.loadGraph();
   },
   
   async loadStats() {
     try {
-      console.log('[GraphViz] loadStats 开始执行...');
-      
       const res = await fetch('/api/graph/stats');
       const stats = await res.json();
-      
-      console.log('[GraphViz] 统计数据:', stats);
       
       const nodesEl = document.getElementById('gs-nodes');
       const edgesEl = document.getElementById('gs-edges');
@@ -35,332 +29,191 @@ const GraphViz = {
   },
   
   updateLegend(byType) {
-    const legendItems = {
-      'PERSON': byType.PERSON || 0,
-      'PROJECT': byType.PROJECT || 0,
-      'FILE': byType.FILE || 0,
-      'CONCEPT': byType.CONCEPT || 0,
-      'DATE': byType.DATE || 0,
-      'ENTITY': byType.ENTITY || 0
-    };
-    
-    Object.entries(legendItems).forEach(([type, count]) => {
+    const types = ['PERSON', 'PROJECT', 'FILE', 'CONCEPT', 'DATE', 'ENTITY'];
+    types.forEach(type => {
+      const count = byType[type] || 0;
       const el = document.querySelector(`.legend-item .legend-dot.${type.toLowerCase()}`);
-      if (el) {
+      if (el && count > 0) {
         const parent = el.closest('.legend-item');
-        if (parent && count > 0) {
-          const text = parent.textContent.trim();
-          if (!text.includes('(')) {
-            parent.childNodes[parent.childNodes.length - 1].textContent += ` (${count})`;
+        if (parent) {
+          const textNodes = Array.from(parent.childNodes).filter(n => n.nodeType === 3);
+          if (textNodes.length > 0) {
+            textNodes[0].textContent = textNodes[0].textContent.trim() + ` (${count})`;
           }
         }
       }
     });
   },
   
+  getTypeColor(type) {
+    const colors = {
+      'PERSON': '#22d3ee',    // 青色
+      'PROJECT': '#a855f7',   // 紫色
+      'FILE': '#10b981',      // 绿色
+      'CONCEPT': '#f59e0b',   // 橙色
+      'DATE': '#6366f1',      // 靛蓝
+      'ENTITY': '#ec4899',    // 粉色
+      'DEFAULT': '#64748b'    // 灰色
+    };
+    return colors[type?.toUpperCase()] || colors['DEFAULT'];
+  },
+  
   async loadGraph() {
     const canvas = document.getElementById('graph-canvas');
     if (!canvas) {
-      console.error('[GraphViz] 找不到 graph-canvas 元素');
+      console.error('[GraphViz] 找不到 graph-canvas');
       return;
     }
     
     canvas.innerHTML = '<div class="graph-loading"><div class="loading-spinner"></div>正在唤醒记忆...</div>';
     
     try {
-      // 获取数据
-      console.log('[GraphViz] 获取图谱数据...');
       const res = await fetch('/api/graph?limit=150');
       const data = await res.json();
       
-      console.log('[GraphViz] 获取到节点:', data.nodes?.length, '边:', data.edges?.length);
+      console.log('[GraphViz] 节点:', data.nodes?.length, '边:', data.edges?.length);
       
       if (!data.nodes || data.nodes.length === 0) {
         canvas.innerHTML = '<div class="graph-placeholder">暂无图谱数据</div>';
         return;
       }
       
-      // 创建名称到节点的映射
-      const nameToNode = {};
+      // 创建 ID 映射
+      const nameToId = {};
       data.nodes.forEach(n => {
-        nameToNode[n.name] = n;
-        if (n.canonical_name) {
-          nameToNode[n.canonical_name] = n;
-        }
+        nameToId[n.name] = n.id;
+        if (n.canonical_name) nameToId[n.canonical_name] = n.id;
       });
       
-      // 转换数据格式
-      const graphData = {
-        nodes: data.nodes.map(n => ({
+      // 准备 vis-network 数据
+      const nodes = new vis.DataSet(
+        data.nodes.map(n => ({
           id: n.id,
-          name: n.name || n.label,
-          type: n.type,
-          access_count: n.access_count || 0,
-          importance: this.calculateImportance(n)
-        })),
-        links: data.edges
-          .filter(e => nameToNode[e.source] && nameToNode[e.target])
-          .map(e => ({
-            source: nameToNode[e.source].id,
-            target: nameToNode[e.target].id,
-            relation: e.relation
-          }))
-      };
+          label: n.name || n.label || n.id,
+          color: {
+            background: this.getTypeColor(n.type),
+            border: '#ffffff',
+            highlight: { background: '#fbbf24', border: '#ffffff' },
+            hover: { background: this.getTypeColor(n.type), border: '#fbbf24' }
+          },
+          font: { color: '#ffffff', size: 14, face: 'Inter, sans-serif' },
+          shape: 'dot',
+          size: Math.max(10, Math.min(30, (n.access_count || 0) * 2 + 10)),
+          title: `<div style="padding: 8px;">
+            <div style="font-weight: 600; margin-bottom: 4px;">${n.name || n.label}</div>
+            <div style="font-size: 12px; color: #94a3b8;">类型: ${n.type || '未知'}</div>
+            ${n.access_count ? `<div style="font-size: 12px; color: #94a3b8;">访问: ${n.access_count}次</div>` : ''}
+          </div>`,
+          shadow: true
+        }))
+      );
       
-      console.log('[GraphViz] 节点:', graphData.nodes.length, '连线:', graphData.links.length);
+      const edges = new vis.DataSet(
+        data.edges
+          .filter(e => nameToId[e.source] && nameToId[e.target])
+          .map((e, i) => ({
+            id: i,
+            from: nameToId[e.source],
+            to: nameToId[e.target],
+            label: e.relation || '',
+            color: { color: '#475569', highlight: '#22d3ee' },
+            font: { size: 10, color: '#94a3b8', strokeWidth: 0 },
+            arrows: { to: { enabled: true, scaleFactor: 0.5 } },
+            smooth: { type: 'continuous' }
+          }))
+      );
       
       // 清空画布
       canvas.innerHTML = '';
       
-      // 创建 SVG
-      const width = canvas.clientWidth || 400;
-      const height = canvas.clientHeight || 300;
+      // 创建网络
+      const container = canvas;
+      const graphData = { nodes, edges };
       
-      const svg = d3.select(canvas)
-        .append('svg')
-        .attr('width', width)
-        .attr('height', height)
-        .attr('class', 'neural-svg');
+      const options = {
+        nodes: {
+          borderWidth: 2,
+          borderWidthSelected: 3
+        },
+        edges: {
+          width: 1.5,
+          selectionWidth: 2
+        },
+        physics: {
+          enabled: true,
+          barnesHut: {
+            gravitationalConstant: -3000,
+            centralGravity: 0.3,
+            springLength: 100,
+            springConstant: 0.05
+          },
+          stabilization: {
+            enabled: true,
+            iterations: 200,
+            updateInterval: 25
+          }
+        },
+        interaction: {
+          hover: true,
+          tooltipDelay: 100,
+          zoomView: true,
+          dragView: true,
+          navigationButtons: true,
+          keyboard: { enabled: true }
+        },
+        layout: {
+          improvedLayout: true
+        }
+      };
       
-      // 添加发光滤镜
-      const defs = svg.append('defs');
-      const glow = defs.append('filter')
-        .attr('id', 'glow')
-        .attr('x', '-50%')
-        .attr('y', '-50%')
-        .attr('width', '200%')
-        .attr('height', '200%');
+      this.network = new vis.Network(container, graphData, options);
+      this.nodes = nodes;
+      this.edges = edges;
       
-      glow.append('feGaussianBlur')
-        .attr('stdDeviation', '3')
-        .attr('result', 'coloredBlur');
-      
-      const feMerge = glow.append('feMerge');
-      feMerge.append('feMergeNode').attr('in', 'coloredBlur');
-      feMerge.append('feMergeNode').attr('in', 'SourceGraphic');
-      
-      // 创建主容器（用于缩放和平移）
-      const container = svg.append('g').attr('class', 'graph-container');
-      
-      // 创建缩放行为
-      this.zoom = d3.zoom()
-        .scaleExtent([0.1, 4])
-        .on('zoom', (event) => {
-          container.attr('transform', event.transform);
-        });
-      
-      svg.call(this.zoom);
-      
-      // 创建力导向模拟
-      this.simulation = d3.forceSimulation(graphData.nodes)
-        .force('link', d3.forceLink(graphData.links).id(d => d.id).distance(60))
-        .force('charge', d3.forceManyBody().strength(-100))
-        .force('center', d3.forceCenter(width / 2, height / 2))
-        .force('collision', d3.forceCollide().radius(d => this.getNodeRadius(d) + 5));
-      
-      // 绘制连线
-      const links = container.append('g')
-        .attr('class', 'links')
-        .selectAll('line')
-        .data(graphData.links)
-        .enter()
-        .append('line')
-        .attr('class', 'neural-link')
-        .attr('stroke', 'rgba(34, 211, 238, 0.2)')
-        .attr('stroke-width', 1);
-      
-      // 绘制节点
-      const nodes = container.append('g')
-        .attr('class', 'nodes')
-        .selectAll('g')
-        .data(graphData.nodes)
-        .enter()
-        .append('g')
-        .attr('class', 'neural-node')
-        .call(d3.drag()
-          .on('start', (event, d) => {
-            if (!event.active) this.simulation.alphaTarget(0.3).restart();
-            d.fx = d.x;
-            d.fy = d.y;
-          })
-          .on('drag', (event, d) => {
-            d.fx = event.x;
-            d.fy = event.y;
-          })
-          .on('end', (event, d) => {
-            if (!event.active) this.simulation.alphaTarget(0);
-            d.fx = null;
-            d.fy = null;
-          }));
-      
-      // 节点圆圈
-      nodes.append('circle')
-        .attr('r', d => this.getNodeRadius(d))
-        .attr('fill', d => this.getNodeColor(d.type))
-        .attr('fill-opacity', 0.3)
-        .attr('stroke', d => this.getNodeColor(d.type))
-        .attr('stroke-width', 2)
-        .attr('filter', 'url(#glow)')
-        .attr('class', 'node-circle');
-      
-      // 节点标签
-      nodes.append('text')
-        .text(d => this.truncateLabel(d.name))
-        .attr('class', 'node-label')
-        .attr('text-anchor', 'middle')
-        .attr('dy', d => this.getNodeRadius(d) + 12)
-        .attr('fill', d => this.getNodeColor(d.type))
-        .attr('font-size', '9px')
-        .attr('font-weight', '600');
-      
-      // 节点交互
-      nodes.on('mouseover', (event, d) => {
-        this.highlightNode(d, nodes, links, true);
-      }).on('mouseout', (event, d) => {
-        this.highlightNode(d, nodes, links, false);
+      // 稳定后适配视图
+      this.network.once('stabilized', () => {
+        this.network.fit({ animation: { duration: 500, easingFunction: 'easeInOutQuad' }});
+        console.log('[GraphViz] 图谱渲染完成');
       });
       
-      // 更新位置
-      this.simulation.on('tick', () => {
-        links
-          .attr('x1', d => d.source.x)
-          .attr('y1', d => d.source.y)
-          .attr('x2', d => d.target.x)
-          .attr('y2', d => d.target.y);
-        
-        nodes.attr('transform', d => `translate(${d.x},${d.y})`);
+      // 点击事件
+      this.network.on('click', params => {
+        if (params.nodes.length > 0) {
+          const nodeId = params.nodes[0];
+          const node = nodes.get(nodeId);
+          console.log('[GraphViz] 点击节点:', node);
+        }
       });
-      
-      // 启动呼吸动画
-      this.startPulseAnimation(nodes);
       
     } catch (err) {
-      console.error('[GraphViz] 加载失败:', err);
-      canvas.innerHTML = `<div style="color: #ff453a; padding: 20px; text-align: center;">加载失败: ${err.message}</div>`;
+      console.error('[GraphViz] 加载图谱失败:', err);
+      canvas.innerHTML = `<div class="graph-error">加载失败: ${err.message}</div>`;
     }
   },
   
-  calculateImportance(node) {
-    const coreTypes = ['PERSON', 'PROJECT'];
-    const isCore = coreTypes.includes(node.type);
-    const accessBonus = Math.min(node.access_count || 0, 10);
-    return isCore ? 2 + accessBonus * 0.1 : 1 + accessBonus * 0.05;
-  },
-  
-  getNodeRadius(node) {
-    const base = 8;
-    return base * node.importance;
-  },
-  
-  getNodeColor(type) {
-    const colors = {
-      'PROJECT': '#a855f7',
-      'PERSON': '#22d3ee',
-      'FILE': '#30d158',
-      'CONCEPT': '#ff9f0a',
-      'DATE': '#0a84ff',
-      'LOCATION': '#ff453a',
-      'ENTITY': '#8e8e93'
-    };
-    return colors[type] || '#8e8e93';
-  },
-  
-  truncateLabel(name) {
-    if (!name) return '';
-    return name.length > 12 ? name.substring(0, 12) + '...' : name;
-  },
-  
-  highlightNode(node, nodes, links, isHover) {
-    if (isHover) {
-      nodes.selectAll('circle')
-        .attr('fill-opacity', 0.1)
-        .attr('stroke-opacity', 0.3);
-      
-      links.attr('stroke-opacity', 0.1);
-      
-      nodes.filter(d => d.id === node.id)
-        .selectAll('circle')
-        .attr('fill-opacity', 0.8)
-        .attr('stroke-width', 3);
-      
-      links.filter(d => d.source.id === node.id || d.target.id === node.id)
-        .attr('stroke', '#22d3ee')
-        .attr('stroke-width', 2)
-        .attr('stroke-opacity', 0.8);
-      
-      const connectedIds = new Set();
-      links.each(d => {
-        if (d.source.id === node.id) connectedIds.add(d.target.id);
-        if (d.target.id === node.id) connectedIds.add(d.source.id);
-      });
-      
-      nodes.filter(d => connectedIds.has(d.id))
-        .selectAll('circle')
-        .attr('fill-opacity', 0.6)
-        .attr('stroke-opacity', 1);
-      
-    } else {
-      nodes.selectAll('circle')
-        .attr('fill-opacity', 0.3)
-        .attr('stroke-width', 2)
-        .attr('stroke-opacity', 1);
-      
-      links
-        .attr('stroke', 'rgba(34, 211, 238, 0.2)')
-        .attr('stroke-width', 1)
-        .attr('stroke-opacity', 1);
+  // 搜索节点
+  search(query) {
+    if (!this.nodes || !query) return;
+    
+    const allNodes = this.nodes.get();
+    const matches = allNodes.filter(n => 
+      n.label.toLowerCase().includes(query.toLowerCase())
+    );
+    
+    if (matches.length > 0) {
+      this.network.selectNodes(matches.map(n => n.id));
+      this.network.focus(matches[0].id, { animation: true, scale: 1.5 });
     }
   },
   
-  startPulseAnimation(nodes) {
-    let phase = 0;
-    const animate = () => {
-      phase += 0.02;
-      nodes.selectAll('circle')
-        .attr('fill-opacity', d => {
-          const base = 0.3;
-          const variation = Math.sin(phase + d.id * 0.1) * 0.1;
-          return base + variation;
-        });
-      this.animationFrame = requestAnimationFrame(animate);
-    };
-    animate();
-  },
-  
-  loadScript(src) {
-    return new Promise((resolve, reject) => {
-      if (document.querySelector(`script[src="${src}"]`)) {
-        resolve();
-        return;
-      }
-      const script = document.createElement('script');
-      script.src = src;
-      script.onload = resolve;
-      script.onerror = reject;
-      document.head.appendChild(script);
-    });
-  },
-  
-  highlightNode(query) {
-    console.log('[GraphViz] 搜索节点:', query);
-  },
-  
-  refresh() {
-    if (this.animationFrame) {
-      cancelAnimationFrame(this.animationFrame);
+  // 重置视图
+  resetView() {
+    if (this.network) {
+      this.network.fit({ animation: true });
+      this.network.unselectAll();
     }
-    this.loadStats();
-    this.loadGraph();
   }
 };
 
-// 初始化
-(function() {
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => GraphViz.init());
-  } else {
-    GraphViz.init();
-  }
-})();
-
+// 导出
 window.GraphViz = GraphViz;
