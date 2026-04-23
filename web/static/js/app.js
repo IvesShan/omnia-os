@@ -76,7 +76,6 @@ async function loadDashboard() {
         document.getElementById('timeline-count').textContent = stats.timeline || 0;
     }
 }
-}
 
 // ============ 记忆管理 ============
 
