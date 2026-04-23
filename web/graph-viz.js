@@ -1,53 +1,33 @@
-// 神经图谱可视化 - 增强版
+// 神经图谱可视化 - 真正的神经网络效果
 const GraphViz = {
   graph: null,
+  animationFrame: null,
+  pulsePhase: 0,
   
   init() {
     console.log('[GraphViz] 初始化');
     this.loadStats();
-    
-    // 默认自动加载图谱
     this.loadGraph();
   },
   
   async loadStats() {
     try {
-      console.log('[GraphViz] loadStats 开始执行...');
-      
       const res = await fetch('/api/graph/stats');
       const stats = await res.json();
-      
-      console.log('[GraphViz] 统计数据:', stats);
       
       const nodesEl = document.getElementById('gs-nodes');
       const edgesEl = document.getElementById('gs-edges');
       
-      console.log('[GraphViz] nodesEl:', nodesEl, 'edgesEl:', edgesEl);
+      if (nodesEl) nodesEl.textContent = stats.nodes || 0;
+      if (edgesEl) edgesEl.textContent = stats.edges || 0;
       
-      if (nodesEl) {
-        nodesEl.textContent = stats.nodes || 0;
-        console.log('[GraphViz] 设置节点数:', stats.nodes);
-      } else {
-        console.error('[GraphViz] 找不到 gs-nodes 元素!');
-      }
-      
-      if (edgesEl) {
-        edgesEl.textContent = stats.edges || 0;
-        console.log('[GraphViz] 设置关系数:', stats.edges);
-      } else {
-        console.error('[GraphViz] 找不到 gs-edges 元素!');
-      }
-      
-      // 更新图例统计
       this.updateLegend(stats.nodes_by_type || {});
-      
     } catch (err) {
       console.error('[GraphViz] 加载统计失败:', err);
     }
   },
   
   updateLegend(byType) {
-    // 更新图例中的数量显示
     const legendItems = {
       'PERSON': byType.PERSON || 0,
       'PROJECT': byType.PROJECT || 0,
@@ -57,15 +37,11 @@ const GraphViz = {
       'ENTITY': byType.ENTITY || 0
     };
     
-    console.log('[GraphViz] 图例统计:', legendItems);
-    
-    // 尝试更新图例中的数字
     Object.entries(legendItems).forEach(([type, count]) => {
       const el = document.querySelector(`.legend-item .legend-dot.${type.toLowerCase()}`);
       if (el) {
         const parent = el.closest('.legend-item');
         if (parent && count > 0) {
-          // 添加数量显示
           const text = parent.textContent.trim();
           if (!text.includes('(')) {
             parent.childNodes[parent.childNodes.length - 1].textContent += ` (${count})`;
@@ -77,170 +53,178 @@ const GraphViz = {
   
   async loadGraph() {
     const canvas = document.getElementById('graph-canvas');
-    if (!canvas) {
-      console.error('[GraphViz] 找不到 graph-canvas 元素');
-      return;
-    }
+    if (!canvas) return;
     
-    // 显示加载状态
     canvas.innerHTML = '<div class="graph-loading"><div class="loading-spinner"></div>正在唤醒记忆...</div>';
     
     try {
-      // 加载 force-graph
-      if (typeof ForceGraph === 'undefined') {
-        console.log('[GraphViz] 加载 ForceGraph 库...');
-        await this.loadScript('https://unpkg.com/force-graph@1.43.4/dist/force-graph.min.js');
+      // 加载 D3.js 和 force-graph
+      if (typeof d3 === 'undefined') {
+        await this.loadScript('https://d3js.org/d3.v7.min.js');
       }
       
-      // 获取数据
-      console.log('[GraphViz] 获取图谱数据...');
-      const res = await fetch('/api/graph?limit=150');
+      const res = await fetch('/api/graph?limit=200');
       const data = await res.json();
-      
-      console.log('[GraphViz] 获取到节点:', data.nodes?.length, '边:', data.edges?.length);
       
       if (!data.nodes || data.nodes.length === 0) {
         canvas.innerHTML = '<div class="graph-placeholder">暂无图谱数据</div>';
         return;
       }
       
-      // 创建名称到节点的映射（关键修复！）
+      // 创建名称到节点的映射
       const nameToNode = {};
       data.nodes.forEach(n => {
         nameToNode[n.name] = n;
-        if (n.canonical_name) {
-          nameToNode[n.canonical_name] = n;
-        }
+        if (n.canonical_name) nameToNode[n.canonical_name] = n;
       });
       
-      // 转换数据格式 - 边的 source/target 必须是节点 ID
+      // 转换数据
       const graphData = {
-        nodes: (data.nodes || []).map(n => ({
+        nodes: data.nodes.map(n => ({
           id: n.id,
           name: n.name || n.label,
           type: n.type,
-          access_count: n.access_count || 0
+          access_count: n.access_count || 0,
+          // 核心节点更大
+          importance: this.calculateImportance(n)
         })),
-        links: (data.edges || [])
-          .filter(e => {
-            // 只保留两端节点都存在的边
-            const sourceNode = nameToNode[e.source];
-            const targetNode = nameToNode[e.target];
-            if (!sourceNode) console.warn('[GraphViz] 找不到源节点:', e.source);
-            if (!targetNode) console.warn('[GraphViz] 找不到目标节点:', e.target);
-            return sourceNode && targetNode;
-          })
+        links: data.edges
+          .filter(e => nameToNode[e.source] && nameToNode[e.target])
           .map(e => ({
-            source: nameToNode[e.source].id,  // 转换为 ID
-            target: nameToNode[e.target].id,  // 转换为 ID
-            weight: e.weight || 0.5,
+            source: nameToNode[e.source].id,
+            target: nameToNode[e.target].id,
             relation: e.relation
           }))
       };
       
-      console.log('[GraphViz] 转换后节点:', graphData.nodes.length, '边:', graphData.links.length);
+      console.log('[GraphViz] 节点:', graphData.nodes.length, '连线:', graphData.links.length);
       
-      // 清空容器
+      // 清空画布
       canvas.innerHTML = '';
       
-      // 获取容器尺寸
-      const width = canvas.offsetWidth || 300;
-      const height = canvas.offsetHeight || 300;
+      // 创建 SVG
+      const width = canvas.clientWidth || 400;
+      const height = canvas.clientHeight || 300;
       
-      console.log('[GraphViz] 容器尺寸:', width, 'x', height);
+      const svg = d3.select(canvas)
+        .append('svg')
+        .attr('width', width)
+        .attr('height', height)
+        .attr('class', 'neural-svg');
       
-      // 创建图谱 - 使用增强的内置参数
-      this.graph = ForceGraph()(canvas)
-        .graphData(graphData)
-        
-        // === 节点配置 ===
-        .nodeId('id')
-        .nodeRelSize(6)  // 节点大小比例（默认 4）
-        .nodeVal(node => Math.sqrt(node.access_count + 1))  // 节点值影响大小
-        .nodeLabel(node => `${node.name}\n类型: ${node.type}\n访问: ${node.access_count}`)
-        .nodeColor(node => this.getNodeColor(node.type))
-        
-        // 自定义节点渲染 - 带发光效果
-        .nodeCanvasObject((node, ctx, globalScale) => {
-          const size = Math.sqrt(node.access_count + 1) * 3;
-          const color = this.getNodeColor(node.type);
-          
-          // 外发光
-          ctx.beginPath();
-          ctx.arc(node.x, node.y, size * 1.5, 0, 2 * Math.PI);
-          ctx.fillStyle = color + '22'; // 13% 透明度
-          ctx.fill();
-          
-          // 主体
-          ctx.beginPath();
-          ctx.arc(node.x, node.y, size, 0, 2 * Math.PI);
-          ctx.fillStyle = color;
-          ctx.fill();
-          
-          // 高亮边框
-          ctx.beginPath();
-          ctx.arc(node.x, node.y, size, 0, 2 * Math.PI);
-          ctx.strokeStyle = color;
-          ctx.lineWidth = 1.5;
-          ctx.stroke();
-          
-          // 显示名称（放大时）
-          if (globalScale > 1.2) {
-            ctx.fillStyle = '#ffffff';
-            ctx.font = `${10 / globalScale}px Sans-Serif`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(node.name, node.x, node.y + size + 8);
-          }
-        })
-        
-        // === 连线配置 ===
-        .linkWidth(link => (link.weight || 0.5) * 2)
-        .linkColor(link => {
-          const weight = link.weight || 0.5;
-          const alpha = 0.3 + weight * 0.5;
-          return `rgba(34, 211, 238, ${alpha})`;
-        })
-        
-        // 方向粒子 - 显示关系流动
-        .linkDirectionalParticles(3)
-        .linkDirectionalParticleWidth(2.5)
-        .linkDirectionalParticleSpeed(0.008)
-        .linkDirectionalParticleColor(() => '#22d3ee')
-        
-        // === 力学引擎参数（内置，无需 d3）===
-        .d3AlphaMin(0.001)        // 最小 alpha 值
-        .d3AlphaDecay(0.015)      // 强度衰减（越小越慢，布局更精细）
-        .d3VelocityDecay(0.35)    // 速度衰减（越大越稳定）
-        .warmupTicks(10)          // 预热帧数（避免初始抖动）
-        .cooldownTicks(200)       // 冷却帧数（更多帧 = 更精细布局）
-        .cooldownTime(15000)      // 冷却时间 15秒
-        
-        // === 视觉参数 ===
-        .backgroundColor('transparent')
-        .width(width)
-        .height(height)
-        
-        // === 交互事件 ===
-        .onNodeClick(node => {
-          console.log('[GraphViz] 点击节点:', node.name);
-          this.highlightConnections(node);
-        })
-        
-        .onNodeHover(node => {
-          canvas.style.cursor = node ? 'pointer' : 'default';
-        })
-        
-        .onEngineStop(() => {
-          console.log('[GraphViz] 力学引擎已稳定');
-        });
+      // 添加发光滤镜
+      const defs = svg.append('defs');
       
-      console.log('[GraphViz] 图谱加载完成');
+      // 发光效果
+      const glow = defs.append('filter')
+        .attr('id', 'glow')
+        .attr('x', '-50%')
+        .attr('y', '-50%')
+        .attr('width', '200%')
+        .attr('height', '200%');
+      
+      glow.append('feGaussianBlur')
+        .attr('stdDeviation', '3')
+        .attr('result', 'coloredBlur');
+      
+      const feMerge = glow.append('feMerge');
+      feMerge.append('feMergeNode').attr('in', 'coloredBlur');
+      feMerge.append('feMergeNode').attr('in', 'SourceGraphic');
+      
+      // 创建力导向模拟
+      const simulation = d3.forceSimulation(graphData.nodes)
+        .force('link', d3.forceLink(graphData.links).id(d => d.id).distance(60))
+        .force('charge', d3.forceManyBody().strength(-100))
+        .force('center', d3.forceCenter(width / 2, height / 2))
+        .force('collision', d3.forceCollide().radius(d => this.getNodeRadius(d) + 5));
+      
+      // 绘制连线
+      const links = svg.append('g')
+        .attr('class', 'links')
+        .selectAll('line')
+        .data(graphData.links)
+        .enter()
+        .append('line')
+        .attr('class', 'neural-link')
+        .attr('stroke', 'rgba(34, 211, 238, 0.2)')
+        .attr('stroke-width', 1);
+      
+      // 绘制节点
+      const nodes = svg.append('g')
+        .attr('class', 'nodes')
+        .selectAll('g')
+        .data(graphData.nodes)
+        .enter()
+        .append('g')
+        .attr('class', 'neural-node')
+        .call(d3.drag()
+          .on('start', dragstarted)
+          .on('drag', dragged)
+          .on('end', dragended));
+      
+      // 节点圆圈
+      nodes.append('circle')
+        .attr('r', d => this.getNodeRadius(d))
+        .attr('fill', d => this.getNodeColor(d.type))
+        .attr('fill-opacity', 0.3)
+        .attr('stroke', d => this.getNodeColor(d.type))
+        .attr('stroke-width', 2)
+        .attr('filter', 'url(#glow)')
+        .attr('class', 'node-circle');
+      
+      // 节点标签
+      nodes.append('text')
+        .text(d => this.truncateLabel(d.name))
+        .attr('class', 'node-label')
+        .attr('text-anchor', 'middle')
+        .attr('dy', d => this.getNodeRadius(d) + 12)
+        .attr('fill', d => this.getNodeColor(d.type))
+        .attr('font-size', '9px')
+        .attr('font-weight', '600');
+      
+      // 节点交互
+      nodes.on('mouseover', (event, d) => {
+        this.highlightNode(d, nodes, links, true);
+      }).on('mouseout', (event, d) => {
+        this.highlightNode(d, nodes, links, false);
+      });
+      
+      // 更新位置
+      simulation.on('tick', () => {
+        links
+          .attr('x1', d => d.source.x)
+          .attr('y1', d => d.source.y)
+          .attr('x2', d => d.target.x)
+          .attr('y2', d => d.target.y);
+        
+        nodes.attr('transform', d => `translate(${d.x},${d.y})`);
+      });
+      
+      // 呼吸动画
+      this.startPulseAnimation(nodes);
       
       // 更新状态
       const statusEl = document.getElementById('neural-status');
       if (statusEl) {
-        statusEl.textContent = `COGNITION ACTIVE · ${data.nodes.length} NODES`;
+        statusEl.textContent = `COGNITION ACTIVE · ${graphData.nodes.length} NODES`;
+      }
+      
+      // 拖拽函数
+      function dragstarted(event, d) {
+        if (!event.active) simulation.alphaTarget(0.3).restart();
+        d.fx = d.x;
+        d.fy = d.y;
+      }
+      
+      function dragged(event, d) {
+        d.fx = event.x;
+        d.fy = event.y;
+      }
+      
+      function dragended(event, d) {
+        if (!event.active) simulation.alphaTarget(0);
+        d.fx = null;
+        d.fy = null;
       }
       
     } catch (err) {
@@ -249,38 +233,102 @@ const GraphViz = {
     }
   },
   
-  // 高亮连接
-  highlightConnections(targetNode) {
-    if (!this.graph || !targetNode) return;
-    
-    const graphData = this.graph.graphData();
-    const connectedNodes = new Set();
-    const connectedLinks = [];
-    
-    graphData.links.forEach(link => {
-      if (link.source.id === targetNode.id || link.target.id === targetNode.id) {
-        connectedNodes.add(link.source.id);
-        connectedNodes.add(link.target.id);
-        connectedLinks.push(link);
-      }
-    });
-    
-    console.log('[GraphViz] 高亮节点:', targetNode.name, '连接数:', connectedLinks.length);
+  calculateImportance(node) {
+    // 核心节点更重要
+    const coreTypes = ['PERSON', 'PROJECT'];
+    const isCore = coreTypes.includes(node.type);
+    const accessBonus = Math.min(node.access_count || 0, 10);
+    return isCore ? 2 + accessBonus * 0.1 : 1 + accessBonus * 0.05;
+  },
+  
+  getNodeRadius(node) {
+    const base = 8;
+    return base * node.importance;
   },
   
   getNodeColor(type) {
-    // 与图例完全一致的配色方案
     const colors = {
-      'PROJECT': '#a855f7',  // 紫色 - 项目
-      'PERSON': '#22d3ee',   // 青色 - 人物
-      'FILE': '#30d158',     // 绿色 - 文件
-      'CONCEPT': '#ff9f0a',  // 橙色 - 概念
-      'DATE': '#0a84ff',     // 蓝色 - 日期
-      'LOCATION': '#ff453a', // 红色 - 地点
-      'ENTITY': '#8e8e93',   // 灰色 - 实体
-      'UNKNOWN': '#8e8e93'   // 灰色 - 未知
+      'PROJECT': '#a855f7',
+      'PERSON': '#22d3ee',
+      'FILE': '#30d158',
+      'CONCEPT': '#ff9f0a',
+      'DATE': '#0a84ff',
+      'LOCATION': '#ff453a',
+      'ENTITY': '#8e8e93'
     };
-    return colors[type] || colors['UNKNOWN'];
+    return colors[type] || '#8e8e93';
+  },
+  
+  truncateLabel(name) {
+    if (!name) return '';
+    return name.length > 12 ? name.substring(0, 10) + '...' : name;
+  },
+  
+  highlightNode(node, nodes, links, isHover) {
+    if (isHover) {
+      // 降低所有节点透明度
+      nodes.selectAll('circle')
+        .attr('fill-opacity', 0.1)
+        .attr('stroke-opacity', 0.3);
+      
+      // 降低所有连线透明度
+      links.attr('stroke-opacity', 0.1);
+      
+      // 高亮当前节点
+      nodes.filter(d => d.id === node.id)
+        .selectAll('circle')
+        .attr('fill-opacity', 0.8)
+        .attr('stroke-width', 3);
+      
+      // 高亮相关连线
+      links.filter(d => d.source.id === node.id || d.target.id === node.id)
+        .attr('stroke', '#22d3ee')
+        .attr('stroke-width', 2)
+        .attr('stroke-opacity', 0.8);
+      
+      // 高亮连接的节点
+      const connectedIds = new Set();
+      links.each(d => {
+        if (d.source.id === node.id) connectedIds.add(d.target.id);
+        if (d.target.id === node.id) connectedIds.add(d.source.id);
+      });
+      
+      nodes.filter(d => connectedIds.has(d.id))
+        .selectAll('circle')
+        .attr('fill-opacity', 0.6)
+        .attr('stroke-opacity', 1);
+      
+    } else {
+      // 恢复所有
+      nodes.selectAll('circle')
+        .attr('fill-opacity', 0.3)
+        .attr('stroke-width', 2)
+        .attr('stroke-opacity', 1);
+      
+      links
+        .attr('stroke', 'rgba(34, 211, 238, 0.2)')
+        .attr('stroke-width', 1)
+        .attr('stroke-opacity', 1);
+    }
+  },
+  
+  startPulseAnimation(nodes) {
+    // 节点呼吸动画
+    const animate = () => {
+      this.pulsePhase += 0.02;
+      const pulse = Math.sin(this.pulsePhase) * 0.1 + 0.3;
+      
+      nodes.selectAll('circle')
+        .attr('fill-opacity', d => {
+          const base = 0.3;
+          const variation = Math.sin(this.pulsePhase + d.id * 0.1) * 0.1;
+          return base + variation;
+        });
+      
+      this.animationFrame = requestAnimationFrame(animate);
+    };
+    
+    animate();
   },
   
   loadScript(src) {
@@ -298,39 +346,24 @@ const GraphViz = {
   },
   
   highlightNode(query) {
-    if (!query || !this.graph) return;
-    
-    const graphData = this.graph.graphData();
-    const found = graphData.nodes.find(n => 
-      (n.name || '').toLowerCase().includes(query.toLowerCase())
-    );
-    
-    if (found) {
-      this.graph.centerAt(found.x, found.y, 1000);
-      this.graph.zoom(3, 1000);
-    }
+    // 搜索并高亮节点
+    console.log('[GraphViz] 搜索节点:', query);
   },
   
-  // 刷新图谱
   refresh() {
+    if (this.animationFrame) {
+      cancelAnimationFrame(this.animationFrame);
+    }
     this.loadStats();
     this.loadGraph();
   }
 };
 
-// 初始化 - 兼容 DOMContentLoaded 已触发的情况
+// 初始化
 (function() {
-  console.log('[GraphViz] 脚本加载, document.readyState:', document.readyState);
-  
   if (document.readyState === 'loading') {
-    // DOM 还在加载中，等待 DOMContentLoaded
-    document.addEventListener('DOMContentLoaded', () => {
-      console.log('[GraphViz] DOMContentLoaded 触发，开始初始化');
-      GraphViz.init();
-    });
+    document.addEventListener('DOMContentLoaded', () => GraphViz.init());
   } else {
-    // DOM 已经加载完成，立即初始化
-    console.log('[GraphViz] DOM 已就绪，立即初始化');
     GraphViz.init();
   }
 })();

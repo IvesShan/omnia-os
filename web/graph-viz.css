@@ -338,3 +338,71 @@
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
+
+/* === 神经网络动态效果 === */
+
+.neural-svg {
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(ellipse at center, rgba(34, 211, 238, 0.03) 0%, transparent 70%);
+}
+
+.neural-link {
+  stroke-linecap: round;
+  transition: stroke 0.3s, stroke-width 0.3s;
+}
+
+.neural-node {
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.neural-node:hover {
+  transform: scale(1.2);
+}
+
+.node-circle {
+  transition: fill-opacity 0.3s, stroke-width 0.3s;
+}
+
+.node-label {
+  pointer-events: none;
+  text-shadow: 0 0 6px rgba(0, 0, 0, 0.9);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* 节点类型发光效果 */
+.neural-node[data-type="PERSON"] .node-circle {
+  filter: url(#glow) drop-shadow(0 0 4px rgba(34, 211, 238, 0.5));
+}
+
+.neural-node[data-type="PROJECT"] .node-circle {
+  filter: url(#glow) drop-shadow(0 0 4px rgba(168, 85, 247, 0.5));
+}
+
+/* 脉冲动画 */
+@keyframes neuralPulse {
+  0%, 100% { 
+    fill-opacity: 0.3;
+    stroke-opacity: 1;
+  }
+  50% { 
+    fill-opacity: 0.5;
+    stroke-opacity: 0.8;
+  }
+}
+
+.neural-node .node-circle {
+  animation: neuralPulse 3s ease-in-out infinite;
+}
+
+/* 连线流动效果 */
+@keyframes linkFlow {
+  0% { stroke-dashoffset: 20; }
+  100% { stroke-dashoffset: 0; }
+}
+
+.neural-link.active {
+  stroke-dasharray: 5 5;
+  animation: linkFlow 1s linear infinite;
+}

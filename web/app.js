@@ -1408,7 +1408,7 @@ function doWake(e) {
 
 function doOpenWorkspace(e) {
   if (e) e.stopPropagation();
-  appendOmnia('[提示] 工作区路径：~/.openclaw/workspace');
+  appendOmnia('[提示] 工作区路径：/home/shan/omnia-os');
 }
 
 function doReload(e) {
