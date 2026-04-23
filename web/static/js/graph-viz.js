@@ -1,20 +1,29 @@
 /**
- * Omnia 神经图谱可视化 - D3.js 力导向图
+ * Omnia 神经图谱可视化 - vis-network
  */
 
-// 全局变量
-let svg, g, simulation, zoom;
-let nodes = [], links = [];
-let nodeElements, linkElements, labelElements;
+let network = null;
+let nodes = null;
+let edges = null;
 
 // 节点类型颜色
 const typeColors = {
-    'PERSON': '#06b6d4',      // 青色
-    'PROJECT': '#8b5cf6',     // 紫色
-    'FILE': '#10b981',        // 绿色
-    'CONCEPT': '#f59e0b',     // 橙色
-    'EVENT': '#ef4444',       // 红色
-    'default': '#6366f1'      // 默认靛蓝
+    'PERSON': { background: '#06b6d4', border: '#0891b2', highlight: '#22d3ee' },
+    'PROJECT': { background: '#8b5cf6', border: '#7c3aed', highlight: '#a78bfa' },
+    'FILE': { background: '#10b981', border: '#059669', highlight: '#34d399' },
+    'CONCEPT': { background: '#f59e0b', border: '#d97706', highlight: '#fbbf24' },
+    'EVENT': { background: '#ef4444', border: '#dc2626', highlight: '#f87171' },
+    'default': { background: '#6366f1', border: '#4f46e5', highlight: '#818cf8' }
+};
+
+// 节点类型图标
+const typeIcons = {
+    'PERSON': '👤',
+    'PROJECT': '📁',
+    'FILE': '📄',
+    'CONCEPT': '💡',
+    'EVENT': '⚡',
+    'default': '🔵'
 };
 
 // 初始化图谱
@@ -22,59 +31,10 @@ async function initGraph() {
     const container = document.getElementById('graph-container');
     if (!container) return;
     
-    const width = container.clientWidth;
-    const height = container.clientHeight;
+    console.log('[GraphViz] vis-network 初始化...');
     
-    // 清空容器
-    container.innerHTML = '';
-    
-    // 创建 SVG
-    svg = d3.select(container)
-        .append('svg')
-        .attr('width', width)
-        .attr('height', height)
-        .attr('viewBox', [0, 0, width, height]);
-    
-    // 添加发光滤镜
-    const defs = svg.append('defs');
-    const filter = defs.append('filter')
-        .attr('id', 'glow')
-        .attr('x', '-50%')
-        .attr('y', '-50%')
-        .attr('width', '200%')
-        .attr('height', '200%');
-    
-    filter.append('feGaussianBlur')
-        .attr('stdDeviation', '3')
-        .attr('result', 'coloredBlur');
-    
-    const feMerge = filter.append('feMerge');
-    feMerge.append('feMergeNode').attr('in', 'coloredBlur');
-    feMerge.append('feMergeNode').attr('in', 'SourceGraphic');
-    
-    // 创建主容器（用于缩放和平移）
-    g = svg.append('g');
-    
-    // 设置缩放行为
-    zoom = d3.zoom()
-        .scaleExtent([0.1, 4])
-        .on('zoom', (event) => {
-            g.attr('transform', event.transform);
-        });
-    
-    svg.call(zoom);
-    
-    // 加载数据
-    await loadGraphData();
-    
-    // 启动呼吸动画
-    startBreathingAnimation();
-}
-
-// 加载图谱数据
-async function loadGraphData() {
     try {
-        // 获取图谱数据
+        // 加载数据
         const response = await fetch('/api/graph');
         const data = await response.json();
         
@@ -83,178 +43,269 @@ async function loadGraphData() {
             return;
         }
         
-        // 转换节点数据格式
-        nodes = data.nodes.map(n => ({
-            id: n.name || n.id,
-            label: n.name || n.canonical_name || n.id,
-            type: n.type || 'default',
-            size: Math.max(8, Math.min(25, (n.access_count || 0) * 2 + 8))
-        }));
+        console.log(`[GraphViz] 获取到节点: ${data.nodes.length} 边: ${data.edges?.length || 0}`);
         
-        // 转换边数据格式
-        links = (data.edges || []).map(e => ({
-            source: e.source,
-            target: e.target,
-            relation: e.relation,
-            weight: e.weight || 1
-        }));
+        // 创建节点数据集
+        const nodeArray = data.nodes.map(n => {
+            const type = n.type || 'default';
+            const colors = typeColors[type] || typeColors.default;
+            const accessCount = n.access_count || 0;
+            const size = Math.max(20, Math.min(40, 20 + accessCount * 2));
+            
+            return {
+                id: n.name || n.id,
+                label: n.name || n.canonical_name || n.id,
+                type: type,
+                value: accessCount,
+                size: size,
+                color: colors,
+                font: {
+                    color: '#e2e8f0',
+                    size: 14,
+                    face: 'Inter, sans-serif',
+                    strokeWidth: 2,
+                    strokeColor: '#0f172a'
+                },
+                borderWidth: 2,
+                shadow: {
+                    enabled: true,
+                    color: 'rgba(99, 102, 241, 0.4)',
+                    size: 15,
+                    x: 0,
+                    y: 0
+                },
+                shape: 'dot',
+                mass: 1 + accessCount * 0.1,
+                title: `<b>${n.name || n.id}</b><br>类型: ${type}<br>访问: ${accessCount}次`
+            };
+        });
         
-        createSimulation();
-        renderGraph();
+        // 创建边数据集
+        const edgeArray = (data.edges || []).map((e, i) => {
+            return {
+                id: i,
+                from: e.source,
+                to: e.target,
+                label: e.relation || '',
+                color: {
+                    color: 'rgba(99, 102, 241, 0.3)',
+                    highlight: '#6366f1',
+                    hover: '#818cf8'
+                },
+                width: 1.5,
+                smooth: {
+                    enabled: true,
+                    type: 'continuous',
+                    roundness: 0.5
+                },
+                font: {
+                    color: '#94a3b8',
+                    size: 11,
+                    face: 'Inter, sans-serif',
+                    strokeWidth: 2,
+                    strokeColor: '#0f172a',
+                    align: 'middle'
+                },
+                arrows: {
+                    to: {
+                        enabled: true,
+                        scaleFactor: 0.5,
+                        type: 'arrow'
+                    }
+                },
+                dashes: false
+            };
+        });
+        
+        nodes = new vis.DataSet(nodeArray);
+        edges = new vis.DataSet(edgeArray);
+        
+        // 网络配置
+        const options = {
+            nodes: {
+                borderWidth: 2,
+                borderWidthSelected: 3,
+                shape: 'dot',
+                size: 25,
+                font: {
+                    color: '#e2e8f0',
+                    size: 14,
+                    face: 'Inter, sans-serif',
+                    strokeWidth: 2,
+                    strokeColor: '#0f172a'
+                },
+                shadow: {
+                    enabled: true,
+                    color: 'rgba(99, 102, 241, 0.4)',
+                    size: 15
+                }
+            },
+            edges: {
+                width: 1.5,
+                selectionWidth: 2,
+                hoverWidth: 2,
+                smooth: {
+                    enabled: true,
+                    type: 'continuous',
+                    roundness: 0.5
+                },
+                arrows: {
+                    to: {
+                        enabled: true,
+                        scaleFactor: 0.5
+                    }
+                },
+                color: {
+                    color: 'rgba(99, 102, 241, 0.3)',
+                    highlight: '#6366f1',
+                    hover: '#818cf8'
+                },
+                font: {
+                    color: '#94a3b8',
+                    size: 11,
+                    strokeWidth: 2,
+                    strokeColor: '#0f172a'
+                }
+            },
+            physics: {
+                enabled: true,
+                barnesHut: {
+                    gravitationalConstant: -2000,
+                    centralGravity: 0.3,
+                    springLength: 150,
+                    springConstant: 0.05,
+                    damping: 0.09,
+                    avoidOverlap: 0.5
+                },
+                stabilization: {
+                    enabled: true,
+                    iterations: 200,
+                    updateInterval: 25
+                }
+            },
+            interaction: {
+                hover: true,
+                tooltipDelay: 200,
+                zoomView: true,
+                dragView: true,
+                dragNodes: true,
+                navigationButtons: true,
+                keyboard: {
+                    enabled: true,
+                    speed: { x: 10, y: 10, zoom: 0.02 }
+                }
+            },
+            layout: {
+                improvedLayout: true,
+                clusterThreshold: 150
+            }
+        };
+        
+        // 创建网络
+        network = new vis.Network(container, { nodes, edges }, options);
+        
+        // 事件监听
+        network.on('click', (params) => {
+            if (params.nodes.length > 0) {
+                const nodeId = params.nodes[0];
+                console.log('[GraphViz] 点击节点:', nodeId);
+                // 可以触发详情面板
+            }
+        });
+        
+        network.on('doubleClick', (params) => {
+            if (params.nodes.length > 0) {
+                const nodeId = params.nodes[0];
+                console.log('[GraphViz] 双击节点:', nodeId);
+                // 可以触发搜索或展开
+            }
+        });
+        
+        network.on('stabilizationProgress', (params) => {
+            const progress = Math.round((params.iterations / params.total) * 100);
+            console.log(`[GraphViz] 布局进度: ${progress}%`);
+        });
+        
+        network.on('stabilizationIterationsDone', () => {
+            console.log('[GraphViz] 布局完成');
+            // 自动适配视图
+            network.fit({
+                animation: {
+                    duration: 500,
+                    easingFunction: 'easeInOutQuad'
+                }
+            });
+        });
+        
+        console.log('[GraphViz] vis-network 初始化完成');
+        
     } catch (error) {
-        console.error('加载图谱数据失败:', error);
+        console.error('[GraphViz] 加载失败:', error);
         showEmptyGraph();
     }
-}
-
-// 创建力导向模拟
-function createSimulation() {
-    const container = document.getElementById('graph-container');
-    const width = container.clientWidth;
-    const height = container.clientHeight;
-    
-    simulation = d3.forceSimulation(nodes)
-        .force('link', d3.forceLink(links).id(d => d.id).distance(100))
-        .force('charge', d3.forceManyBody().strength(-300))
-        .force('center', d3.forceCenter(width / 2, height / 2))
-        .force('collision', d3.forceCollide().radius(d => d.size + 10));
-    
-    simulation.on('tick', ticked);
-}
-
-// 渲染图谱
-function renderGraph() {
-    // 绘制连线
-    linkElements = g.append('g')
-        .attr('class', 'links')
-        .selectAll('line')
-        .data(links)
-        .enter()
-        .append('line')
-        .attr('stroke', 'rgba(99, 102, 241, 0.3)')
-        .attr('stroke-width', d => Math.max(1, d.weight * 2));
-    
-    // 绘制节点组
-    nodeElements = g.append('g')
-        .attr('class', 'nodes')
-        .selectAll('g')
-        .data(nodes)
-        .enter()
-        .append('g')
-        .attr('class', 'node-group')
-        .call(d3.drag()
-            .on('start', dragStarted)
-            .on('drag', dragged)
-            .on('end', dragEnded))
-        .on('mouseover', highlightConnected)
-        .on('mouseout', unhighlight);
-    
-    // 绘制节点圆形
-    nodeElements.append('circle')
-        .attr('r', d => d.size || 10)
-        .attr('fill', d => typeColors[d.type] || typeColors.default)
-        .attr('filter', 'url(#glow)')
-        .attr('opacity', 0.9);
-    
-    // 绘制标签
-    labelElements = nodeElements.append('text')
-        .text(d => d.label || d.id)
-        .attr('text-anchor', 'middle')
-        .attr('dy', d => (d.size || 10) + 14)
-        .attr('font-size', '10px')
-        .attr('fill', '#374151')
-        .attr('pointer-events', 'none');
-}
-
-// 更新位置
-function ticked() {
-    linkElements
-        .attr('x1', d => d.source.x)
-        .attr('y1', d => d.source.y)
-        .attr('x2', d => d.target.x)
-        .attr('y2', d => d.target.y);
-    
-    nodeElements
-        .attr('transform', d => `translate(${d.x}, ${d.y})`);
-}
-
-// 拖拽事件
-function dragStarted(event, d) {
-    if (!event.active) simulation.alphaTarget(0.3).restart();
-    d.fx = d.x;
-    d.fy = d.y;
-}
-
-function dragged(event, d) {
-    d.fx = event.x;
-    d.fy = event.y;
-}
-
-function dragEnded(event, d) {
-    if (!event.active) simulation.alphaTarget(0);
-    d.fx = null;
-    d.fy = null;
-}
-
-// 高亮连接的节点
-function highlightConnected(event, d) {
-    const connectedIds = new Set();
-    links.forEach(link => {
-        if (link.source.id === d.id) connectedIds.add(link.target.id);
-        if (link.target.id === d.id) connectedIds.add(link.source.id);
-    });
-    
-    nodeElements.selectAll('circle')
-        .attr('opacity', n => (n.id === d.id || connectedIds.has(n.id)) ? 1 : 0.3);
-    
-    linkElements
-        .attr('stroke', l => (l.source.id === d.id || l.target.id === d.id) 
-            ? 'rgba(99, 102, 241, 0.8)' 
-            : 'rgba(99, 102, 241, 0.1)')
-        .attr('stroke-width', l => (l.source.id === d.id || l.target.id === d.id) ? 2 : 1);
-}
-
-// 取消高亮
-function unhighlight() {
-    nodeElements.selectAll('circle').attr('opacity', 0.9);
-    linkElements
-        .attr('stroke', 'rgba(99, 102, 241, 0.3)')
-        .attr('stroke-width', d => Math.max(1, d.weight * 2));
-}
-
-// 呼吸动画
-function startBreathingAnimation() {
-    function breathe() {
-        nodeElements.selectAll('circle')
-            .transition()
-            .duration(2000)
-            .attr('opacity', 0.7)
-            .transition()
-            .duration(2000)
-            .attr('opacity', 0.9)
-            .on('end', breathe);
-    }
-    breathe();
 }
 
 // 显示空图谱
 function showEmptyGraph() {
     const container = document.getElementById('graph-container');
-    container.innerHTML = '<p class="text-gray-500 text-center">暂无图谱数据</p>';
+    if (!container) return;
+    
+    container.innerHTML = `
+        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #64748b;">
+            <div style="font-size: 48px; margin-bottom: 16px; opacity: 0.5;">🕸️</div>
+            <div style="font-size: 18px; font-weight: 500;">神经图谱为空</div>
+            <div style="font-size: 14px; margin-top: 8px; opacity: 0.7;">开始与 Omnia 对话，构建记忆网络</div>
+        </div>
+    `;
 }
 
-// 页面加载完成后初始化
-document.addEventListener('DOMContentLoaded', () => {
-    // 检查是否有 D3.js
-    if (typeof d3 === 'undefined') {
-        // 动态加载 D3.js
-        const script = document.createElement('script');
-        script.src = 'https://d3js.org/d3.v7.min.js';
-        script.onload = () => {
-            initGraph();
-        };
-        document.head.appendChild(script);
-    } else {
-        initGraph();
+// 刷新图谱
+async function refreshGraph() {
+    if (network) {
+        network.destroy();
+        network = null;
     }
+    await initGraph();
+}
+
+// 适配视图
+function fitGraph() {
+    if (network) {
+        network.fit({
+            animation: {
+                duration: 500,
+                easingFunction: 'easeInOutQuad'
+            }
+        });
+    }
+}
+
+// 搜索节点
+function focusNode(nodeId) {
+    if (network && nodes) {
+        const node = nodes.get(nodeId);
+        if (node) {
+            network.focus(nodeId, {
+                scale: 1.5,
+                animation: {
+                    duration: 500,
+                    easingFunction: 'easeInOutQuad'
+                }
+            });
+            network.selectNodes([nodeId]);
+        }
+    }
+}
+
+// 导出为图片
+function exportAsImage() {
+    if (network) {
+        // vis-network 不直接支持导出，可以用 html2canvas
+        console.log('[GraphViz] 导出功能待实现');
+    }
+}
+
+// 页面加载后初始化
+document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(initGraph, 500);
 });
