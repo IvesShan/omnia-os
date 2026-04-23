@@ -11,7 +11,7 @@
 
 ```bash
 # 1. 下载 deb 包
-cd /home/shan/.openclaw/workspace/omnia-os/src-tauri/target/release/bundle/deb
+cd /home/shan/omnia-os/src-tauri/target/release/bundle/deb
 
 # 2. 安装
 sudo dpkg -i Omnia_1.1.1_amd64.deb

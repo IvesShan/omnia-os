@@ -2,8 +2,8 @@
 
 **导入时间**: 2026-04-20 02:12  
 **最后更新**: 2026-04-20 20:08  
-**来源**: OpenClaw `/home/shan/.openclaw/workspace/skills/` + GitHub  
-**目标**: Omnia `/home/shan/.openclaw/workspace/omnia-os/skills/imported/`
+**来源**: OpenClaw `/home/shan/omnia-os/skills/` + GitHub  
+**目标**: Omnia `/home/shan/omnia-os/skills/imported/`
 
 ---
 

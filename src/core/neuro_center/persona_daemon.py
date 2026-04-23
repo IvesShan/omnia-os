@@ -118,9 +118,39 @@ class PersonaDaemon:
                     self.end_headers()
 
             def log_message(self, format, *args):
+                pass  # Suppress default logging
+
+            def do_GET(self):
+                """Handle GET requests for health checks."""
+                if self.path in ["/api/status", "/health", "/"]:
+                    try:
+                        # Return daemon status
+                        status = {
+                            "status": "running",
+                            "daemon": "omnia",
+                            "pid": os.getpid(),
+                            "timestamp": datetime.now().isoformat(),
+                        }
+                        response = json.dumps(status, ensure_ascii=False)
+                        self.send_response(200)
+                        self.send_header("Content-Type", "application/json")
+                        self.send_header("Access-Control-Allow-Origin", "*")
+                        self.end_headers()
+                        self.wfile.write(response.encode("utf-8"))
+                    except Exception as e:
+                        self.daemon_log("ERROR", f"Health check error: {e}")
+                        self.send_response(500)
+                        self.end_headers()
+                else:
+                    self.send_response(404)
+                    self.end_headers()
+
                 pass  # Suppress default HTTP logging
 
+        # Allow socket reuse to avoid "Address already in use" errors
+        import socket
         self._http_server = HTTPServer(("127.0.0.1", self.config.ide_bridge_port), IdeHandler)
+        self._http_server.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self._http_thread = threading.Thread(target=self._http_server.serve_forever, daemon=True)
         self._http_thread.start()
         self._log("INFO", f"IDE bridge listening on port {self.config.ide_bridge_port}")

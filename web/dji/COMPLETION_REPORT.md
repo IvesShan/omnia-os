@@ -75,7 +75,7 @@
 
 ### 方式1: 启动器（推荐）
 ```bash
-cd /home/shan/.openclaw/workspace/omnia-os/web/dji
+cd /home/shan/omnia-os/web/dji
 # 1. 启动API
 python3 api.py &
 
@@ -87,7 +87,7 @@ google-chrome launcher.html
 
 ### 方式2: 启动脚本
 ```bash
-cd /home/shan/.openclaw/workspace/omnia-os/web/dji
+cd /home/shan/omnia-os/web/dji
 ./start.sh
 ```
 
@@ -97,7 +97,7 @@ cd /home/shan/.openclaw/workspace/omnia-os/web/dji
 python3 api.py
 
 # 2. 打开浏览器
-# 访问: file:///home/shan/.openclaw/workspace/omnia-os/web/dji/index.html
+# 访问: file:///home/shan/omnia-os/web/dji/index.html
 ```
 
 ## ✨ 核心特性
@@ -203,7 +203,7 @@ python3 api.py
 **版本**: v1.0.0  
 **状态**: ✅ 已完成，可投入使用  
 **API端口**: 5002  
-**访问地址**: `file:///home/shan/.openclaw/workspace/omnia-os/web/dji/index.html`
+**访问地址**: `file:///home/shan/omnia-os/web/dji/index.html`
 
 ---
 

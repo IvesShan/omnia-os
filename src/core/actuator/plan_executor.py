@@ -147,8 +147,8 @@ Available tools:
 - query_memory(query, layer) - Query your memory palace for past conversations, facts, and user preferences
 
 Project paths:
-- Omnia: /home/shan/.openclaw/workspace/omnia-os
-- Workspace: /home/shan/.openclaw/workspace
+- Omnia: /home/shan//home/shan/omnia-os/omnia-os
+- Workspace: /home/shan//home/shan/omnia-os
 - Daemon: scripts/start_daemon.py
 
 Your memory system:

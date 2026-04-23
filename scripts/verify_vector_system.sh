@@ -2,7 +2,7 @@
 # 验证 Omnia 向量系统
 # 运行此脚本需要 1-2 分钟（首次加载模型较慢）
 
-cd /home/shan/.openclaw/workspace/omnia-os
+cd /home/shan/omnia-os
 
 echo "=========================================="
 echo "Omnia 向量系统验证"
@@ -75,4 +75,4 @@ echo "启动守护进程:"
 echo "  python3 scripts/start_daemon.py"
 echo ""
 echo "查看日志:"
-echo "  tail -f ~/.openclaw/workspace/.omnia/daemon.log"
+echo "  tail -f ~//home/shan/omnia-os/.omnia/daemon.log"

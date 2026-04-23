@@ -168,6 +168,23 @@ def _try_chat_with_fallback(message: str, system_prompt: str, primary_key: str, 
 
 
 def chat(message: str) -> None:
+    # Check for local model mode first
+    model_mode = os.environ.get("OMNIA_MODEL_MODE", "cloud")
+    
+    if model_mode == "local":
+        # Use local LLM
+        print("[Omnia] Using local model (GPU accelerated)...\n")
+        system_prompt = assemble_wake_prompt(message)
+        
+        try:
+            reply = _chat_openai_compatible_requests(None, "local", system_prompt, message)
+            print("[Omnia] " + reply + "\n")
+            return
+        except Exception as e:
+            print(f"[Omnia] Local model failed: {e}")
+            print("[Omnia] Falling back to cloud provider...\n")
+    
+    # Cloud provider logic
     key_name, api_key = _load_api_key()
     if not api_key:
         print(
@@ -209,7 +226,12 @@ def chat(message: str) -> None:
 
 def _build_model_config(provider: str) -> tuple[str, str]:
     print(f"[_build_model_config] provider={provider}")
-    if provider in ("qianfan", "baiduqianfancodingplan"):
+    if provider == "local":
+        # Local LLM (llama.cpp with GPU acceleration)
+        url = os.environ.get("LOCAL_LLM_URL", "http://localhost:8080/v1/chat/completions")
+        model = os.environ.get("LOCAL_LLM_MODEL", "gemma-4-E4B-it-OBLITERATED-Q8_0.gguf")
+        print(f"[_build_model_config] Using Local LLM: url={url}, model={model}")
+    elif provider in ("qianfan", "baiduqianfancodingplan"):
         # Qianfan Coding Plan - 实测可用：/v2/coding/chat/completions + messages 格式
         base_url = "https://qianfan.baidubce.com/v2/coding"
         url = f"{base_url}/chat/completions"
@@ -227,10 +249,69 @@ def _build_model_config(provider: str) -> tuple[str, str]:
     return url, model
 
 
+
+
+def call_local_llm(messages: list, tools: list | None = None) -> dict:
+    """Call local LLM server (llama.cpp with GPU acceleration)."""
+    import requests
+    
+    url = os.environ.get("LOCAL_LLM_URL", "http://localhost:8080/v1/chat/completions")
+    model = os.environ.get("LOCAL_LLM_MODEL", "Qwen2.5-Coder-7B")
+    
+    headers = {
+        "Content-Type": "application/json",
+    }
+    
+    payload = {
+        "model": model,
+        "messages": messages,
+        "temperature": 0.7,
+        "max_tokens": 4096,
+    }
+    
+    if tools:
+        payload["tools"] = tools
+        print(f"[call_local_llm] Tools included: {len(tools)} tools")
+    
+    print(f"[call_local_llm] POST {url}")
+    print(f"[call_local_llm] Model: {model}")
+    
+    try:
+        response = requests.post(url, headers=headers, json=payload, timeout=120)
+        
+        if response.status_code != 200:
+            error_text = response.text
+            print(f"[call_local_llm] Error response: {error_text[:500]}")
+            raise RuntimeError(f"Local LLM error {response.status_code}: {error_text}")
+        
+        data = response.json()
+        print(f"[call_local_llm] Response keys: {list(data.keys())}")
+        
+        # Add usage stats (local LLM doesn't count tokens)
+        if "usage" not in data:
+            data["usage"] = {
+                "prompt_tokens": 0,
+                "completion_tokens": 0,
+                "total_tokens": 0,
+                "note": "Local inference - no token cost"
+            }
+        
+        return data
+        
+    except requests.exceptions.ConnectionError:
+        raise RuntimeError("Local LLM service not running. Start it with: bash scripts/local_llm.sh start")
+    except requests.exceptions.Timeout:
+        raise RuntimeError("Local LLM timeout. Model may be loading or GPU memory full.")
+
+
 def _call_model_messages(api_key: str, provider: str, messages: list, tools: list | None = None) -> dict:
     """调用模型，支持 OpenAI 和 Anthropic 格式"""
     import requests
 
+    # Local LLM - use local server
+    if provider == "local":
+        return call_local_llm(messages, tools)
+    
     # Kimi 使用 Anthropic Messages API 格式
     if provider == "kimi":
         model = os.environ.get("KIMI_MODEL", "K2.6-code-preview")
@@ -299,8 +380,14 @@ def _chat_openai_compatible_requests(api_key: str, provider: str, system_prompt:
         ],
     )
     # All providers use standard chat completions response format
+    # Handle reasoning models (like Gemma) that return reasoning_content
     try:
-        return data["choices"][0]["message"]["content"]
+        msg = data["choices"][0]["message"]
+        content = msg.get("content", "")
+        # If content is empty but reasoning_content exists, use that
+        if not content and "reasoning_content" in msg:
+            content = msg["reasoning_content"]
+        return content
     except (KeyError, IndexError) as e:
         raise RuntimeError(f"Unexpected response format: {data}")
 

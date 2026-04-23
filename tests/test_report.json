@@ -1,0 +1,88 @@
+{
+  "summary": {
+    "total": 13,
+    "passed": 4,
+    "failed": 9,
+    "success_rate": "30.8%"
+  },
+  "results": [
+    {
+      "test": "健康检查",
+      "success": false,
+      "message": "状态码: 404",
+      "timestamp": "2026-04-21T23:11:56.814220"
+    },
+    {
+      "test": "前端页面访问",
+      "success": false,
+      "message": "缺失: 导航栏, 状态指示器",
+      "timestamp": "2026-04-21T23:11:56.816193"
+    },
+    {
+      "test": "静态资源: /static/css/app.css",
+      "success": true,
+      "message": "",
+      "timestamp": "2026-04-21T23:11:56.818343"
+    },
+    {
+      "test": "静态资源: /static/js/app.js",
+      "success": true,
+      "message": "",
+      "timestamp": "2026-04-21T23:11:56.820533"
+    },
+    {
+      "test": "静态资源: /static/js/model-switcher.js",
+      "success": false,
+      "message": "状态码: 404",
+      "timestamp": "2026-04-21T23:11:56.822298"
+    },
+    {
+      "test": "API 状态查询",
+      "success": true,
+      "message": "当前模式: N/A",
+      "timestamp": "2026-04-21T23:11:56.825268"
+    },
+    {
+      "test": "模型健康检查",
+      "success": false,
+      "message": "状态码: 404",
+      "timestamp": "2026-04-21T23:11:56.826958"
+    },
+    {
+      "test": "切换到 local_only",
+      "success": false,
+      "message": "当前模式: None",
+      "timestamp": "2026-04-21T23:11:56.831614"
+    },
+    {
+      "test": "切换到 cloud_only",
+      "success": false,
+      "message": "当前模式: None",
+      "timestamp": "2026-04-21T23:11:57.337077"
+    },
+    {
+      "test": "聊天测试: '你好'",
+      "success": false,
+      "message": "回复为空",
+      "timestamp": "2026-04-21T23:12:01.570334"
+    },
+    {
+      "test": "聊天测试: '介绍一下你自己'",
+      "success": false,
+      "message": "回复为空",
+      "timestamp": "2026-04-21T23:12:09.831699"
+    },
+    {
+      "test": "聊天测试: '今天天气怎么样？'",
+      "success": false,
+      "message": "回复为空",
+      "timestamp": "2026-04-21T23:12:19.066894"
+    },
+    {
+      "test": "错误处理: 无效模式",
+      "success": true,
+      "message": "正确返回 400",
+      "timestamp": "2026-04-21T23:12:20.069441"
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+# Omnia 守护进程配置
+
+daemon:
+  heartbeat_interval: 60  # 心跳间隔（秒）
+  log_level: INFO
+  
+memory:
+  auto_compress: true
+  retention_days: 365
+  
+paths:
+  memory: ./memory
+  logs: ./logs
+  data: ./data
+  skills: ./skills

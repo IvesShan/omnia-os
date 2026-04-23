@@ -24,7 +24,7 @@
 
 ### 方式1: 使用启动脚本
 ```bash
-cd /home/shan/.openclaw/workspace/omnia-os/web/dji
+cd /home/shan/omnia-os/web/dji
 chmod +x start.sh
 ./start.sh
 ```
@@ -35,7 +35,7 @@ chmod +x start.sh
 python3 api.py
 
 # 2. 打开浏览器
-# 访问 file:///home/shan/.openclaw/workspace/omnia-os/web/dji/index.html
+# 访问 file:///home/shan/omnia-os/web/dji/index.html
 ```
 
 ## 📁 文件结构

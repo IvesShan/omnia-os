@@ -217,6 +217,30 @@ MODEL_REGISTRY: dict[str, ModelConfig] = {
         supports_tools=False,
         base_url="http://localhost:11434/v1",
     ),
+    # === Local LLM (llama.cpp server) ===
+    "local/gemma-4-4b": ModelConfig(
+        provider=ProviderType.CUSTOM,
+        model_id="gemma-4-E4B-it-OBLITERATED-Q8_0.gguf",
+        display_name="Gemma 4 4B (Local GPU)",
+        context_window=32_768,
+        max_output=4_096,
+        supports_vision=False,
+        supports_tools=False,
+        supports_streaming=True,
+        base_url="http://localhost:8080",
+    ),
+    "local/qwen-7b": ModelConfig(
+        provider=ProviderType.CUSTOM,
+        model_id="qwen-7b",
+        display_name="Qwen 7B (Local GPU)",
+        context_window=32_768,
+        max_output=4_096,
+        supports_vision=False,
+        supports_tools=False,
+        supports_streaming=True,
+        base_url="http://localhost:8080",
+    ),
+
 }
 
 

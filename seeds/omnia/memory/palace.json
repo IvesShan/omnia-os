@@ -1,0 +1,21 @@
+{
+  "facts": [
+    {"content": "用户偏好: Kimi Coding 模型，注意 RPM 限制", "type": "preference", "project": "system", "score": 0.4},
+    {"content": "课件设计: Apple Keynote + Stripe 风格，深色主题", "type": "preference", "project": "system", "score": 0.35},
+    {"content": "工作方式: 主动记忆管理，不等待手动添加", "type": "habit", "project": "user", "score": 0.3}
+  ],
+  "relations": [
+    {"from": "user", "relation": "manages", "to": "miaoxiujiang"},
+    {"from": "user", "relation": "manages", "to": "dongjidi"},
+    {"from": "user", "relation": "uses", "to": "omnia"}
+  ],
+  "habits": [
+    {"content": "遇到问题 → 分析 → 解决，不轻易放弃", "type": "habit", "project": "user", "score": 0.3},
+    {"content": "重要改动及时提交到 git", "type": "habit", "project": "system", "score": 0.25}
+  ],
+  "timeline": [
+    {"content": "Omnia 2.0 架构升级完成", "type": "milestone", "project": "omnia", "created_at": "2026-04-15"},
+    {"content": "记忆系统 v2.0 分层架构实现", "type": "milestone", "project": "omnia", "created_at": "2026-04-08"}
+  ],
+  "last_updated": "2026-04-15T03:00:00"
+}

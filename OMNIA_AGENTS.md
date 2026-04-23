@@ -79,7 +79,7 @@ data = _call_model_messages(
 ### Omnia 项目
 
 ```
-/home/shan/.openclaw/workspace/omnia-os/
+/home/shan/omnia-os/
 ├── src/
 │   ├── omnia/           # Web 服务器
 │   ├── core/
@@ -118,7 +118,7 @@ data = _call_model_messages(
 
 ```python
 # 正确的方式
-execute_shell("python3 /home/shan/.openclaw/workspace/omnia-os/scripts/start_daemon.py")
+execute_shell("python3 /home/shan/omnia-os/scripts/start_daemon.py")
 ```
 
 ### 查询记忆
@@ -135,10 +135,10 @@ query_memory(query="用户偏好", layer="facts")
 
 ```python
 # 列出项目目录
-list_directory(path="/home/shan/.openclaw/workspace/omnia-os")
+list_directory(path="/home/shan/omnia-os")
 
 # 读取配置文件
-read_file(path="/home/shan/.openclaw/workspace/omnia-os/config/omnia.yaml")
+read_file(path="/home/shan/omnia-os/config/omnia.yaml")
 ```
 
 ## 错误处理

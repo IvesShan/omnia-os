@@ -1,9 +1,9 @@
 # Omnia Chat Handler - 融合三家最佳实践
 # 核心策略：工具执行后完全重建消息列表
-# 新增：神经图谱上下文增强
+# 新增：神经图谱上下文增强 + 会话历史自动加载
 
 import json
-from core.config import MEMORY_PALACE_DB
+from core.config import MEMORY_PALACE_DB, OMNIA_HOME
 import uuid
 from typing import Any
 import re
@@ -18,6 +18,7 @@ def handle_chat(message: str, history: list, api_key: str, provider: str, system
     3. 双系统提示强化禁止（Hermes）
     4. 极简总结提示
     5. 神经图谱上下文增强（NEW）
+    6. 会话历史自动加载（NEW - 解决对话连续性问题）
     """
     from omnia.chat import _call_model_messages
     from core.actuator.tool_registry import TOOLS_SCHEMA, check_tool_safety, dispatch_tool
@@ -27,6 +28,8 @@ def handle_chat(message: str, history: list, api_key: str, provider: str, system
     from core.neural_graph.context_enhancer import get_graph_enhancer
     from core.memory_palace.memory_palace_with_graph import MemoryPalace
     from core.neural_graph.updater import NeuralGraphUpdater
+    from core.session_manager import get_session_manager, load_recent_conversations, merge_histories
+    from core.context_manager import ContextManager, SessionContext, save_current_context
     from pathlib import Path
     
     import omnia.web_server as ws
@@ -35,8 +38,11 @@ def handle_chat(message: str, history: list, api_key: str, provider: str, system
     hooks = get_hook_registry()
     prompt_builder = get_prompt_builder()
     
+    # ========== 会话管理（NEW）==========
+    session_manager = get_session_manager()
+    session_id = session_manager.get_or_create_session()
+    
     # 初始化 MemoryPalace（带 Neural Graph Hook）
-    session_id = str(uuid.uuid4())[:8]
     memory_db = MEMORY_PALACE_DB
     
     # 初始化 NeuralGraphUpdater 并设置 hook
@@ -48,6 +54,25 @@ def handle_chat(message: str, history: list, api_key: str, provider: str, system
         print(f"[Chat] Failed to init NeuralGraphUpdater, falling back to basic MemoryPalace: {e}")
         mp = MemoryPalace(str(memory_db))
     
+    # ========== 自动加载历史（NEW - 解决对话连续性）==========
+    # 如果前端传来的历史很短（< 5 条），从数据库加载
+    if len(history) < 20:  # 优化: 提高阈值，确保加载足够历史
+        print(f"[Chat] Frontend history too short ({len(history)}), loading from database...")
+        db_history = load_recent_conversations(
+            limit=20,  # 优化: 加载更多历史
+            current_message=message,
+            min_similarity=0.5,  # 优化: 启用语义搜索
+        )
+        history = merge_histories(history, db_history, max_total=40)  # 优化: 增加上下文容量
+        print(f"[Chat] History merged: {len(history)} messages")
+    
+    # ========== 加载上次上下文（NEW）==========
+    context_manager = ContextManager(OMNIA_HOME)
+    last_context = context_manager.load_context()
+    
+    if last_context:
+        print(f"[Chat] Last context loaded: {last_context.topic}")
+    
     # ========== 触发 ON_MESSAGE Hook ==========
     try:
         on_message_context = HookContext(
@@ -56,7 +81,8 @@ def handle_chat(message: str, history: list, api_key: str, provider: str, system
             metadata={
                 "session_id": session_id,
                 "history_length": len(history),
-                "provider": provider
+                "provider": provider,
+                "last_context": last_context.to_dict() if last_context else None,
             }
         )
         hooks.trigger(HookType.ON_MESSAGE, on_message_context)
@@ -94,6 +120,23 @@ def handle_chat(message: str, history: list, api_key: str, provider: str, system
     prompt_context = PromptContext(mode="normal")
     dynamic_prompt = prompt_builder.build_for_provider(provider, prompt_context)
     
+    # 如果有上次上下文，追加到系统提示
+    if last_context:
+        context_prompt = f"""
+
+## 上次会话上下文
+
+📅 时间: {last_context.timestamp}
+📌 主题: {last_context.topic}
+📝 摘要: {last_context.summary}
+"""
+        if last_context.active_project:
+            context_prompt += f"\n🏗️ 项目: {last_context.active_project}"
+        if last_context.next_steps:
+            context_prompt += f"\n➡️ 下一步: {', '.join(last_context.next_steps[:3])}"
+        
+        dynamic_prompt = dynamic_prompt + context_prompt
+    
     # 如果有图谱上下文，追加到系统提示
     if graph_context_prompt:
         dynamic_prompt = dynamic_prompt + "\n" + graph_context_prompt
@@ -102,66 +145,29 @@ def handle_chat(message: str, history: list, api_key: str, provider: str, system
     
     # 添加历史
     for h in history:
-        if h.get("role") in ("user", "assistant") and h.get("content"):
+        if h.get("role") in ("user", "assistant"):
             messages.append({"role": h["role"], "content": h["content"]})
     
-    # 添加当前消息
+    # 添加当前用户消息
     messages.append({"role": "user", "content": message})
     
-    steps: list[dict] = []
-    compressor = ContextCompressor()
+    print(f"[Chat] Initial messages: {len(messages)} (system + {len(history)} history + 1 current)")
+    
+    steps = []
     tool_calls_executed = False
     
     for round_num in range(MAX_TOOL_ROUNDS):
-        print(f"[Chat] Round {round_num + 1}, messages: {len(messages)}, use_tools: {not tool_calls_executed}")
+        print(f"\n[Chat] === Round {round_num + 1}/{MAX_TOOL_ROUNDS} ===")
         
-        # 关键修复：如果已经执行过工具，完全重建消息列表（FreeCode 方案）
+        # 策略 1: 工具执行后完全重建（FreeCode 方案）
         if tool_calls_executed:
-            print(f"[Chat] REBUILDING messages for summarization (FreeCode strategy)")
+            # 清空消息列表，只保留系统提示和关键信息
+            messages = [{"role": "system", "content": dynamic_prompt}]
             
-            # 策略 1: 完全重建，不保留历史
-            messages = []
-            
-            # 策略 2: 极简的系统提示
-            messages.append({
-                "role": "system",
-                "content": f"""你刚刚执行了一些工具操作并获得了结果。
-
-现在你的唯一任务是：
-1. 用自然语言总结你发现了什么
-2. 回答用户的原始问题：{original_message}
-
-严格禁止：
-❌ 输出任何工具调用格式（XML/JSON/函数调用）
-❌ 再次调用工具
-❌ 提及"工具"、"函数"、"API调用"
-
-正确做法：
-✅ 直接回答用户的问题
-✅ 像和朋友聊天一样自然
-✅ 用自然语言描述你的发现"""
-            })
-            
-            # 策略 3: 格式化的工具结果（OpenClaw 方案）
-            formatted_results = []
-            for i, step in enumerate(steps, 1):
-                formatted_results.append(f"""
-[工具结果 {i}]
-工具: {step['tool']}
-参数: {step['arguments']}
-结果: {step['result_summary'][:500]}
-[结束]
-""")
-            
-            # 策略 4: 添加明确的问题，包含工具结果
-            formatted_results_text = "\n".join(formatted_results)
+            # 策略 2: 添加极简的总结提示
             messages.append({
                 "role": "user",
-                "content": f"""{formatted_results_text}
-
-基于以上工具执行结果，请回答：
-
-{original_message}
+                "content": f"""基于之前的工具执行结果，请回答：{original_message}
 
 记住：用自然语言回答，不要输出任何工具调用格式。"""
             })
@@ -201,11 +207,31 @@ def handle_chat(message: str, history: list, api_key: str, provider: str, system
             except Exception as e:
                 print(f"[Chat] Failed to log assistant reply: {e}")
             
+            # ========== 保存当前上下文（NEW）==========
+            try:
+                # 提取主题和摘要
+                topic = extract_topic(message)
+                summary = summarize_conversation(message, reply)
+                active_project = detect_active_project(message, reply)
+                next_steps = extract_next_steps(reply)
+                
+                save_current_context(
+                    topic=topic,
+                    summary=summary,
+                    active_project=active_project,
+                    next_steps=next_steps,
+                )
+                print(f"[Chat] Context saved: {topic}")
+            except Exception as e:
+                print(f"[Chat] Failed to save context: {e}")
+            
             return {
                 "reply": reply,
                 "steps": steps,
                 "tool_calls_executed": tool_calls_executed,
                 "graph_context_used": bool(graph_context_prompt),
+                "session_id": session_id,
+                "history_loaded": len(history),
             }
         
         # 有工具调用
@@ -229,114 +255,110 @@ def handle_chat(message: str, history: list, api_key: str, provider: str, system
                 print(f"[Chat] Unexpected error parsing args: {e}")
                 tool_args = {}
             
-            print(f"[Chat] Tool: {tool_name}, Args: {tool_args}, Args type: {type(tool_args)}")
+            print(f"[Chat] Tool: {tool_name}, Args: {tool_args}")
             
-            # 触发 PRE_TOOL_USE Hook
-            pre_hook_context = HookContext(
-                type=HookType.PRE_TOOL_USE,
-                tool_name=tool_name,
-                tool_args=tool_args
-            )
-            hooks.trigger(HookType.PRE_TOOL_USE, pre_hook_context)
+            # 安全检查
+            if not check_tool_safety(tool_name, tool_args):
+                print(f"[Chat] Tool blocked by safety check: {tool_name}")
+                messages.append({
+                    "role": "tool",
+                    "name": tool_name,
+                    "content": json.dumps({"error": "Tool blocked by safety policy"})
+                })
+                continue
             
-            # 验证参数
-            print(f"[Chat] Validating args for {tool_name}: {tool_args}")
-            validation_error = None
-            if tool_name == "read_file" and "path" not in tool_args:
-                validation_error = "read_file requires 'path' argument"
-            elif tool_name == "list_directory" and "path" not in tool_args:
-                validation_error = "list_directory requires 'path' argument"
-            elif tool_name == "execute_shell" and "command" not in tool_args:
-                validation_error = "execute_shell requires 'command' argument"
-            elif tool_name == "write_file" and ("path" not in tool_args or "content" not in tool_args):
-                validation_error = "write_file requires 'path' and 'content' arguments"
-            elif tool_name == "web_search" and "query" not in tool_args:
-                validation_error = "web_search requires 'query' argument"
-            
-            if validation_error:
-                result = {"error": validation_error}
-                print(f"[Chat] Validation failed: {validation_error}")
-            else:
-                # 安全检查
-                safety = check_tool_safety(tool_name, tool_args)
-                if safety.requires_confirm:
-                    cid = uuid.uuid4().hex[:8]
-                    _store_confirmation(cid, {
-                        "messages": messages.copy(),
-                        "tool_name": tool_name,
-                        "tool_args": tool_args,
-                        "tool_call_id": tc.get("id", "unknown"),
-                        "api_key": api_key,
-                        "provider": provider,
-                        "reason": safety.reason,
-                    })
-                    return {
-                        "needs_confirm": True,
-                        "confirm_id": cid,
-                        "reason": safety.reason,
-                        "tool": tool_name,
-                        "arguments": tool_args,
-                    }
-                
-                # 执行工具
+            # 执行工具
+            try:
                 result = dispatch_tool(tool_name, tool_args)
-
-                # 记录工具调用
-                try:
-                    mp.log_tool_use(
-                        session_id=session_id,
-                        turn_number=round_num,
-                        tool_name=tool_name,
-                        arguments=tool_args,
-                        result=str(result)[:1000]  # 限制结果长度
-                    )
-                    print(f"[Chat] Logged tool call: {tool_name}, session={session_id}")
-                except Exception as e:
-                    print(f"[Chat] Failed to log tool call: {e}")
-            
-            # 触发 POST_TOOL_USE Hook
-            post_hook_context = HookContext(
-                type=HookType.POST_TOOL_USE,
-                tool_name=tool_name,
-                tool_args=tool_args,
-                tool_result=result
-            )
-            hooks.trigger(HookType.POST_TOOL_USE, post_hook_context)
-            
-            tool_calls_executed = True
-            
-            # 记录步骤
-            steps.append({
-                "tool": tool_name,
-                "arguments": tool_args,
-                "result_summary": str(result)[:200],
-            })
-            
-            # 压缩结果（OpenClaw 方案：添加警告）
-            result_str = str(result)
-            if len(result_str) > 1000:
-                compressed = compressor.compress(result_str, max_tokens=500)
-                result_summary = f"[COMPRESSED] {compressed}"
-            else:
-                result_summary = result_str
-            
-            # 添加工具结果消息（OpenClaw 方案：明确警告）
-            messages.append({
-                "role": "tool",
-                "tool_call_id": tc.get("id", "unknown"),
-                "name": tool_name,
-                "content": f"""⚠️ 这是工具执行结果，请勿再次调用工具。
-
-工具: {tool_name}
-结果: {result_summary}
-
-请基于此结果回答用户问题，不要再次调用工具。"""
-            })
+                print(f"[Chat] Tool result: {str(result)[:200]}")
+                
+                # 记录步骤
+                steps.append({
+                    "tool": tool_name,
+                    "arguments": tool_args,
+                    "result_summary": str(result)[:500]
+                })
+                
+                tool_calls_executed = True
+                
+                # 添加工具结果
+                messages.append({
+                    "role": "tool",
+                    "name": tool_name,
+                    "content": json.dumps(result, ensure_ascii=False)
+                })
+                
+            except Exception as e:
+                print(f"[Chat] Tool execution error: {e}")
+                import traceback
+                traceback.print_exc()
+                messages.append({
+                    "role": "tool",
+                    "name": tool_name,
+                    "content": json.dumps({"error": str(e)})
+                })
     
-    # 达到最大轮数
+    # 超过最大轮数
+    reply = "抱歉，工具调用次数超过限制。请尝试简化您的请求。"
+    
+    # 保存上下文
+    try:
+        save_current_context(
+            topic=extract_topic(message),
+            summary="工具调用超限",
+            next_steps=["简化请求"],
+        )
+    except Exception as e:
+        print(f"[Chat] Failed to save context: {e}")
+    
     return {
-        "reply": "抱歉，我尝试了多次但仍未完成任务。请尝试换一种方式提问。",
+        "reply": reply,
         "steps": steps,
         "tool_calls_executed": tool_calls_executed,
-        "graph_context_used": bool(graph_context_prompt),
+        "error": "max_rounds_exceeded",
     }
+
+
+# ========== 辅助函数 ==========
+
+def extract_topic(message: str) -> str:
+    """从消息中提取主题"""
+    # 简单实现：取前 50 个字符
+    topic = message.strip()[:50]
+    if len(message) > 50:
+        topic += "..."
+    return topic
+
+
+def summarize_conversation(user_message: str, assistant_reply: str) -> str:
+    """总结对话"""
+    # 简单实现：取用户消息的前 100 个字符
+    summary = user_message.strip()[:100]
+    if len(user_message) > 100:
+        summary += "..."
+    return summary
+
+
+def detect_active_project(user_message: str, assistant_reply: str) -> str:
+    """检测活跃项目"""
+    # 简单实现：查找关键词
+    keywords = ["Omnia", "喵修匠", "懂机帝", "OpenClaw", "项目"]
+    text = user_message + " " + assistant_reply
+    for keyword in keywords:
+        if keyword in text:
+            return keyword
+    return None
+
+
+def extract_next_steps(reply: str) -> list:
+    """从回复中提取下一步"""
+    # 简单实现：查找"下一步"关键词
+    if "下一步" in reply:
+        # 提取包含"下一步"的句子
+        lines = reply.split("\n")
+        steps = []
+        for line in lines:
+            if "下一步" in line or line.strip().startswith("-"):
+                steps.append(line.strip())
+        return steps[:3]
+    return []

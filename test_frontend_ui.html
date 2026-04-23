@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Omnia 模型切换 UI 测试</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
+        .status-dot.online {
+            background-color: #10b981;
+            box-shadow: 0 0 8px #10b981;
+        }
+        .status-dot.offline {
+            background-color: #ef4444;
+            box-shadow: 0 0 8px #ef4444;
+        }
+        .status-dot.loading {
+            background-color: #f59e0b;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .mode-btn {
+            transition: all 0.3s ease;
+        }
+        .mode-btn.active {
+            border-color: #6366f1;
+            background-color: #eef2ff;
+        }
+        .test-result {
+            padding: 12px;
+            border-radius: 8px;
+            margin: 8px 0;
+        }
+        .test-result.success {
+            background-color: #d1fae5;
+            border-left: 4px solid #10b981;
+        }
+        .test-result.error {
+            background-color: #fee2e2;
+            border-left: 4px solid #ef4444;
+        }
+        .test-result.info {
+            background-color: #dbeafe;
+            border-left: 4px solid #3b82f6;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen p-8">
+    <div class="max-w-4xl mx-auto">
+        <h1 class="text-3xl font-bold text-gray-900 mb-8">🧪 Omnia 模型切换 UI 测试</h1>
+        
+        <!-- 状态监控 -->
+        <div class="bg-white rounded-lg shadow p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">📊 实时状态</h2>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <p class="text-sm text-gray-600">后端服务</p>
+                    <p id="backend-status" class="text-lg font-medium">
+                        <span class="status-dot loading"></span>
+                        检查中...
+                    </p>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-600">当前模式</p>
+                    <p id="current-mode" class="text-lg font-medium">-</p>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-600">本地模型</p>
+                    <p id="local-status" class="text-lg font-medium">
+                        <span class="status-dot loading"></span>
+                        检查中...
+                    </p>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-600">云端模型</p>
+                    <p id="cloud-status" class="text-lg font-medium">
+                        <span class="status-dot loading"></span>
+                        检查中...
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 模式切换 -->
+        <div class="bg-white rounded-lg shadow p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">🔄 模式切换</h2>
+            <div class="space-y-3">
+                <button onclick="switchMode('local_only')" class="mode-btn w-full px-4 py-3 text-left rounded-lg border-2 border-gray-200 hover:border-gray-300">
+                    <div class="flex items-center">
+                        <span class="text-2xl mr-3">🖥️</span>
+                        <div>
+                            <p class="font-medium text-gray-900">本地 GPU</p>
+                            <p class="text-xs text-gray-500">使用本地 Gemma 4 128K 模型</p>
+                        </div>
+                    </div>
+                </button>
+
+                <button onclick="switchMode('cloud_only')" class="mode-btn w-full px-4 py-3 text-left rounded-lg border-2 border-gray-200 hover:border-gray-300">
+                    <div class="flex items-center">
+                        <span class="text-2xl mr-3">☁️</span>
+                        <div>
+                            <p class="font-medium text-gray-900">云端模型</p>
+                            <p class="text-xs text-gray-500">使用 Kimi/Qianfan 云端模型</p>
+                        </div>
+                    </div>
+                </button>
+
+                <button onclick="switchMode('auto')" class="mode-btn w-full px-4 py-3 text-left rounded-lg border-2 border-gray-200 hover:border-gray-300">
+                    <div class="flex items-center">
+                        <span class="text-2xl mr-3">🤖</span>
+                        <div>
+                            <p class="font-medium text-gray-900">智能模式</p>
+                            <p class="text-xs text-gray-500">根据任务复杂度自动选择</p>
+                        </div>
+                    </div>
+                </button>
+            </div>
+        </div>
+
+        <!-- 聊天测试 -->
+        <div class="bg-white rounded-lg shadow p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">💬 聊天测试</h2>
+            <div class="mb-4">
+                <input type="text" id="chat-input" placeholder="输入消息..." class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+            </div>
+            <button onclick="sendChat()" class="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
+                发送
+            </button>
+            <div id="chat-response" class="mt-4 p-4 bg-gray-50 rounded-lg hidden">
+                <p class="text-sm text-gray-600">响应：</p>
+                <p id="chat-text" class="mt-2 text-gray-900"></p>
+            </div>
+        </div>
+
+        <!-- 测试结果 -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <h2 class="text-xl font-semibold mb-4">📋 测试结果</h2>
+            <div id="test-results"></div>
+            <button onclick="runAllTests()" class="mt-4 px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
+                运行所有测试
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:5001';
+        let currentMode = 'auto';
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            checkStatus();
+            setInterval(checkStatus, 5000); // 每5秒刷新状态
+        });
+
+        // 检查状态
+        async function checkStatus() {
+            try {
+                const response = await fetch(`${API_BASE}/api/model/status`);
+                const data = await response.json();
+                
+                updateStatus('backend', true);
+                updateStatus('local', data.local_online);
+                updateStatus('cloud', data.cloud_online);
+                document.getElementById('current-mode').textContent = data.current_mode;
+                currentMode = data.current_mode;
+                
+                // 更新按钮状态
+                updateModeButtons();
+                
+                addTestResult('状态检查', 'success', 'API 连接正常');
+            } catch (error) {
+                updateStatus('backend', false);
+                addTestResult('状态检查', 'error', `连接失败: ${error.message}`);
+            }
+        }
+
+        // 更新状态显示
+        function updateStatus(type, online) {
+            const element = document.getElementById(`${type}-status`);
+            const dot = element.querySelector('.status-dot');
+            
+            if (online) {
+                dot.className = 'status-dot online';
+                element.innerHTML = `<span class="status-dot online"></span>在线`;
+            } else {
+                dot.className = 'status-dot offline';
+                element.innerHTML = `<span class="status-dot offline"></span>离线`;
+            }
+        }
+
+        // 更新模式按钮
+        function updateModeButtons() {
+            document.querySelectorAll('.mode-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+        }
+
+        // 切换模式
+        async function switchMode(mode) {
+            try {
+                const response = await fetch(`${API_BASE}/api/model/mode`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ mode })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    addTestResult('模式切换', 'success', `成功切换到 ${mode} 模式`);
+                    currentMode = mode;
+                    document.getElementById('current-mode').textContent = mode;
+                } else {
+                    addTestResult('模式切换', 'error', data.error || '切换失败');
+                }
+                
+                checkStatus(); // 刷新状态
+            } catch (error) {
+                addTestResult('模式切换', 'error', `请求失败: ${error.message}`);
+            }
+        }
+
+        // 发送聊天
+        async function sendChat() {
+            const input = document.getElementById('chat-input');
+            const message = input.value.trim();
+            
+            if (!message) return;
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/chat`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message })
+                });
+                
+                const data = await response.json();
+                
+                document.getElementById('chat-response').classList.remove('hidden');
+                document.getElementById('chat-text').textContent = data.response;
+                
+                addTestResult('聊天测试', 'success', `响应长度: ${data.response.length} 字符`);
+            } catch (error) {
+                addTestResult('聊天测试', 'error', `请求失败: ${error.message}`);
+            }
+            
+            input.value = '';
+        }
+
+        // 添加测试结果
+        function addTestResult(name, type, message) {
+            const container = document.getElementById('test-results');
+            const timestamp = new Date().toLocaleTimeString();
+            
+            const result = document.createElement('div');
+            result.className = `test-result ${type}`;
+            result.innerHTML = `
+                <div class="flex justify-between items-start">
+                    <div>
+                        <span class="font-medium">${name}</span>
+                        <p class="text-sm text-gray-600 mt-1">${message}</p>
+                    </div>
+                    <span class="text-xs text-gray-500">${timestamp}</span>
+                </div>
+            `;
+            
+            container.insertBefore(result, container.firstChild);
+            
+            // 只保留最近10条
+            while (container.children.length > 10) {
+                container.removeChild(container.lastChild);
+            }
+        }
+
+        // 运行所有测试
+        async function runAllTests() {
+            addTestResult('测试套件', 'info', '开始运行所有测试...');
+            
+            // 测试1: 状态检查
+            await checkStatus();
+            
+            // 测试2: 模式切换
+            await switchMode('local_only');
+            await new Promise(r => setTimeout(r, 1000));
+            
+            await switchMode('cloud_only');
+            await new Promise(r => setTimeout(r, 1000));
+            
+            await switchMode('auto');
+            
+            // 测试3: 聊天功能
+            document.getElementById('chat-input').value = '你好，请介绍一下自己';
+            await sendChat();
+            
+            addTestResult('测试套件', 'success', '所有测试完成！');
+        }
+
+        // 回车发送
+        document.getElementById('chat-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendChat();
+        });
+    </script>
+</body>
+</html>

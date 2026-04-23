@@ -29,7 +29,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 
 # 使用 SharedVectorService（与 Memory Palace 共享）
-from core.shared_vector_service import get_vector_service
+from core.vector_ipc import get_hybrid_vector_service
 
 
 class VectorIntegration:

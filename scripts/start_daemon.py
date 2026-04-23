@@ -12,6 +12,10 @@ WORKSPACE_ROOT = PROJECT_ROOT.parent
 # Use OMNIA_HOME from config (same as web_server.py)
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 from core.config import OMNIA_HOME
+# Load .env configuration
+import sys
+sys.path.insert(0, str(PROJECT_ROOT))
+from scripts.load_env import load_env
 
 PID_FILE = OMNIA_HOME / "daemon.pid"
 LOG_FILE = OMNIA_HOME / "daemon.log"
@@ -27,14 +31,19 @@ def main():
         except (OSError, ValueError):
             pass
 
-    # Use pytorch_env if available (for semantic vectors)
+    # Priority: pytorch_env > omnia venv > system python
     pytorch_python = Path.home() / "pytorch_env" / "bin" / "python3"
+    omnia_venv_python = PROJECT_ROOT / ".venv" / "bin" / "python3"
+    
     if pytorch_python.exists():
         python_exe = str(pytorch_python)
         print("✓ Using pytorch_env (semantic vectors enabled)")
+    elif omnia_venv_python.exists():
+        python_exe = str(omnia_venv_python)
+        print("✓ Using omnia venv (chromadb enabled)")
     else:
         python_exe = sys.executable
-        print("⚠ Using system Python (semantic vectors disabled)")
+        print("⚠ Using system Python (limited features)")
 
     # Write runner script with offline mode support and context loading
     runner = PROJECT_ROOT / ".omnia" / "_daemon_runner.py"
@@ -105,18 +114,45 @@ except Exception as e:
     sys.stdout.flush()
 
 # Step 2: Enable semantic vectors (loads model, ~30-60 seconds)
+vector_service = None
 try:
     from core.shared_vector_service import SharedVectorService
     print("[BOOTSTRAP] Enabling semantic vectors...")
     sys.stdout.flush()
-    svc = SharedVectorService()
-    if svc.enable_semantic():
+    vector_service = SharedVectorService()
+    if vector_service.enable_semantic():
         print("[BOOTSTRAP] ✓ Semantic vectors enabled (384-dim embeddings)")
     else:
         print("[BOOTSTRAP] ⚠ Using hash-based vectors (model not available)")
     sys.stdout.flush()
 except Exception as e:
     print(f"[BOOTSTRAP] Warning: Semantic vectors unavailable: {{e}}")
+    sys.stdout.flush()
+
+# Step 2.5: Start Vector IPC Server (share model with web server)
+if vector_service is not None:
+    try:
+        from core.vector_ipc import VectorIPCServer
+        ipc_server = VectorIPCServer(vector_service)
+        ipc_server.start()
+        print("[BOOTSTRAP] ✓ Vector IPC server started (shared model ready)")
+        sys.stdout.flush()
+    except Exception as e:
+        print(f"[BOOTSTRAP] Warning: Vector IPC server failed: {{e}}")
+        sys.stdout.flush()
+
+
+# Step 2.6: Initialize VectorStore (ChromaDB)
+try:
+    from core.neural_graph.vector_store import VectorStore
+    from core.config import VECTOR_STORE_DIR
+    print("[BOOTSTRAP] Initializing VectorStore (ChromaDB)...")
+    sys.stdout.flush()
+    vector_store = VectorStore(persist_dir=VECTOR_STORE_DIR)
+    print(f"[BOOTSTRAP] ✓ VectorStore initialized (collection: {vector_store.collection_name})")
+    sys.stdout.flush()
+except Exception as e:
+    print(f"[BOOTSTRAP] Warning: VectorStore unavailable: {e}")
     sys.stdout.flush()
 
 # Step 3: Start daemon

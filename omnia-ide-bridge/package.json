@@ -1,0 +1,48 @@
+{
+  "name": "omnia-ide-bridge",
+  "displayName": "Omnia IDE Bridge",
+  "description": "Send active file and cursor context to Omnia",
+  "version": "0.1.0",
+  "publisher": "origin",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "configuration": {
+      "title": "Omnia IDE Bridge",
+      "properties": {
+        "omnia.ideBridge.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable sending context to Omnia"
+        },
+        "omnia.ideBridge.endpoint": {
+          "type": "string",
+          "default": "http://127.0.0.1:5001/ide-context",
+          "description": "Omnia daemon endpoint"
+        },
+        "omnia.ideBridge.debounceMs": {
+          "type": "number",
+          "default": 300,
+          "description": "Debounce delay for selection changes"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "@types/vscode": "^1.80.0",
+    "typescript": "^5.0.0"
+  }
+}

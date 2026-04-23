@@ -10,7 +10,7 @@ from lark_oapi.ws.client import Client as WSClient
 from lark_oapi.event.dispatcher_handler import EventDispatcherHandler
 
 # 加载配置
-CONFIG_PATH = "/home/shan/.openclaw/workspace/omnia-os/config/feishu.json"
+CONFIG_PATH = "/home/shan//home/shan/omnia-os/omnia-os/config/feishu.json"
 
 def load_config():
     with open(CONFIG_PATH, 'r') as f:

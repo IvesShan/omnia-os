@@ -4,7 +4,7 @@
 
 set -e
 
-OMNIA_DIR="/home/shan/.openclaw/workspace/omnia-os"
+OMNIA_DIR="/home/shan/omnia-os"
 LOG_DIR="$OMNIA_DIR/logs"
 PID_DIR="$OMNIA_DIR/.pids"
 

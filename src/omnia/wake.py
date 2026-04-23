@@ -18,6 +18,7 @@ from core.neural_graph.context_enhancer import NeuralGraphContextEnhancer
 from core.neuro_center.notification_queue import pop_notifications_for_session
 from core.personas import load_persona
 from core.working_memory import load_working_memory, load_current_task
+from core.context_manager import ContextManager
 
 
 def _load_ide_context(workspace_root: Path) -> Optional[str]:
@@ -212,7 +213,7 @@ def assemble_wake_prompt(
 可用工具：read_file, write_file, execute_shell, list_directory, web_search, query_memory
 
 ## 项目路径
-- Omnia: /home/shan/.openclaw/workspace/omnia-os
+- Omnia: /home/shan//home/shan/omnia-os/omnia-os
 - 守护进程: scripts/start_daemon.py
 """
     components.append(PromptComponent("agents_manual", agents_summary, priority=15))
@@ -228,6 +229,67 @@ def assemble_wake_prompt(
             "working_memory",
             "## Essential Context (L1)\n\n" + working_memory,
             priority=12  # 高于 Persona (10)
+        ))
+    
+    # Load last session context (NEW - 解决对话连续性问题)
+    context_manager = ContextManager(OMNIA_HOME)
+    last_context = context_manager.load_context()
+    if last_context:
+        context_parts = ["## 上次会话上下文"]
+        context_parts.append(f"📅 时间: {last_context.timestamp}")
+        context_parts.append(f"📌 主题: {last_context.topic}")
+        context_parts.append(f"📝 摘要: {last_context.summary}")
+        
+        if last_context.active_project:
+            context_parts.append(f"🏗️ 项目: {last_context.active_project}")
+        
+        if last_context.next_steps:
+            context_parts.append(f"➡️ 下一步: {', '.join(last_context.next_steps[:3])}")
+        
+        # 接续提示
+        context_parts.append("")
+        context_parts.append("⚠️ **重要**: 如果用户的话题与上次相关，请主动接续，不要装作不知道。")
+        context_parts.append("如果用户问\"继续\"，请根据上次的上下文继续之前的工作。")
+        
+        context_text = "\n".join(context_parts)
+        components.append(PromptComponent(
+            "last_session_context",
+            context_text,
+            priority=11.5  # 仅低于 working_memory
+        ))
+
+
+    # Semantic search for related conversations (NEW - P1 optimization)
+    related_conversations = []
+    if message:
+        try:
+            similar = mp.search_conversations_semantic(message, top_k=5)
+            if similar:
+                # Filter by similarity threshold
+                related_conversations = [
+                    (conv, score) for conv, score in similar 
+                    if score > 0.7
+                ][:3]  # Top 3 most relevant
+        except Exception as e:
+            print(f"[Wake] Semantic search failed: {e}")
+    
+    if related_conversations:
+        conv_parts = ["## 相关历史对话"]
+        conv_parts.append("以下是与当前话题语义相似的历史对话片段：")
+        conv_parts.append("")
+        for i, (conv, score) in enumerate(related_conversations, 1):
+            content_preview = conv['content'][:150]
+            if len(conv['content']) > 150:
+                content_preview += "..."
+            conv_parts.append(f"**{i}.** [{conv['role']}] {content_preview}")
+            conv_parts.append(f"   相似度: {score:.2f}")
+            conv_parts.append("")
+        
+        conv_text = "\n".join(conv_parts)
+        components.append(PromptComponent(
+            "related_conversations",
+            conv_text,
+            priority=4.8  # 高于 Neural Graph (4.5)
         ))
 
     current_task = load_current_task(project_root)

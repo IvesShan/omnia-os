@@ -908,6 +908,25 @@ html, body {
   flex-shrink: 0;
 }
 .api-dot.qianfan { background: var(--success); box-shadow: 0 0 6px var(--success); }
+
+/* 千帆选中状态 */
+.api-item[data-provider="qianfan"].selected {
+  border-left: 3px solid var(--success);
+  background: linear-gradient(135deg, rgba(34, 211, 238, 0.1) 0%, rgba(16, 185, 129, 0.05) 100%);
+}
+
+.api-item[data-provider="qianfan"].selected .api-name {
+  color: var(--success);
+}
+
+.api-item[data-provider="qianfan"].selected .api-dot {
+  animation: pulse-cyan 2s ease-in-out infinite;
+}
+
+@keyframes pulse-cyan {
+  0%, 100% { box-shadow: 0 0 6px var(--success); }
+  50% { box-shadow: 0 0 12px var(--success), 0 0 20px rgba(34, 211, 238, 0.5); }
+}
 .api-dot.kimi { background: #ff6b6b; box-shadow: 0 0 6px #ff6b6b; }
 .api-dot.openai { background: #10a37f; box-shadow: 0 0 6px #10a37f; }
 .api-dot.anthropic { background: #d4a574; box-shadow: 0 0 6px #d4a574; }
@@ -2329,4 +2348,316 @@ html, body {
 @keyframes pulse-stop {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.6; }
+}
+
+/* Local LLM Special Styles */
+/* 本地 GPU 特殊样式 - 只在选中时显示绿色高亮 */
+.api-item[data-provider="local"] .api-dot {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+}
+
+.api-item[data-provider="local"].selected {
+  border-left: 3px solid var(--success);
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.05) 100%);
+  border-color: var(--success);
+}
+
+.api-item[data-provider="local"].selected .api-name {
+  color: var(--success);
+}
+
+.api-item[data-provider="local"].selected .api-dot {
+  animation: pulse-green 2s ease-in-out infinite;
+}
+
+@keyframes pulse-green {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+/* =========================================
+   模型模式选择器样式
+   ========================================= */
+
+.model-mode-status {
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(34, 211, 238, 0.2);
+  margin-bottom: 10px;
+}
+
+.mode-label {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.mode-value {
+  color: #22d3ee;
+  font-weight: 600;
+  font-size: 13px;
+  margin-left: 6px;
+}
+
+.mode-value.local {
+  color: #10b981;
+}
+
+.mode-value.cloud {
+  color: #a855f7;
+}
+
+.mode-value.smart {
+  color: #22d3ee;
+}
+
+.model-mode-buttons {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.mode-btn {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 10px 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.mode-btn:hover {
+  background: rgba(34, 211, 238, 0.1);
+  border-color: rgba(34, 211, 238, 0.3);
+  transform: translateY(-2px);
+}
+
+.mode-btn.active {
+  background: rgba(34, 211, 238, 0.15);
+  border-color: #22d3ee;
+  box-shadow: 0 0 15px rgba(34, 211, 238, 0.3);
+}
+
+.mode-btn.active[data-mode="local_only"] {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: #10b981;
+  box-shadow: 0 0 15px rgba(16, 185, 129, 0.3);
+}
+
+.mode-btn.active[data-mode="cloud_only"] {
+  background: rgba(168, 85, 247, 0.15);
+  border-color: #a855f7;
+  box-shadow: 0 0 15px rgba(168, 85, 247, 0.3);
+}
+
+.mode-icon {
+  font-size: 20px;
+}
+
+.mode-name {
+  color: #fff;
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.mode-desc {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 10px;
+}
+
+.model-info {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+  font-size: 11px;
+}
+
+.info-label {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.info-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+}
+
+.info-value.online {
+  color: #10b981;
+}
+
+.info-value.offline {
+  color: #ef4444;
+}
+
+.info-value.checking {
+  color: #f59e0b;
+}
+
+/* =========================================
+   模型模式面板样式
+   ========================================= */
+
+.mode-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 6px;
+  border: 1px solid rgba(34, 211, 238, 0.2);
+}
+
+.mode-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.mode-value {
+  font-size: 13px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 4px;
+  transition: all 0.3s ease;
+}
+
+.mode-value.local {
+  background: rgba(34, 197, 94, 0.2);
+  color: #22c55e;
+  border: 1px solid rgba(34, 197, 94, 0.4);
+}
+
+.mode-value.cloud {
+  background: rgba(59, 130, 246, 0.2);
+  color: #3b82f6;
+  border: 1px solid rgba(59, 130, 246, 0.4);
+}
+
+.mode-value.smart {
+  background: rgba(168, 85, 247, 0.2);
+  color: #a855f7;
+  border: 1px solid rgba(168, 85, 247, 0.4);
+}
+
+.mode-buttons {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.mode-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 8px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-family: inherit;
+}
+
+.mode-btn:hover {
+  background: rgba(34, 211, 238, 0.1);
+  border-color: rgba(34, 211, 238, 0.3);
+  transform: translateY(-2px);
+}
+
+.mode-btn.active {
+  background: rgba(34, 211, 238, 0.15);
+  border-color: rgba(34, 211, 238, 0.5);
+  box-shadow: 0 0 10px rgba(34, 211, 238, 0.3);
+}
+
+.mode-icon {
+  font-size: 20px;
+}
+
+.mode-name {
+  font-size: 11px;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.service-status {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.service-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+}
+
+.service-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #666;
+  transition: all 0.3s ease;
+}
+
+.service-dot.online {
+  background: #22c55e;
+  box-shadow: 0 0 8px rgba(34, 197, 94, 0.6);
+  animation: pulse 2s infinite;
+}
+
+.service-dot.offline {
+  background: #ef4444;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.service-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  flex: 1;
+}
+
+.service-value {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 3px;
+  transition: all 0.3s ease;
+}
+
+.service-value.online {
+  color: #22c55e;
+  background: rgba(34, 197, 94, 0.1);
+}
+
+.service-value.offline {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.service-value.checking {
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.1);
 }

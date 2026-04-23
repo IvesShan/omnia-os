@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 
 # Import shared vector service
-from core.shared_vector_service import get_vector_service
+from core.vector_ipc import get_hybrid_vector_service
 
 # 统一使用 config.py 中的路径配置
 from core.config import NEURAL_GRAPH_DB, MEMORY_PALACE_DB

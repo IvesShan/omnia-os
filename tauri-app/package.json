@@ -1,0 +1,28 @@
+{
+  "name": "omnia-manager",
+  "version": "2.0.0",
+  "description": "Omnia Native Management Application",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "tauri": "tauri"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.2.0",
+    "@tauri-apps/plugin-shell": "^2.2.0",
+    "axios": "^1.7.0",
+    "dayjs": "^1.11.0",
+    "pinia": "^2.3.1",
+    "vue": "^3.5.0",
+    "vue-router": "^4.4.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.2.0",
+    "@vitejs/plugin-vue": "^5.2.0",
+    "typescript": "^5.6.0",
+    "vite": "^6.0.0",
+    "vue-tsc": "^2.1.0"
+  }
+}

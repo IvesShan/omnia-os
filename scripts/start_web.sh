@@ -1,7 +1,7 @@
 #!/bin/bash
 # Omnia Web 管理面板启动脚本
 
-cd /home/shan/.openclaw/workspace/omnia-os
+cd /home/shan/omnia-os
 
 # 检查 Python 环境
 if ! command -v python3 &> /dev/null; then

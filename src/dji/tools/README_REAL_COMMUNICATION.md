@@ -20,14 +20,14 @@
 ### 1. 测试设备发现（无需 sudo）
 
 ```bash
-cd /home/shan/.openclaw/workspace/omnia-os/src/dji/tools
+cd /home/shan/omnia-os/src/dji/tools
 python3 simple_test.py
 ```
 
 ### 2. 测试真实通信（需要 sudo）
 
 ```bash
-cd /home/shan/.openclaw/workspace/omnia-os/src/dji/tools
+cd /home/shan/omnia-os/src/dji/tools
 sudo python3 real_communication.py
 ```
 

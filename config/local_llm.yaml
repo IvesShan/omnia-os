@@ -1,0 +1,32 @@
+# Local LLM Configuration
+# 本地大模型配置 - llama.cpp server
+
+# 默认模型
+default_model: "local/gemma-4-4b"
+
+# 模型列表
+models:
+  gemma-4-4b:
+    model_id: "gemma-4-E4B-it-OBLITERATED-Q8_0.gguf"
+    display_name: "Gemma 4 4B (Local)"
+    context_window: 32768
+    max_output: 4096
+    supports_vision: false
+    supports_tools: false
+    supports_streaming: true
+    base_url: "http://localhost:8080"
+    gpu_layers: 99
+    gpu_memory: "5.5GB"
+    
+# API 端点配置
+api:
+  base_url: "http://localhost:8080"
+  timeout: 300
+  max_retries: 3
+  
+# 性能配置
+performance:
+  gpu_acceleration: true
+  gpu_type: "AMD Radeon RX 6800/6900 XT"
+  gpu_memory_total: "16GB"
+  gpu_memory_used: "5.5GB"

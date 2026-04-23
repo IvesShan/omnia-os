@@ -39,7 +39,7 @@ from omnia.chat import _load_api_key, _call_model_messages
 from omnia.wake import assemble_wake_prompt
 
 WEB_DIR = PROJECT_ROOT / "web"
-WORKSPACE = PROJECT_ROOT.parent
+WORKSPACE = PROJECT_ROOT  # Git repo is here, not parent
 PENDING_CONF_PATH = OMNIA_HOME / "pending_confirmations.json"
 
 import atexit
@@ -670,6 +670,43 @@ def create_app() -> Flask:
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
+
+    @app.route("/api/model/status", methods=["GET"])
+    def get_model_status():
+        """Return model service status for frontend."""
+        global _current_provider
+        
+        # Check if daemon is running
+        daemon_running = _daemon_status()
+        
+        # Check if any provider is configured
+        env_vars = {
+            "qianfan": "QIANFAN_API_KEY",
+            "kimi": "MOONSHOT_API_KEY", 
+            "openai": "OPENAI_API_KEY",
+            "anthropic": "ANTHROPIC_API_KEY",
+        }
+        
+        cloud_online = False
+        for pid, env_key in env_vars.items():
+            if os.environ.get(env_key):
+                cloud_online = True
+                break
+            # Also check .env file
+            env_file = PROJECT_ROOT / ".env"
+            if env_file.exists():
+                for line in env_file.read_text(encoding="utf-8").splitlines():
+                    line = line.strip()
+                    if line.startswith(f"{env_key}=") and not line.startswith("#"):
+                        cloud_online = True
+                        break
+        
+        return jsonify({
+            "local_online": daemon_running,
+            "cloud_online": cloud_online,
+            "current_mode": _current_provider or "cloud",
+        })
+
     @app.route("/api/providers", methods=["GET"])
     def get_providers_route():
         """Return available API providers and current selection."""
@@ -712,6 +749,7 @@ def create_app() -> Flask:
         if _current_provider:
             active = _current_provider
         else:
+            active = None  # Initialize first
             # First check .env file (only non-commented lines)
             env_file = PROJECT_ROOT / ".env"
             if env_file.exists():
@@ -1323,12 +1361,41 @@ def handle_feishu_message(app, event):
     pass
 
 
+
+
+def _check_port_in_use(port: int, host: str = "127.0.0.1") -> bool:
+    """Check if a port is already in use."""
+    import socket
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        try:
+            s.bind((host, port))
+            return False
+        except OSError:
+            return True
+
+
 def main():
+    # Check if port 5001 is already in use
+    if _check_port_in_use(5001):
+        print("=" * 60)
+        print("⚠️  端口 5001 已被占用!")
+        print("=" * 60)
+        print("\n可能原因:")
+        print("  1. 另一个 Omnia web 服务器正在运行")
+        print("  2. 其他程序占用了该端口")
+        print("\n解决方案:")
+        print("  1. 查找并终止占用进程:")
+        print("     lsof -i :5001")
+        print("     kill -9 <PID>")
+        print("  2. 或者等待几秒后重试")
+        print("=" * 60)
+        sys.exit(1)
+    
     app = create_app()
     print("Omnia Web UI 启动于 http://127.0.0.1:5001/")
     
     try:
-        app.run(host="0.0.0.0", port=5001, threaded=True)
+        app.run(host="127.0.0.1", port=5001, threaded=True)
     finally:
         # Cleanup MCP connections on shutdown
         print("[MCP] Shutting down...")

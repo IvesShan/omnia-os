@@ -2,7 +2,7 @@
 # Perception Monitor - 文件变化监控
 # 监控重要目录的文件变化
 
-WATCH_DIR="$HOME/.openclaw/workspace"
+WATCH_DIR="$HOME//home/shan/omnia-os"
 SNAPSHOT_FILE="$HOME/.openclaw/protect/file-snapshot.txt"
 LOG_FILE="$HOME/.openclaw/logs/file-changes.log"
 DATE=$(date '+%Y-%m-%d %H:%M:%S')

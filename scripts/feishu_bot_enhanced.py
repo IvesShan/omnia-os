@@ -11,7 +11,7 @@ import threading
 import lark_oapi as lark
 
 # 添加项目路径
-sys.path.insert(0, '/home/shan/.openclaw/workspace/omnia-os')
+sys.path.insert(0, '/home/shan//home/shan/omnia-os/omnia-os')
 
 # 导入 URL 检测模块
 from src.omnia.url_detector import extract_urls, is_url_message, get_primary_url, get_url_type

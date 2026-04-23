@@ -8,7 +8,7 @@ Auto Memory Extraction - 自动从 Verbatim 提取记忆到 Memory Palace
 3. 存储到 memory_palace.db
 
 建议 cron 配置：
-  0 */4 * * * /usr/bin/python3 /home/shan/.openclaw/workspace/omnia-os/scripts/auto_memory_extraction.py >> /tmp/memory_extraction.log 2>&1
+  0 */4 * * * /usr/bin/python3 /home/shan//home/shan/omnia-os/omnia-os/scripts/auto_memory_extraction.py >> /tmp/memory_extraction.log 2>&1
 """
 
 import os

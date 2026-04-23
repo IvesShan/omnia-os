@@ -77,6 +77,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('.hud-panel').forEach((panel) => {
     panel.addEventListener('click', (e) => {
       if (e.target.tagName === 'BUTTON' || e.target.closest('button')) return;
+      if (e.target.closest(".api-item")) return;  // 让 api-item 自己处理点击
       const action = panel.dataset.action;
       if (action) handlePanelClick(action);
     });
@@ -1670,6 +1671,7 @@ async function loadApiProviders() {
 
 function getProviderName(id) {
   const names = {
+    local: '本地 GPU',
     qianfan: '百度千帆',
     kimi: 'Moonshot',
     openai: 'OpenAI',
@@ -2053,3 +2055,5 @@ removeTyping = function() {
 };
 
 console.log('[中止按钮] 已初始化');
+
+// =========================================

@@ -1,0 +1,23 @@
+[
+  {
+    "name": "filesystem",
+    "command": "/home/shan/.nvm/versions/node/v24.15.0/bin/node",
+    "args": [
+      "/home/shan/.npm/_npx/a3241bba59c344f5/node_modules/@modelcontextprotocol/server-filesystem/dist/index.js",
+      "/home/shan/omnia-os"
+    ],
+    "enabled": true
+  },
+  {
+    "name": "git",
+    "command": "/home/shan/.local/bin/uvx",
+    "args": ["mcp-server-git", "--repository", "/home/shan/omnia-os"],
+    "enabled": true
+  },
+  {
+    "name": "fetch",
+    "command": "/home/shan/.local/bin/uvx",
+    "args": ["mcp-server-fetch"],
+    "enabled": true
+  }
+]

@@ -1,0 +1,23 @@
+[package]
+name = "omnia-desktop"
+version = "1.1.1"
+description = "Omnia AIOS Desktop Application"
+authors = ["Omnia Team"]
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["devtools"] }
+tauri-plugin-shell = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+lazy_static = "1.4"
+dirs = "5.0"
+reqwest = { version = "0.11", features = ["blocking", "json"] }
+chrono = "0.4"
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]

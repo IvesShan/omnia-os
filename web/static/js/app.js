@@ -54,6 +54,17 @@ async function loadDashboard() {
         document.getElementById('memory-count').textContent = status.memory_count;
         document.getElementById('skills-count').textContent = status.skills_count;
         document.getElementById('last-activity').textContent = formatTime(status.last_activity);
+        
+        // 更新环境信息
+        if (status.env) {
+            const env = status.env;
+            document.getElementById('env-host').textContent = env.hostname || '—';
+            document.getElementById('env-model').textContent = (env.provider && env.model) 
+                ? `${env.provider} / ${env.model}` 
+                : (env.model || '—');
+            document.getElementById('env-shell').textContent = env.shell || '—';
+            document.getElementById('env-os').textContent = env.os || '—';
+        }
     }
     
     // 加载记忆统计
@@ -64,6 +75,7 @@ async function loadDashboard() {
         document.getElementById('habits-count').textContent = stats.habits || 0;
         document.getElementById('timeline-count').textContent = stats.timeline || 0;
     }
+}
 }
 
 // ============ 记忆管理 ============

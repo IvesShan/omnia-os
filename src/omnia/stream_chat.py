@@ -70,18 +70,27 @@ def stream_chat(message: str, history: list = None) -> Generator[str, None, None
     """
     history = history or []
     
-    # 加载API配置
-    key_name, api_key = _load_api_key()
-    if not api_key:
-        yield f"data: {json.dumps({'type': 'error', 'message': 'No API key configured'})}\n\n"
-        return
+    # === 优先检查本地模型模式 ===
+    model_mode = os.environ.get("OMNIA_MODEL_MODE", "cloud")
     
-    # 检测provider
-    provider = "kimi"
-    if "QIANFAN" in key_name.upper():
-        provider = "qianfan"
-    elif "OPENAI" in key_name.upper():
-        provider = "openai"
+    if model_mode == "local":
+        # 使用本地模型
+        print("[stream_chat] Using local model (GPU accelerated)")
+        provider = "local"
+        api_key = None  # 本地模型不需要 API key
+    else:
+        # 云端模型：加载API配置
+        key_name, api_key = _load_api_key()
+        if not api_key:
+            yield f"data: {json.dumps({'type': 'error', 'message': 'No API key configured'})}\n\n"
+            return
+        
+        # 检测provider
+        provider = "kimi"
+        if "QIANFAN" in key_name.upper():
+            provider = "qianfan"
+        elif "OPENAI" in key_name.upper():
+            provider = "openai"
     
     # === 统一流程 ===
     # 不判断复杂度，直接执行

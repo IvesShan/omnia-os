@@ -1,5 +1,5 @@
 # This file implements Anthropic Messages API support for Kimi
-# Save this as /home/shan/.openclaw/workspace/omnia-os/src/omnia/kimi_anthropic.py
+# Save this as /home/shan//home/shan/omnia-os/omnia-os/src/omnia/kimi_anthropic.py
 
 import json
 import requests

@@ -43,8 +43,8 @@ node scripts/playwright-stealth.js https://example.com
 If you're using OpenClaw, you can place this skill in the skills directory:
 
 ```bash
-# Assuming your OpenClaw workspace is at ~/.openclaw/workspace
-cp -r playwright-scraper-skill ~/.openclaw/workspace/skills/
+# Assuming your OpenClaw workspace is at /home/shan/omnia-os
+cp -r playwright-scraper-skill /home/shan/omnia-os/skills/
 
 # Then you can invoke it in OpenClaw
 ```

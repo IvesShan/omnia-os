@@ -2,8 +2,8 @@
 # Memory 2.0 - 记忆强度计算器
 # 计算和更新所有记忆的强度权重
 
-MEMORY_DIR="$HOME/.openclaw/workspace/memory"
-STRENGTH_DB="$HOME/.openclaw/workspace/memory/meta/strength-db.json"
+MEMORY_DIR="$HOME//home/shan/omnia-os/memory"
+STRENGTH_DB="$HOME//home/shan/omnia-os/memory/meta/strength-db.json"
 DATE=$(date '+%Y-%m-%d')
 
 mkdir -p "$(dirname "$STRENGTH_DB")"

@@ -1,0 +1,35 @@
+# Omnia Core Dependencies
+# Python 3.8+ required
+
+# LLM APIs
+openai>=1.0.0
+anthropic>=0.18.0
+requests>=2.31.0
+
+# MCP (Model Context Protocol)
+mcp>=0.9.0
+
+# Data & Config
+pydantic>=2.0.0
+python-dotenv>=1.0.0
+pyyaml>=6.0
+numpy>=1.24.0
+
+# Async & Networking
+httpx>=0.25.0
+websockets>=12.0
+
+# Utilities
+python-dateutil>=2.8.0
+tiktoken>=0.5.0
+croniter>=2.0.0
+
+# Vector Store & Embeddings (for semantic search)
+chromadb>=1.5.0
+sentence-transformers>=2.2.0
+
+# Optional: Memory System
+# mcp-server-memory  # 如果需要本地记忆服务器
+
+# Optional: Feishu Integration
+# 飞书 SDK 需要单独安装

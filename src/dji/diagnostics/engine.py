@@ -21,7 +21,7 @@ class DiagnosticEngine:
             knowledge_base_path: 知识库路径
         """
         self.knowledge_base_path = knowledge_base_path or Path(
-            "/home/shan/.openclaw/workspace/omnia-os/knowledge_base/dji"
+            "/home/shan//home/shan/omnia-os/omnia-os/knowledge_base/dji"
         )
         
         # 加载故障代码数据库

@@ -1,0 +1,55 @@
+complex_keywords:
+- 重构
+- 架构
+- 整个模块
+- 整个项目
+- 全部
+- 系统
+explore:
+- 理解
+- 梳理
+- 整理
+- 架构
+- 设计
+- 思路
+- 帮我理解
+- 帮我梳理
+modify:
+- 改
+- 修
+- 删除
+- 添加
+- 创建
+- 重写
+- 优化
+- 重构
+- 修复
+- 实现
+- 帮我改
+- 帮我修
+- 帮我写
+- 帮我实现
+- 更新
+- 调整
+- 帮我弄
+query:
+- 查
+- 看
+- 找
+- 搜索
+- 列表
+- 是什么
+- 干嘛的
+- 怎么用
+- 了解
+- 分析
+- 解释
+- 说明
+- 帮我看看
+- 帮我查
+- 有哪些
+thresholds:
+  complex_max_reads: 5
+  medium_max_reads: 3
+  simple_max_reads: 2
+  suggest_edit_threshold: 3

@@ -8,7 +8,7 @@ from pathlib import Path
 from datetime import datetime
 
 DB_PATH = Path.home() / ".omnia" / "memory_palace.db"
-VERBATIM_DIR = Path("/home/shan/.openclaw/workspace/verbatim_db/embeddings")
+VERBATIM_DIR = Path("/home/shan//home/shan/omnia-os/verbatim_db/embeddings")
 
 def import_verbatim():
     conn = sqlite3.connect(DB_PATH)

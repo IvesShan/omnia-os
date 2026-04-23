@@ -1,0 +1,285 @@
+# Omnia 深度诊断报告
+
+**诊断时间**: 2026-04-22 02:05  
+**版本**: 1.1.0  
+**诊断者**: 无限 (Omnia System Guardian)
+
+---
+
+## 📊 系统概览
+
+### ✅ 正常运行
+
+| 组件 | 状态 | 详情 |
+|------|------|------|
+| **守护进程** | ✅ 运行中 | PID: 247990, 端口: 6789 |
+| **Web Server** | ✅ 运行中 | 端口: 5001 (非 3820) |
+| **记忆宫殿** | ✅ 健康 | 174 facts, 112 relations, 14 habits, 5709 timeline |
+| **语义向量** | ✅ 已加载 | 384-dim embeddings (all-MiniLM-L6-v2) |
+| **技能系统** | ✅ 活跃 | 20 个技能, 8 个活跃 |
+| **自动记忆** | ✅ 已注册 | 3 个 hooks (ON_MESSAGE, POST_RESPONSE, POST_TOOL_USE) |
+
+### ⚠️ 需要修复
+
+| 问题 | 严重性 | 影响 |
+|------|--------|------|
+| **端口冲突** | 🔴 高 | 守护进程启动失败，多次重试 |
+| **神经图谱为空** | 🟡 中 | Nodes: 0, Edges: 0 |
+| **工具注册不完整** | 🟡 中 | 6 个工具缺少 name 字段 |
+| **Web Server 缺少 /health** | 🟢 低 | 返回 404，影响监控 |
+
+---
+
+## 🔍 详细诊断
+
+### 1. 端口冲突问题 🔴
+
+**问题**: 守护进程启动时端口 6789 被占用
+
+**错误日志**:
+```
+OSError: [Errno 98] Address already in use
+File: persona_daemon.py, line 150
+```
+
+**原因分析**:
+- 之前的守护进程没有正确关闭
+- 端口没有被释放
+
+**修复建议**:
+```python
+# 方案 1: 添加端口重用选项
+self._http_server = HTTPServer(("127.0.0.1", self.config.ide_bridge_port), IdeHandler)
+self._http_server.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+
+# 方案 2: 检查端口是否可用
+import socket
+sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+result = sock.connect_ex(('127.0.0.1', 6789))
+if result == 0:
+    print("Port already in use, killing existing process")
+sock.close()
+```
+
+---
+
+### 2. 神经图谱为空 🟡
+
+**问题**: NeuralGraph 数据库为空
+
+**当前状态**:
+- neural_nodes: 0
+- neural_edges: 0
+
+**影响**:
+- 无法进行知识图谱推理
+- 实体关系缺失
+
+**修复建议**:
+1. **手动初始化**: 从 Memory Palace 导入数据
+   ```python
+   from core.neural_graph import NeuralGraph
+   from core.memory_palace.memory_palace import MemoryPalace
+   
+   ng = NeuralGraph()
+   mp = MemoryPalace()
+   
+   # 从 facts 创建节点
+   for fact in mp.list_facts():
+       ng.add_node(fact.key, fact.value, metadata={"source": "fact"})
+   ```
+
+2. **自动同步**: 添加定期同步任务
+   ```python
+   # 在 persona_daemon.py 中添加
+   def _sync_neural_graph(self):
+       """定期同步 Memory Palace -> Neural Graph"""
+       pass
+   ```
+
+---
+
+### 3. 工具注册不完整 🟡
+
+**问题**: 工具 schema 缺少 `name` 字段
+
+**当前状态**:
+```
+Total tools: 6
+  - Name: unknown
+  - Name: unknown
+  - Name: unknown
+  ...
+```
+
+**影响**:
+- 工具调用可能失败
+- LLM 无法正确识别工具
+
+**修复建议**:
+检查 `tool_registry.py` 中的工具定义：
+```python
+# 确保每个工具有 name 字段
+TOOLS_SCHEMA = [
+    {
+        "name": "read_file",  # 必须有
+        "description": "...",
+        "parameters": {...}
+    }
+]
+```
+
+---
+
+### 4. Web Server 缺少 /health 端点 🟢
+
+**问题**: `/health` 返回 404
+
+**当前状态**:
+- Web server 运行在 5001 端口
+- 没有 `/health` 端点
+
+**修复建议**:
+在 `web_server.py` 中添加：
+```python
+@app.route('/health', methods=['GET'])
+def health_check():
+    return jsonify({
+        "status": "healthy",
+        "version": "1.1.0",
+        "memory_palace": "ok",
+        "neural_graph": "ok",
+        "timestamp": datetime.now().isoformat()
+    })
+```
+
+---
+
+## 📈 性能分析
+
+### 内存使用
+
+| 进程 | PID | 内存 | CPU |
+|------|-----|------|-----|
+| Web Server | 247925 | 110 MB | 0.4% |
+| Daemon | 247990 | 735 MB | 0.3% |
+| **总计** | - | **845 MB** | - |
+
+### 数据库大小
+
+| 数据库 | 大小 | 记录数 |
+|--------|------|--------|
+| memory_palace.db | 19 MB | 6,009 条 |
+| neural_graph.db | 20 KB | 0 条 |
+| fts.db | 49 KB | - |
+
+### 磁盘空间
+
+| 目录 | 大小 | 说明 |
+|------|------|------|
+| ~/.omnia/ | 25 MB | 数据目录 |
+| omnia-os/ | 8.2 GB | 代码库（已优化） |
+
+---
+
+## 🛠️ 修复优先级
+
+### P0 - 立即修复
+- [ ] **端口冲突**: 添加端口重用或自动清理逻辑
+- [ ] **守护进程稳定性**: 防止重复启动失败
+
+### P1 - 本周修复
+- [ ] **神经图谱同步**: 实现自动导入机制
+- [ ] **工具注册**: 修复工具 schema
+
+### P2 - 后续优化
+- [ ] **健康检查端点**: 添加 `/health` API
+- [ ] **监控面板**: 实时显示系统状态
+- [ ] **日志轮转**: 自动压缩旧日志
+
+---
+
+## 🔧 快速修复脚本
+
+### 修复端口冲突
+
+```bash
+# 1. 停止所有守护进程
+pkill -f "_daemon_runner.py"
+
+# 2. 清理端口
+fuser -k 6789/tcp
+
+# 3. 重启守护进程
+cd /home/shan/omnia-os
+python3 scripts/start_daemon.py
+```
+
+### 初始化神经图谱
+
+```bash
+cd /home/shan/omnia-os
+python3 << 'EOF'
+import sys
+sys.path.insert(0, 'src')
+from core.neural_graph import NeuralGraph
+from core.memory_palace.memory_palace import MemoryPalace
+
+ng = NeuralGraph()
+mp = MemoryPalace()
+
+# 导入 facts
+import sqlite3
+conn = sqlite3.connect('/home/shan/.omnia/memory_palace.db')
+cursor = conn.cursor()
+cursor.execute('SELECT key, value, metadata FROM facts')
+facts = cursor.fetchall()
+conn.close()
+
+for key, value, metadata in facts:
+    ng.add_node(key, value, node_type="fact", metadata=metadata or {})
+
+print(f"Imported {len(facts)} facts to NeuralGraph")
+EOF
+```
+
+---
+
+## 📊 系统健康评分
+
+| 维度 | 评分 | 说明 |
+|------|------|------|
+| **稳定性** | 7/10 | 端口冲突影响启动 |
+| **功能性** | 8/10 | 核心功能正常 |
+| **性能** | 9/10 | 内存使用合理 |
+| **数据完整性** | 8/10 | 记忆完整，图谱缺失 |
+| **可维护性** | 7/10 | 日志完善，缺少监控 |
+| **总分** | **7.8/10** | 良好，需优化 |
+
+---
+
+## 🎯 改进建议
+
+### 短期（1周内）
+1. 修复端口冲突问题
+2. 实现神经图谱自动同步
+3. 添加健康检查端点
+
+### 中期（1个月内）
+1. 实现监控面板
+2. 优化守护进程启动逻辑
+3. 添加自动备份机制
+
+### 长期（3个月内）
+1. 实现分布式部署
+2. 添加性能监控和告警
+3. 实现自动扩缩容
+
+---
+
+**诊断完成时间**: 2026-04-22 02:05:00  
+**下次诊断建议**: 1 周后
+
+---
+
+*Generated by Omnia System Guardian v1.1.0*

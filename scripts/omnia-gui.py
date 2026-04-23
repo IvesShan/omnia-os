@@ -138,7 +138,7 @@ class OmniaGUI:
     def control_daemon(self, action):
         """控制守护进程"""
         if action == "start":
-            subprocess.run(["python3", "/home/shan/.openclaw/workspace/omnia-os/scripts/start_daemon.py"])
+            subprocess.run(["python3", "/home/shan//home/shan/omnia-os/omnia-os/scripts/start_daemon.py"])
             self.notify("Omnia", "守护进程已启动", "system-run")
         
         elif action == "stop":

@@ -3,8 +3,8 @@
 # 根据消息主题，智能加载相关记忆和skills
 
 TOPIC="$1"
-MEMORY_DIR="$HOME/.openclaw/workspace/memory_topics"
-SKILLS_DIR="$HOME/.openclaw/workspace/skills"
+MEMORY_DIR="$HOME//home/shan/omnia-os/memory_topics"
+SKILLS_DIR="$HOME//home/shan/omnia-os/skills"
 
 # 初始化加载列表
 MEMORY_TO_LOAD=""

@@ -317,3 +317,89 @@ async def index():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=5001)
+
+# ============ 模型管理 API ============
+
+# 导入 SmartModelRouter
+import sys
+sys.path.insert(0, str(OMNIA_ROOT / "src"))
+from core.providers.smart_router import SmartModelRouter, ModelMode
+
+# 全局路由器实例
+_router_instance = None
+
+def get_router() -> SmartModelRouter:
+    """获取路由器单例"""
+    global _router_instance
+    if _router_instance is None:
+        _router_instance = SmartModelRouter()
+    return _router_instance
+
+class ModelStatus(BaseModel):
+    """模型状态"""
+    mode: str
+    mode_display: str
+    local_available: bool
+    local_model: str
+    cloud_fast_model: str
+    cloud_smart_model: str
+
+class ModelSwitchRequest(BaseModel):
+    """模型切换请求"""
+    mode: str  # "local_only" | "cloud_only" | "auto"
+
+@app.get("/api/model/status", response_model=ModelStatus)
+async def get_model_status():
+    """获取当前模型状态"""
+    router = get_router()
+    
+    # 检查本地模型可用性
+    local_available = await router.is_local_available()
+    
+    # 模式显示名称
+    mode_display_map = {
+        "local_only": "🖥️ 本地 GPU",
+        "cloud_only": "☁️ 云端模型",
+        "auto": "🤖 智能选择"
+    }
+    
+    return ModelStatus(
+        mode=router.mode.value,
+        mode_display=mode_display_map.get(router.mode.value, router.mode.value),
+        local_available=local_available,
+        local_model=router.config.local_model,
+        cloud_fast_model=router.config.cloud_fast_model,
+        cloud_smart_model=router.config.cloud_smart_model
+    )
+
+@app.post("/api/model/switch")
+async def switch_model(request: ModelSwitchRequest):
+    """切换模型模式"""
+    router = get_router()
+    
+    try:
+        router.set_mode(request.mode)
+        return {
+            "status": "success",
+            "mode": router.mode.value,
+            "message": f"已切换到 {router.mode.value} 模式"
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/api/model/test")
+async def test_model():
+    """测试当前模型连接"""
+    router = get_router()
+    
+    # 测试本地模型
+    if router.mode == ModelMode.LOCAL_ONLY or router.mode == ModelMode.AUTO:
+        local_ok = await router.is_local_available()
+    else:
+        local_ok = False
+    
+    return {
+        "mode": router.mode.value,
+        "local_available": local_ok,
+        "recommendation": "本地模型可用" if local_ok else "建议启动本地模型服务"
+    }

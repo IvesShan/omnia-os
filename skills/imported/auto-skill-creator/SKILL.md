@@ -89,11 +89,11 @@ When creating a new skill, use this structure:
 SKILL_NAME=$1
 SKILL_TYPE=$2
 
-mkdir -p "~/.openclaw/workspace/skills/$SKILL_NAME/scripts"
-mkdir -p "~/.openclaw/workspace/skills/$SKILL_NAME/references"
+mkdir -p "/home/shan/omnia-os/skills/$SKILL_NAME/scripts"
+mkdir -p "/home/shan/omnia-os/skills/$SKILL_NAME/references"
 
 # Generate SKILL.md
-cat > "~/.openclaw/workspace/skills/$SKILL_NAME/SKILL.md" <> EOF
+cat > "/home/shan/omnia-os/skills/$SKILL_NAME/SKILL.md" <> EOF
 ---
 name: $SKILL_NAME
 description: [Auto-generated] Handles $SKILL_TYPE tasks
@@ -106,7 +106,7 @@ description: [Auto-generated] Handles $SKILL_TYPE tasks
 ## Usage
 
 \`\`\`bash
-~/.openclaw/workspace/skills/$SKILL_NAME/scripts/main.sh [args]
+/home/shan/omnia-os/skills/$SKILL_NAME/scripts/main.sh [args]
 \`\`\`
 EOF
 

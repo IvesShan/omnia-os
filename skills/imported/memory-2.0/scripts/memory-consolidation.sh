@@ -2,9 +2,9 @@
 # Memory 2.0 - 记忆巩固与遗忘
 # 每日凌晨执行：归档低强度记忆，强化重要记忆
 
-MEMORY_DIR="$HOME/.openclaw/workspace/memory"
-ARCHIVE_DIR="$HOME/.openclaw/workspace/memory/archive/$(date +%Y-%m)"
-STRENGTH_DB="$HOME/.openclaw/workspace/memory_2_0/meta/strength-db.json"
+MEMORY_DIR="$HOME//home/shan/omnia-os/memory"
+ARCHIVE_DIR="$HOME//home/shan/omnia-os/memory/archive/$(date +%Y-%m)"
+STRENGTH_DB="$HOME//home/shan/omnia-os/memory_2_0/meta/strength-db.json"
 DATE=$(date '+%Y-%m-%d %H:%M:%S')
 
 mkdir -p "$ARCHIVE_DIR"
@@ -47,7 +47,7 @@ echo "  ✓ 关联网络已更新"
 
 # 4. 生成每日记忆摘要
 echo "4. 生成记忆摘要..."
-SUMMARY_FILE="$HOME/.openclaw/workspace/memory/meta/daily-summary-$(date +%Y%m%d).md"
+SUMMARY_FILE="$HOME//home/shan/omnia-os/memory/meta/daily-summary-$(date +%Y%m%d).md"
 
 cat > "$SUMMARY_FILE" <> EOF
 # 记忆巩固报告 - $(date +%Y-%m-%d)

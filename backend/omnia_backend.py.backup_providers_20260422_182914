@@ -1,0 +1,754 @@
+#!/usr/bin/env python3
+"""
+Omnia Backend Service
+独立后端服务，可被 PyInstaller 打包
+
+功能：
+- API 代理（百度千帆/Kimi）
+- Memory Palace 管理
+- Agent 管理
+- 配置管理
+- WebSocket 日志推送
+"""
+
+import os
+import sys
+import json
+import asyncio
+import logging
+from pathlib import Path
+from datetime import datetime
+from typing import Optional, Dict, Any, List
+
+from flask import Flask, request, jsonify, Response
+from flask_cors import CORS
+import websocket
+import threading
+
+# ============ 配置 ============
+
+DEFAULT_PORT = int(os.environ.get('OMNIA_PORT', 5001))
+CONFIG_DIR = Path.home() / '.omnia' / 'config'
+DATA_DIR = Path.home() / '.omnia' / 'data'
+LOG_DIR = Path.home() / '.omnia' / 'logs'
+
+# 确保目录存在
+CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+
+# 日志配置
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    handlers=[
+        logging.FileHandler(LOG_DIR / 'omnia.log'),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger('omnia-backend')
+
+# ============ Flask App ============
+
+app = Flask(__name__)
+CORS(app)
+
+# ============ 配置管理 ============
+
+class ConfigManager:
+    """配置管理器"""
+    
+    def __init__(self):
+        self.config_file = CONFIG_DIR / 'settings.json'
+        self.api_keys_file = CONFIG_DIR / 'api_keys.json'
+        self.config = self.load_config()
+        self.api_keys = self.load_api_keys()
+    
+    def load_config(self) -> Dict:
+        """加载配置"""
+        if self.config_file.exists():
+            try:
+                with open(self.config_file, 'r') as f:
+                    return json.load(f)
+            except Exception as e:
+                logger.error(f"Failed to load config: {e}")
+        
+        # 默认配置
+        return {
+            'backend': {
+                'port': 5001,
+                'auto_start': True,
+                'log_level': 'info'
+            },
+            'api': {
+                'default_model': 'ernie-4.0-8k',
+                'provider': 'baidu'
+            },
+            'memory': {
+                'max_entries': 10000
+            }
+        }
+    
+    def load_api_keys(self) -> Dict:
+        """加载 API 密钥"""
+        if self.api_keys_file.exists():
+            try:
+                with open(self.api_keys_file, 'r') as f:
+                    return json.load(f)
+            except Exception as e:
+                logger.error(f"Failed to load API keys: {e}")
+        
+        return {
+            'baidu_api_key': '',
+            'baidu_secret_key': '',
+            'kimi_api_key': ''
+        }
+    
+    def save_config(self, config: Dict):
+        """保存配置"""
+        self.config = config
+        with open(self.config_file, 'w') as f:
+            json.dump(config, f, indent=2)
+        logger.info("Config saved")
+    
+    def save_api_keys(self, api_keys: Dict):
+        """保存 API 密钥"""
+        self.api_keys = api_keys
+        with open(self.api_keys_file, 'w') as f:
+            json.dump(api_keys, f, indent=2)
+        logger.info("API keys saved")
+    
+    def get(self, key: str, default=None):
+        """获取配置项"""
+        keys = key.split('.')
+        value = self.config
+        for k in keys:
+            if isinstance(value, dict):
+                value = value.get(k)
+            else:
+                return default
+        return value if value is not None else default
+
+config_manager = ConfigManager()
+
+# ============ Agent 管理 ============
+
+class AgentManager:
+    """Agent 管理器"""
+    
+    def __init__(self):
+        self.agents_dir = DATA_DIR / 'agents'
+        self.agents_dir.mkdir(parents=True, exist_ok=True)
+        self.agents = self.load_agents()
+    
+    def load_agents(self) -> Dict[str, Dict]:
+        """加载所有 Agent"""
+        agents = {}
+        for agent_file in self.agents_dir.glob('*.json'):
+            try:
+                with open(agent_file, 'r') as f:
+                    agent = json.load(f)
+                    agents[agent['id']] = agent
+            except Exception as e:
+                logger.error(f"Failed to load agent {agent_file}: {e}")
+        
+        # 默认 Agent
+        if not agents:
+            default_agent = {
+                'id': 'infinite',
+                'name': 'Infinite',
+                'role': 'AI Assistant',
+                'system_prompt': 'You are Infinite (无限), a helpful AI assistant.',
+                'created_at': datetime.now().isoformat(),
+                'model': config_manager.get('api.default_model', 'ernie-4.0-8k')
+            }
+            agents['infinite'] = default_agent
+            # 直接保存文件，不调用 save_agent（因为 self.agents 还未初始化）
+            agent_file = self.agents_dir / f"{default_agent['id']}.json"
+            with open(agent_file, 'w') as f:
+                json.dump(default_agent, f, indent=2)
+            logger.info(f"Created default agent: {default_agent['id']}")
+        
+        return agents
+    
+    def save_agent(self, agent: Dict):
+        """保存 Agent"""
+        agent_file = self.agents_dir / f"{agent['id']}.json"
+        with open(agent_file, 'w') as f:
+            json.dump(agent, f, indent=2)
+        self.agents[agent['id']] = agent
+        logger.info(f"Agent saved: {agent['id']}")
+    
+    def delete_agent(self, agent_id: str):
+        """删除 Agent"""
+        agent_file = self.agents_dir / f"{agent_id}.json"
+        if agent_file.exists():
+            agent_file.unlink()
+        if agent_id in self.agents:
+            del self.agents[agent_id]
+        logger.info(f"Agent deleted: {agent_id}")
+    
+    def list_agents(self) -> List[Dict]:
+        """列出所有 Agent"""
+        return list(self.agents.values())
+
+agent_manager = AgentManager()
+
+# ============ API 路由 ============
+
+@app.route('/api/status', methods=['GET'])
+def get_status():
+    """获取系统状态 - 前端 HUD 使用"""
+    try:
+        # 读取技能数量
+        skills_file = Path(__file__).parent.parent / 'skills' / '.omnia' / 'active_skills.json'
+        skills_data = {'active': 0, 'inactive': 0, 'total': 0}
+        
+        if skills_file.exists():
+            with open(skills_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                active = len(data.get('active_skills', []))
+                inactive = len(data.get('inactive_skills', []))
+                skills_data = {
+                    'active': active,
+                    'inactive': inactive,
+                    'total': active + inactive,
+                    'count': active  # 兼容旧版
+                }
+        
+        # 读取记忆数量
+        memory_file = Path(__file__).parent.parent / 'memory' / 'MEMORY.md'
+        memory_stats = {'facts': 0, 'relations': 0, 'habits': 0, 'timeline': 0, 'conversation_logs': 0}
+        
+        if memory_file.exists():
+            content = memory_file.read_text()
+            # 简单统计各层记忆数量
+            for layer in ['facts', 'relations', 'habits', 'timeline']:
+                memory_stats[layer] = content.count(f'## {layer.capitalize()}')
+        
+        return jsonify({
+            'daemon_running': True,
+            'api_ready': True,
+            'skills': skills_data,
+            'memory': memory_stats,
+            'timestamp': datetime.now().isoformat()
+        })
+    except Exception as e:
+        logger.error(f"Failed to get status: {e}")
+        return jsonify({
+            'daemon_running': False,
+            'api_ready': False,
+            'skills': {'total': 0},
+            'memory': {},
+            'error': str(e)
+        })
+
+
+@app.route('/api/health', methods=['GET'])
+def health_check():
+    """健康检查"""
+    return jsonify({
+        'status': 'ok',
+        'timestamp': datetime.now().isoformat(),
+        'version': '0.1.0'
+    })
+
+@app.route('/api/config', methods=['GET'])
+def get_config():
+    """获取配置"""
+    return jsonify({
+        'config': config_manager.config,
+        'api_keys': {
+            k: '***' + v[-4:] if v and len(v) > 4 else '***' if v else ''
+            for k, v in config_manager.api_keys.items()
+        }
+    })
+
+@app.route('/api/config', methods=['POST'])
+def save_config():
+    """保存配置"""
+    data = request.json
+    if 'config' in data:
+        config_manager.save_config(data['config'])
+    if 'api_keys' in data:
+        config_manager.save_api_keys(data['api_keys'])
+    return jsonify({'status': 'ok', 'message': 'Config saved'})
+
+@app.route('/api/agents', methods=['GET'])
+def list_agents():
+    """列出所有 Agent"""
+    return jsonify(agent_manager.list_agents())
+
+@app.route('/api/agents', methods=['POST'])
+def create_agent():
+    """创建 Agent"""
+    agent = request.json
+    agent['id'] = agent.get('id') or agent['name'].lower().replace(' ', '_')
+    agent['created_at'] = datetime.now().isoformat()
+    agent_manager.save_agent(agent)
+    return jsonify(agent)
+
+@app.route('/api/agents/<agent_id>', methods=['PUT'])
+def update_agent(agent_id):
+    """更新 Agent"""
+    agent = request.json
+    agent['id'] = agent_id
+    agent['updated_at'] = datetime.now().isoformat()
+    agent_manager.save_agent(agent)
+    return jsonify(agent)
+
+@app.route('/api/agents/<agent_id>', methods=['DELETE'])
+def delete_agent(agent_id):
+    """删除 Agent"""
+    agent_manager.delete_agent(agent_id)
+    return jsonify({'status': 'ok'})
+
+@app.route('/api/chat', methods=['POST'])
+def chat():
+    """聊天接口"""
+    from src.omnia.chat_handler import handle_chat
+    data = request.json
+    result = handle_chat(data)
+    return jsonify(result)
+
+@app.route('/api/memory/search', methods=['POST'])
+def search_memory():
+    """搜索记忆"""
+    from src.omnia.memory import search_memory
+    query = request.json.get('query', '')
+    results = search_memory(query)
+    return jsonify(results)
+
+@app.route('/api/logs', methods=['GET'])
+def get_logs():
+    """获取日志"""
+    lines = request.args.get('lines', 100, type=int)
+    log_file = LOG_DIR / 'omnia.log'
+    
+    if not log_file.exists():
+        return jsonify([])
+    
+    with open(log_file, 'r') as f:
+        all_lines = f.readlines()
+        recent = all_lines[-lines:]
+    
+    return jsonify([line.strip() for line in recent])
+
+# ============ 主程序 ============
+
+def main():
+    """主入口"""
+    port = config_manager.get('backend.port', DEFAULT_PORT)
+    
+    logger.info(f"Starting Omnia Backend on port {port}")
+    logger.info(f"Config dir: {CONFIG_DIR}")
+    logger.info(f"Data dir: {DATA_DIR}")
+    logger.info(f"Log dir: {LOG_DIR}")
+    
+    app.run(host='0.0.0.0', port=port, debug=False)
+
+if __name__ == '__main__':
+    main()
+
+
+# ============ Neural Graph API ============
+
+@app.route('/api/graph', methods=['GET'])
+def get_graph():
+    """
+    获取神经图谱数据（用于可视化）
+    
+    Query params:
+        - types: 节点类型过滤（逗号分隔，如 PERSON,PROJECT）
+        - min_weight: 最小关系权重（默认 0.3）
+    """
+    try:
+        from src.core.neural_graph import NeuralGraph
+        
+        graph = NeuralGraph()
+        
+        # 解析参数
+        node_types = request.args.get('types', '').split(',') if request.args.get('types') else None
+        min_weight = float(request.args.get('min_weight', 0.3))
+        
+        # 导出图谱
+        data = graph.export_to_json(node_types=node_types, min_weight=min_weight)
+        
+        return jsonify(data)
+    
+    except Exception as e:
+        logger.error(f"Failed to export graph: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/graph/stats', methods=['GET'])
+def get_graph_stats():
+    """获取图谱统计信息"""
+    try:
+        from src.core.neural_graph import NeuralGraph
+        
+        graph = NeuralGraph()
+        stats = graph.get_stats()
+        
+        return jsonify(stats)
+    
+    except Exception as e:
+        logger.error(f"Failed to get graph stats: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/graph/search', methods=['GET'])
+def search_graph():
+    """搜索图谱节点"""
+    try:
+        from src.core.neural_graph import NeuralGraph
+        
+        query = request.args.get('q', '')
+        limit = int(request.args.get('limit', 10))
+        
+        if not query:
+            return jsonify({'nodes': []})
+        
+        graph = NeuralGraph()
+        nodes = graph.search_nodes(query, limit=limit)
+        
+        return jsonify({'nodes': nodes})
+    
+    except Exception as e:
+        logger.error(f"Failed to search graph: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/graph/node/<path:entity_name>', methods=['GET'])
+def get_graph_node(entity_name):
+    """获取节点详情和关联关系"""
+    try:
+        from src.core.neural_graph import NeuralGraph
+        
+        depth = int(request.args.get('depth', 2))
+        
+        graph = NeuralGraph()
+        
+        # 导出子图
+        subgraph = graph.export_subgraph(entity_name, depth=depth)
+        
+        return jsonify(subgraph)
+    
+    except Exception as e:
+        logger.error(f"Failed to get node: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+
+# ============ HUD 面板支持 API ============
+
+@app.route('/api/open-ide', methods=['POST'])
+def open_ide():
+    """打开 VS Code"""
+    import subprocess
+    try:
+        subprocess.Popen(['code', '.'], cwd=os.getcwd())
+        return jsonify({'success': True, 'message': 'VS Code 已启动'})
+    except FileNotFoundError:
+        return jsonify({'success': False, 'error': 'VS Code 未安装或不在 PATH 中'}), 404
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/git/status', methods=['GET'])
+def git_status():
+    """获取 Git 状态"""
+    import subprocess
+    try:
+        result = subprocess.run(
+            ['git', 'status', '--porcelain'],
+            capture_output=True,
+            text=True,
+            cwd=os.getcwd()
+        )
+        files = result.stdout.strip().split('\n') if result.stdout.strip() else []
+        return jsonify({
+            'files': files,
+            'count': len(files),
+            'clean': len(files) == 0
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/system/env', methods=['GET'])
+def system_env():
+    """获取系统环境"""
+    import platform
+    import sys
+    return jsonify({
+        'os': platform.system(),
+        'os_version': platform.version(),
+        'python': platform.python_version(),
+        'hostname': platform.node(),
+        'cwd': os.getcwd(),
+        'shell': os.environ.get('SHELL', 'unknown'),
+        'user': os.environ.get('USER', 'unknown')
+    })
+
+
+@app.route('/api/system/stats', methods=['GET'])
+def system_stats():
+    """获取系统资源"""
+    try:
+        import psutil
+        return jsonify({
+            'cpu_percent': psutil.cpu_percent(interval=0.5),
+            'memory': {
+                'total': psutil.virtual_memory().total,
+                'available': psutil.virtual_memory().available,
+                'percent': psutil.virtual_memory().percent
+            },
+            'disk': {
+                'total': psutil.disk_usage('/').total,
+                'used': psutil.disk_usage('/').used,
+                'percent': psutil.disk_usage('/').percent
+            }
+        })
+    except ImportError:
+        return jsonify({
+            'cpu_percent': 0,
+            'memory': {'percent': 0},
+            'disk': {'percent': 0},
+            'error': 'psutil not installed'
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/notifications', methods=['GET'])
+def get_notifications():
+    """获取通知列表"""
+    # 从日志文件读取最近的通知
+    log_file = LOG_DIR / 'omnia.log'
+    notifications = []
+    
+    if log_file.exists():
+        with open(log_file, 'r') as f:
+            lines = f.readlines()[-50:]  # 最近 50 行
+            for line in lines:
+                if 'WARNING' in line or 'ERROR' in line:
+                    notifications.append({
+                        'type': 'warning' if 'WARNING' in line else 'error',
+                        'message': line.strip(),
+                        'time': line.split()[0] if line.split() else ''
+                    })
+    
+    return jsonify({
+        'notifications': notifications[-10:],  # 最近 10 条
+        'count': len(notifications)
+    })
+
+
+@app.route('/api/skills/list', methods=['GET'])
+def list_skills():
+    """获取技能列表 - 从 active_skills.json 读取"""
+    skills_file = Path(__file__).parent.parent / 'skills' / '.omnia' / 'active_skills.json'
+    
+    if skills_file.exists():
+        try:
+            with open(skills_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                active_skills = data.get('active_skills', [])
+                inactive_skills = data.get('inactive_skills', [])
+                
+                # 格式化激活技能
+                skills = []
+                for skill in active_skills:
+                    skills.append({
+                        'id': skill.get('id', 'unknown'),
+                        'name': skill.get('name', 'Unknown'),
+                        'status': skill.get('status', 'active'),
+                        'priority': skill.get('priority', 0),
+                        'triggers': skill.get('triggers', []),
+                        'description': skill.get('description', '')
+                    })
+                
+                return jsonify({
+                    'skills': skills,
+                    'active': len(active_skills),
+                    'inactive': len(inactive_skills),
+                    'total': len(active_skills) + len(inactive_skills),
+                    'count': len(active_skills)  # 兼容旧版
+                })
+        except Exception as e:
+            logger.error(f"Failed to load skills: {e}")
+            return jsonify({'skills': [], 'count': 0, 'error': str(e)})
+    
+    return jsonify({'skills': [], 'count': 0, 'total': 0})
+
+
+@app.route('/api/workflow/status', methods=['GET'])
+def workflow_status():
+    """获取工作流状态"""
+    # 暂时返回静态状态，未来可以连接实际的工作流引擎
+    return jsonify({
+        'active': False,
+        'current': None,
+        'pending': 0,
+        'completed_today': 0
+    })
+
+# ============ 模型切换 API ============
+
+# 导入 SmartModelRouter
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
+from core.providers.smart_router import SmartModelRouter, ModelMode
+
+# 初始化路由器
+model_router = SmartModelRouter()
+
+
+@app.route('/api/model/status', methods=['GET'])
+def get_model_status():
+    """
+    获取当前模型状态
+    
+    返回：
+    - mode: 当前模式 (local_only/cloud_only/auto)
+    - local_available: 本地模型是否可用
+    - local_model: 本地模型名称
+    - mode_display: 模式显示名称
+    """
+    try:
+        import asyncio
+        mode = model_router.mode.value
+        local_available = asyncio.run(model_router.is_local_available())
+        
+        mode_display_map = {
+            'local_only': '🖥️ 本地 GPU',
+            'cloud_only': '☁️ 云端模型',
+            'auto': '🤖 智能选择'
+        }
+        
+        return jsonify({
+            'mode': mode,
+            'mode_display': mode_display_map.get(mode, mode),
+            'local_available': local_available,
+            'local_model': model_router.config.local_model,
+            'cloud_fast_model': model_router.config.cloud_fast_model,
+            'cloud_smart_model': model_router.config.cloud_smart_model,
+            'prefer_local': model_router.config.prefer_local
+        })
+    except Exception as e:
+        logger.error(f"Failed to get model status: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/model/switch', methods=['POST'])
+def switch_model():
+    """
+    切换模型模式
+    
+    参数：
+    - mode: "local_only" | "cloud_only" | "auto"
+    
+    返回：
+    - success: 是否成功
+    - mode: 当前模式
+    - message: 提示信息
+    """
+    try:
+        import asyncio
+        data = request.get_json()
+        mode = data.get('mode', 'auto')
+        
+        # 验证模式
+        valid_modes = ['local_only', 'cloud_only', 'auto']
+        if mode not in valid_modes:
+            return jsonify({
+                'success': False,
+                'error': f'Invalid mode: {mode}. Valid modes: {valid_modes}'
+            }), 400
+        
+        # 如果切换到本地模式，检查本地模型是否可用
+        if mode == 'local_only':
+            if not asyncio.run(model_router.is_local_available()):
+                return jsonify({
+                    'success': False,
+                    'error': '本地模型不可用，请检查 llama.cpp server 是否运行'
+                }), 400
+        
+        # 切换模式
+        model_router.set_mode(mode)
+        
+        # 保存到配置
+        config_manager.config['model'] = config_manager.config.get('model', {})
+        config_manager.config['model']['mode'] = mode
+        config_manager.save_config(config_manager.config)
+        
+        mode_display_map = {
+            'local_only': '🖥️ 本地 GPU',
+            'cloud_only': '☁️ 云端模型',
+            'auto': '🤖 智能选择'
+        }
+        
+        logger.info(f"Model switched to {mode}")
+        
+        return jsonify({
+            'success': True,
+            'mode': mode,
+            'mode_display': mode_display_map.get(mode, mode),
+            'message': f'已切换到 {mode_display_map.get(mode, mode)}'
+        })
+    except Exception as e:
+        logger.error(f"Failed to switch model: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/model/health', methods=['GET'])
+def check_model_health():
+    """
+    检查本地模型健康状态
+    
+    返回：
+    - local_available: 本地模型是否可用
+    - response_time: 响应时间（毫秒）
+    - gpu_memory: GPU 内存使用情况（如果可用）
+    """
+    try:
+        import asyncio
+        import time
+        start_time = time.time()
+        
+        # 检查本地模型是否可用
+        local_available = asyncio.run(model_router.is_local_available())
+        
+        response_time = int((time.time() - start_time) * 1000)
+        
+        # 尝试获取 GPU 信息
+        gpu_info = {}
+        try:
+            import subprocess
+            result = subprocess.run(
+                ['nvidia-smi', '--query-gpu=memory.used,memory.total', '--format=csv,noheader,nounits'],
+                capture_output=True,
+                text=True,
+                timeout=2
+            )
+            if result.returncode == 0:
+                used, total = result.stdout.strip().split(',')
+                gpu_info = {
+                    'memory_used_mb': int(used.strip()),
+                    'memory_total_mb': int(total.strip()),
+                    'memory_percent': int(int(used.strip()) / int(total.strip()) * 100)
+                }
+        except:
+            pass
+        
+        return jsonify({
+            'local_available': local_available,
+            'response_time_ms': response_time,
+            'gpu': gpu_info
+        })
+    except Exception as e:
+        logger.error(f"Failed to check model health: {e}")
+        return jsonify({'error': str(e)}), 500
+

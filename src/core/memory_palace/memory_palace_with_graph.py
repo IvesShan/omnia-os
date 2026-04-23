@@ -61,7 +61,7 @@ class MemoryPalace:
     def vector_service(self):
         """Lazy-load vector service (singleton)."""
         if self._vector_service is None:
-            self._vector_service = get_vector_service()
+            self._vector_service = get_hybrid_vector_service()
         return self._vector_service
 
     def initialize(self, schema_path: Optional[Path] = None) -> None:
@@ -382,6 +382,28 @@ class MemoryPalace:
     # ------------------------------------------------------------------
     # Cross-layer semantic search
     # ------------------------------------------------------------------
+
+    def search_conversations_semantic(
+        self, query: str, top_k: int = 10
+    ) -> List[Tuple[Dict[str, Any], float]]:
+        """Semantic search across conversation logs."""
+        query_vec = self.vector_service.encode(query)
+        
+        conn = self._connect()
+        rows = conn.execute(
+            "SELECT * FROM conversation_logs WHERE embedding IS NOT NULL"
+        ).fetchall()
+        
+        results = []
+        for row in rows:
+            if row['embedding']:
+                stored_vec = np.frombuffer(row['embedding'], dtype=np.float32)
+                similarity = self.vector_service.similarity(query_vec, stored_vec)
+                results.append((dict(row), similarity))
+        
+        results.sort(key=lambda x: x[1], reverse=True)
+        return results[:top_k]
+
     def search_all_semantic(self, query: str, top_k: int = 10) -> Dict[str, List[Tuple[Dict[str, Any], float]]]:
         """Search across all memory layers semantically."""
         return {

@@ -2,7 +2,7 @@
 # Attention Manager - 上下文自动总结重置
 # 当token使用过高时，自动总结历史对话并重置上下文
 
-SUMMARY_FILE="$HOME/.openclaw/workspace/memory/conversation_summary_$(date +%Y%m%d).md"
+SUMMARY_FILE="$HOME//home/shan/omnia-os/memory/conversation_summary_$(date +%Y%m%d).md"
 DATE=$(date '+%Y-%m-%d %H:%M:%S')
 
 echo "🧹 触发自动总结重置..."

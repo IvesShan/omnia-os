@@ -1,0 +1,16 @@
+# Omnia 模型模式配置
+# 当前模式: cloud (云端)
+
+current_mode: cloud
+
+# 本地模型配置
+local:
+  enabled: true
+  endpoint: "http://localhost:8080/v1"
+  model: "gemma-4-E4B-it-OBLITERATED-Q8_0.gguf"
+
+# 云端模型配置
+cloud:
+  enabled: true
+  provider: qianfan
+  model: "ERNIE-4.0-8K"

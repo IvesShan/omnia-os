@@ -1,0 +1,10 @@
+{
+  "app_id": "cli_a9540774f0b8dcc4",
+  "app_secret": "C4AOjmYuoRrcgFNm9XoHahwOzEoqgsyR",
+  "connection_mode": "websocket",
+  "enabled": true,
+  "event_types": [
+    "im.message.receive_v1"
+  ],
+  "help_text": "飞书机器人配置 - Omnia AIOS"
+}

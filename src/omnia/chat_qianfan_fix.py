@@ -2,7 +2,7 @@
 import re
 
 # Read the file
-with open('/home/shan/.openclaw/workspace/omnia-os/src/omnia/chat.py', 'r') as f:
+with open('/home/shan//home/shan/omnia-os/omnia-os/src/omnia/chat.py', 'r') as f:
     content = f.read()
 
 # Find and replace the problematic section
@@ -81,7 +81,7 @@ new_code = '''    if provider in ("baiduqianfancodingplan", "qianfan"):
 
 if old_code in content:
     content = content.replace(old_code, new_code)
-    with open('/home/shan/.openclaw/workspace/omnia-os/src/omnia/chat.py', 'w') as f:
+    with open('/home/shan//home/shan/omnia-os/omnia-os/src/omnia/chat.py', 'w') as f:
         f.write(content)
     print("✓ chat.py patched successfully")
 else:

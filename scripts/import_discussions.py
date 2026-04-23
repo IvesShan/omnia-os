@@ -8,7 +8,7 @@ from pathlib import Path
 from datetime import datetime
 
 DB_PATH = Path.home() / ".omnia" / "memory_palace.db"
-DISCUSSIONS_DIR = Path("/home/shan/.openclaw/workspace/.omnia/discussions")
+DISCUSSIONS_DIR = Path("/home/shan//home/shan/omnia-os/.omnia/discussions")
 
 def import_discussions():
     conn = sqlite3.connect(DB_PATH)

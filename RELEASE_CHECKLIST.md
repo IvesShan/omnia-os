@@ -44,7 +44,7 @@
 ### 方式 1: 自动打包（推荐）
 
 ```bash
-cd /home/shan/.openclaw/workspace/omnia-os
+cd /home/shan/omnia-os
 ./scripts/package-for-usb.sh 1.0
 ```
 

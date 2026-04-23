@@ -12,9 +12,9 @@ description: Active perception system to monitor environment changes and user st
 ### 1. File System Perception 👁️
 
 **Monitor:**
-- `~/.openclaw/workspace/` - 文件创建、修改、删除
-- `~/.openclaw/workspace/projects/` - 项目文件变化
-- `~/.openclaw/workspace/memory/` - 记忆文件更新
+- `/home/shan/omnia-os/` - 文件创建、修改、删除
+- `/home/shan/omnia-os/projects/` - 项目文件变化
+- `/home/shan/omnia-os/memory/` - 记忆文件更新
 - `~/.openclaw/outputs/` - 输出文件生成
 
 **Detection:**

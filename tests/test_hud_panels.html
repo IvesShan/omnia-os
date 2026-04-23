@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>Omnia HUD 面板测试</title>
+  <style>
+    body {
+      font-family: 'JetBrains Mono', monospace;
+      background: #0a0e27;
+      color: #22d3ee;
+      padding: 20px;
+    }
+    .test-item {
+      background: rgba(34, 211, 238, 0.1);
+      border: 1px solid rgba(34, 211, 238, 0.3);
+      border-radius: 8px;
+      padding: 15px;
+      margin: 10px 0;
+    }
+    .test-item h3 {
+      margin: 0 0 10px 0;
+      color: #a855f7;
+    }
+    .status {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: bold;
+    }
+    .status.pass { background: #22c55e; color: #fff; }
+    .status.fail { background: #ef4444; color: #fff; }
+    .status.pending { background: #f59e0b; color: #000; }
+    pre {
+      background: rgba(0, 0, 0, 0.3);
+      padding: 10px;
+      border-radius: 4px;
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+  <h1>🧪 Omnia HUD 面板功能测试</h1>
+  <div id="results"></div>
+
+  <script>
+    const API_BASE = window.location.origin;
+    const results = [];
+
+    // 测试函数
+    async function testAPI(name, endpoint, method = 'GET') {
+      try {
+        const res = await fetch(`${API_BASE}${endpoint}`, { method });
+        const data = await res.json();
+        return { name, status: res.ok ? 'pass' : 'fail', data };
+      } catch (err) {
+        return { name, status: 'fail', error: err.message };
+      }
+    }
+
+    async function runTests() {
+      // API 测试
+      const apiTests = [
+        { name: '健康检查', endpoint: '/api/health' },
+        { name: '图谱统计', endpoint: '/api/graph/stats' },
+        { name: '图谱数据', endpoint: '/api/graph?limit=10' },
+        { name: '系统环境', endpoint: '/api/system/env' },
+        { name: '系统资源', endpoint: '/api/system/stats' },
+        { name: 'Git 状态', endpoint: '/api/git/status' },
+        { name: '通知列表', endpoint: '/api/notifications' },
+        { name: '技能列表', endpoint: '/api/skills/list' },
+        { name: '工作流状态', endpoint: '/api/workflow/status' },
+      ];
+
+      for (const test of apiTests) {
+        const result = await testAPI(test.name, test.endpoint);
+        results.push(result);
+      }
+
+      // POST 测试
+      const postTests = [
+        { name: '记忆搜索', endpoint: '/api/memory/search', body: { query: '原点' } },
+      ];
+
+      for (const test of postTests) {
+        try {
+          const res = await fetch(`${API_BASE}${test.endpoint}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(test.body)
+          });
+          const data = await res.json();
+          results.push({ name: test.name, status: res.ok ? 'pass' : 'fail', data });
+        } catch (err) {
+          results.push({ name: test.name, status: 'fail', error: err.message });
+        }
+      }
+
+      // 渲染结果
+      const container = document.getElementById('results');
+      container.innerHTML = results.map(r => `
+        <div class="test-item">
+          <h3>${r.name}</h3>
+          <span class="status ${r.status}">${r.status.toUpperCase()}</span>
+          ${r.data ? `<pre>${JSON.stringify(r.data, null, 2)}</pre>` : ''}
+          ${r.error ? `<pre style="color: #ef4444;">${r.error}</pre>` : ''}
+        </div>
+      `).join('');
+
+      // 统计
+      const passed = results.filter(r => r.status === 'pass').length;
+      const failed = results.filter(r => r.status === 'fail').length;
+      
+      container.innerHTML = `
+        <div class="test-item">
+          <h2>测试结果</h2>
+          <p>✅ 通过: ${passed} | ❌ 失败: ${failed} | 总计: ${results.length}</p>
+        </div>
+      ` + container.innerHTML;
+    }
+
+    // 运行测试
+    runTests();
+  </script>
+</body>
+</html>
