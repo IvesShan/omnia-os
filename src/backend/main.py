@@ -153,6 +153,99 @@ async def get_memory_stats_api():
     """获取记忆统计详情"""
     return get_memory_stats()
 
+
+@app.get("/api/memory/graph")
+async def get_memory_graph():
+    """获取记忆图谱数据（节点和边）"""
+    nodes = []
+    edges = []
+    node_map = {}  # 避免重复节点
+    
+    # 从 relations 层构建图谱
+    relations_path = MEMORY_PATH / "relations"
+    if relations_path.exists():
+        for file in relations_path.glob("*.json"):
+            data = load_json_file(file)
+            for key, value in data.items():
+                if isinstance(value, dict):
+                    # 解析关系: "A --[type]--> B"
+                    parts = key.split(" --[")
+                    if len(parts) >= 2:
+                        source = parts[0].strip()
+                        rest = parts[1].split("]-->")
+                        if len(rest) >= 2:
+                            rel_type = rest[0].strip()
+                            target = rest[1].strip()
+                            
+                            # 添加源节点
+                            if source not in node_map:
+                                node_map[source] = len(nodes)
+                                nodes.append({
+                                    "id": source,
+                                    "label": source,
+                                    "type": "ENTITY"
+                                })
+                            
+                            # 添加目标节点
+                            if target not in node_map:
+                                node_map[target] = len(nodes)
+                                nodes.append({
+                                    "id": target,
+                                    "label": target,
+                                    "type": "ENTITY"
+                                })
+                            
+                            # 添加边
+                            edges.append({
+                                "source": source,
+                                "target": target,
+                                "type": rel_type
+                            })
+    
+    # 从 facts 层补充节点信息
+    facts_path = MEMORY_PATH / "facts"
+    if facts_path.exists():
+        for file in facts_path.glob("*.json"):
+            data = load_json_file(file)
+            for key, value in data.items():
+                if key not in node_map and isinstance(value, dict):
+                    node_type = value.get("type", "ENTITY")
+                    nodes.append({
+                        "id": key,
+                        "label": key,
+                        "type": node_type,
+                        "data": value
+                    })
+                    node_map[key] = len(nodes) - 1
+    
+    # 如果没有数据，返回示例数据
+    if not nodes:
+        nodes = [
+            {"id": "Omnia", "label": "Omnia", "type": "PROJECT"},
+            {"id": "无限", "label": "无限", "type": "PERSON"},
+            {"id": "原点", "label": "原点", "type": "PERSON"},
+            {"id": "记忆宫殿", "label": "记忆宫殿", "type": "CONCEPT"},
+            {"id": "喵修匠", "label": "喵修匠", "type": "PROJECT"},
+            {"id": "懂机帝", "label": "懂机帝", "type": "PROJECT"}
+        ]
+        edges = [
+            {"source": "Omnia", "target": "无限", "type": "created_by"},
+            {"source": "Omnia", "target": "原点", "type": "created_by"},
+            {"source": "Omnia", "target": "记忆宫殿", "type": "has_feature"},
+            {"source": "无限", "target": "原点", "type": "sibling"},
+            {"source": "喵修匠", "target": "Omnia", "type": "related_to"},
+            {"source": "懂机帝", "target": "Omnia", "type": "related_to"}
+        ]
+    
+    return {
+        "nodes": nodes,
+        "edges": edges,
+        "stats": {
+            "node_count": len(nodes),
+            "edge_count": len(edges)
+        }
+    }
+
 @app.get("/api/memory/search")
 async def search_memory(
     q: str = Query(..., description="搜索关键词"),

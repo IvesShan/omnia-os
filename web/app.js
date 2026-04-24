@@ -1350,11 +1350,35 @@ function handlePanelClick(action) {
     // === HUD 面板修复 - 新增缺失的 case 分支 ===
     case 'neural-graph':
       // 触发神经图谱加载
-      if (typeof GraphViz !== 'undefined') {
-        GraphViz.loadGraph();
-        GraphViz.loadStats();
-      }
-      appendOmnia('[系统] 神经图谱已激活，正在加载实体关系网络...');
+      const initGraphViz = () => {
+        if (typeof GraphViz !== 'undefined') {
+          // 检查是否已初始化 Three.js 场景
+          if (!GraphViz.scene) {
+            console.log('[App] GraphViz 未初始化，调用 init()');
+            GraphViz.init();
+          } else {
+            console.log('[App] GraphViz 已初始化，刷新数据');
+            GraphViz.loadGraph();
+            GraphViz.loadStats();
+          }
+          appendOmnia('[系统] 神经图谱已激活，正在加载实体关系网络...');
+        } else {
+          console.log('[App] GraphViz 尚未加载，等待 three-loaded 事件...');
+          // 等待 graph-viz.js 加载完成
+          window.addEventListener('three-loaded', () => {
+            setTimeout(() => {
+              if (typeof GraphViz !== 'undefined') {
+                GraphViz.init();
+                appendOmnia('[系统] 神经图谱已激活，正在加载实体关系网络...');
+              } else {
+                console.error('[App] GraphViz 仍未定义！');
+                appendOmnia('[系统] 神经图谱模块加载失败，请刷新页面重试。');
+              }
+            }, 100);
+          }, { once: true });
+        }
+      };
+      initGraphViz();
       break;
     
     case 'api-selector':

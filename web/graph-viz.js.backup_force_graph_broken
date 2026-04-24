@@ -1,0 +1,308 @@
+// 神经图谱可视化 - Force Graph 版本（修复后）
+const GraphViz = {
+  graph: null,
+  graphData: null,
+  particles: [],
+  animationId: null,
+  
+  init() {
+    console.log('[GraphViz] 初始化 Force Graph');
+    this.loadStats();
+    this.loadGraph();
+  },
+  
+  async loadStats() {
+    try {
+      const res = await fetch('/api/graph/stats');
+      const stats = await res.json();
+      
+      const nodesEl = document.getElementById('gs-nodes');
+      const edgesEl = document.getElementById('gs-edges');
+      
+      if (nodesEl) nodesEl.textContent = stats.nodes || 0;
+      if (edgesEl) edgesEl.textContent = stats.edges || 0;
+      
+      this.updateLegend(stats.nodes_by_type || {});
+      
+    } catch (err) {
+      console.error('[GraphViz] 加载统计失败:', err);
+    }
+  },
+  
+  updateLegend(byType) {
+    const types = ['PERSON', 'PROJECT', 'FILE', 'CONCEPT', 'DATE', 'ENTITY'];
+    types.forEach(type => {
+      const count = byType[type] || 0;
+      const el = document.querySelector(`.legend-item .legend-dot.${type.toLowerCase()}`);
+      if (el && count > 0) {
+        const parent = el.closest('.legend-item');
+        if (parent) {
+          const textNodes = Array.from(parent.childNodes).filter(n => n.nodeType === 3);
+          if (textNodes.length > 0) {
+            textNodes[0].textContent = textNodes[0].textContent.trim() + ` (${count})`;
+          }
+        }
+      }
+    });
+  },
+  
+  getTypeColor(type) {
+    const colors = {
+      'PERSON': '#22d3ee',    // 青色
+      'PROJECT': '#a855f7',   // 紫色
+      'FILE': '#10b981',      // 绿色
+      'CONCEPT': '#f59e0b',   // 橙色
+      'DATE': '#6366f1',      // 靛蓝
+      'ENTITY': '#ec4899',    // 粉色
+      'DEFAULT': '#64748b'    // 灰色
+    };
+    return colors[type?.toUpperCase()] || colors['DEFAULT'];
+  },
+  
+  async loadGraph() {
+    const canvas = document.getElementById('graph-canvas');
+    if (!canvas) {
+      console.error('[GraphViz] 找不到 graph-canvas');
+      return;
+    }
+    
+    canvas.innerHTML = '<div class="graph-loading"><div class="loading-spinner"></div>正在唤醒记忆...</div>';
+    
+    try {
+      const res = await fetch('/api/graph?limit=150');
+      const data = await res.json();
+      
+      console.log('[GraphViz] 节点:', data.nodes?.length, '边:', data.edges?.length);
+      
+      if (!data.nodes || data.nodes.length === 0) {
+        canvas.innerHTML = '<div class="graph-placeholder">暂无图谱数据</div>';
+        return;
+      }
+      
+      // 创建 ID 映射
+      const nameToId = {};
+      data.nodes.forEach(n => {
+        nameToId[n.name] = n.id;
+        if (n.canonical_name) nameToId[n.canonical_name] = n.id;
+      });
+      
+      // 准备 Force Graph 数据格式
+      const nodes = data.nodes.map(n => ({
+        id: n.id,
+        name: n.name || n.label || n.id,
+        type: n.type,
+        val: Math.max(5, Math.min(15, (n.access_count || 0) * 0.5 + 5)), // 节点大小
+        access_count: n.access_count || 0
+      }));
+      
+      const links = data.edges
+        .filter(e => {
+          const sourceId = e.source_id || nameToId[e.source];
+          const targetId = e.target_id || nameToId[e.target];
+          return sourceId && targetId;
+        })
+        .map(e => ({
+          source: e.source_id || nameToId[e.source],
+          target: e.target_id || nameToId[e.target],
+          relation: e.relation
+        }));
+      
+      this.graphData = { nodes, links };
+      
+      // 清空画布
+      canvas.innerHTML = '';
+      
+      // 创建 Force Graph - 使用正确的 API
+      this.graph = ForceGraph()(canvas)
+        .graphData(this.graphData)
+        .width(canvas.clientWidth)
+        .height(canvas.clientHeight)
+        .backgroundColor('transparent')
+        
+        // 节点渲染 - 外发光 + 内核高亮
+        .nodeCanvasObject((node, ctx, globalScale) => {
+          const size = node.val * 2;
+          const color = this.getTypeColor(node.type);
+          
+          // 外发光效果
+          ctx.beginPath();
+          ctx.arc(node.x, node.y, size + 4, 0, 2 * Math.PI);
+          ctx.fillStyle = color + '20'; // 20% opacity glow
+          ctx.fill();
+          
+          // 主节点
+          ctx.beginPath();
+          ctx.arc(node.x, node.y, size, 0, 2 * Math.PI);
+          ctx.fillStyle = color;
+          ctx.fill();
+          
+          // 内核高亮
+          ctx.beginPath();
+          ctx.arc(node.x, node.y, size * 0.4, 0, 2 * Math.PI);
+          ctx.fillStyle = '#ffffff40';
+          ctx.fill();
+          
+          // 标签（放大时显示）
+          if (globalScale > 0.8) {
+            ctx.font = `${Math.max(10, 12 / globalScale)}px Inter, sans-serif`;
+            ctx.fillStyle = '#ffffff';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            ctx.fillText(node.name, node.x, node.y + size + 4);
+          }
+        })
+        
+        // 边渲染 - 流动粒子效果
+        .linkCanvasObjectMode(() => 'after')
+        .linkCanvasObject((link, ctx, globalScale) => {
+          const start = link.source;
+          const end = link.target;
+          
+          if (!start || !end || !Number.isFinite(start.x) || !Number.isFinite(end.y)) return;
+          
+          // 绘制连线
+          ctx.beginPath();
+          ctx.moveTo(start.x, start.y);
+          ctx.lineTo(end.x, end.y);
+          ctx.strokeStyle = 'rgba(100, 116, 139, 0.2)';
+          ctx.lineWidth = 0.5;
+          ctx.stroke();
+        })
+        
+        // 力导向参数 - 使用 d3Force() 方法
+        .d3AlphaDecay(0.02)
+        .d3VelocityDecay(0.3)
+        .d3Force('link', d3.forceLink().id(d => d.id).distance(50).strength(0.1))
+        .d3Force('charge', d3.forceManyBody().strength(-120))
+        .d3Force('collide', d3.forceCollide(8))
+        .d3Force('center', d3.forceCenter(canvas.clientWidth / 2, canvas.clientHeight / 2))
+        
+        // 交互
+        .onNodeClick(node => {
+          console.log('[GraphViz] 点击节点:', node);
+          this.showNodeInfo(node);
+        })
+        .onNodeDragEnd(node => {
+          node.fx = node.x;
+          node.fy = node.y;
+        });
+      
+      // 初始化粒子系统
+      this.initParticles();
+      
+      console.log('[GraphViz] 图谱渲染完成');
+      
+    } catch (err) {
+      console.error('[GraphViz] 加载图谱失败:', err);
+      canvas.innerHTML = `<div class="graph-error">加载失败: ${err.message}</div>`;
+    }
+  },
+  
+  // 初始化流动粒子
+  initParticles() {
+    if (!this.graphData || !this.graphData.links) return;
+    
+    this.particles = [];
+    const particleCount = 50; // 粒子数量
+    
+    for (let i = 0; i < particleCount; i++) {
+      const linkIdx = Math.floor(Math.random() * this.graphData.links.length);
+      this.particles.push({
+        linkIdx,
+        progress: Math.random(),
+        speed: 0.002 + Math.random() * 0.003
+      });
+    }
+    
+    this.animateParticles();
+  },
+  
+  // 粒子动画循环
+  animateParticles() {
+    if (!this.graph || !this.particles.length) return;
+    
+    // 更新粒子位置
+    this.particles.forEach(p => {
+      p.progress += p.speed;
+      if (p.progress > 1) {
+        p.progress = 0;
+        p.linkIdx = Math.floor(Math.random() * this.graphData.links.length);
+      }
+    });
+    
+    // 重绘粒子层
+    this.graph.linkCanvasObject((link, ctx) => {
+      const start = link.source;
+      const end = link.target;
+      
+      if (!start || !end || !Number.isFinite(start.x) || !Number.isFinite(end.y)) return;
+      
+      // 绘制连线
+      ctx.beginPath();
+      ctx.moveTo(start.x, start.y);
+      ctx.lineTo(end.x, end.y);
+      ctx.strokeStyle = 'rgba(100, 116, 139, 0.15)';
+      ctx.lineWidth = 0.5;
+      ctx.stroke();
+      
+      // 绘制该连线上的粒子
+      this.particles.forEach(p => {
+        const link = this.graphData.links[p.linkIdx];
+        if (link.source !== start || link.target !== end) return;
+        
+        const x = start.x + (end.x - start.x) * p.progress;
+        const y = start.y + (end.y - start.y) * p.progress;
+        
+        // 粒子拖尾
+        const tailLength = 0.05;
+        const tailX = start.x + (end.x - start.x) * Math.max(0, p.progress - tailLength);
+        const tailY = start.y + (end.y - start.y) * Math.max(0, p.progress - tailLength);
+        
+        ctx.beginPath();
+        ctx.moveTo(tailX, tailY);
+        ctx.lineTo(x, y);
+        ctx.strokeStyle = 'rgba(34, 211, 238, 0.6)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        
+        // 粒子头部
+        ctx.beginPath();
+        ctx.arc(x, y, 2, 0, 2 * Math.PI);
+        ctx.fillStyle = 'rgba(34, 211, 238, 0.8)';
+        ctx.fill();
+      });
+    });
+    
+    this.animationId = requestAnimationFrame(() => this.animateParticles());
+  },
+  
+  // 显示节点信息
+  showNodeInfo(node) {
+    // TODO: 在侧边栏显示节点详情
+    console.log('[GraphViz] 节点信息:', node);
+  },
+  
+  // 搜索节点
+  search(query) {
+    if (!this.graphData || !query) return;
+    
+    const match = this.graphData.nodes.find(n => 
+      n.name.toLowerCase().includes(query.toLowerCase())
+    );
+    
+    if (match && this.graph) {
+      this.graph.centerAt(match.x, match.y, 1000);
+      this.graph.zoom(2, 1000);
+    }
+  },
+  
+  // 重置视图
+  resetView() {
+    if (this.graph) {
+      this.graph.zoomToFit(1000);
+    }
+  }
+};
+
+// 导出
+window.GraphViz = GraphViz;

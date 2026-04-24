@@ -1150,10 +1150,9 @@ async function loadStatus() {
     pulseIfChanged($('#skill-val'), String((data.skills || {}).total || 0));
 
     const allOk = data.daemon_running && data.api_ready;
-    const linkFill = $("#link-strength");
-    const linkLabel = $("#link-label");
+    const linkFill = $('#link-strength');
+    const linkLabel = $('#link-label');
     if (!linkFill || !linkLabel) return;
-    if (allOk) {
       linkFill.style.width = '100%';
       linkFill.style.background = 'var(--success)';
       linkLabel.textContent = 'LINK: STRONG';

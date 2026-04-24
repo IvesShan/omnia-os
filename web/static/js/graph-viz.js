@@ -1,311 +1,421 @@
 /**
- * Omnia 神经图谱可视化 - vis-network
+ * 神经图谱可视化 - 3D 全息大脑版本
+ * 融合 porweb 视觉风格 + VowVector 架构
+ * 特性：全息粒子大脑、知识图谱节点、Bloom 后处理
  */
 
-let network = null;
-let nodes = null;
-let edges = null;
-
-// 节点类型颜色
-const typeColors = {
-    'PERSON': { background: '#06b6d4', border: '#0891b2', highlight: '#22d3ee' },
-    'PROJECT': { background: '#8b5cf6', border: '#7c3aed', highlight: '#a78bfa' },
-    'FILE': { background: '#10b981', border: '#059669', highlight: '#34d399' },
-    'CONCEPT': { background: '#f59e0b', border: '#d97706', highlight: '#fbbf24' },
-    'EVENT': { background: '#ef4444', border: '#dc2626', highlight: '#f87171' },
-    'default': { background: '#6366f1', border: '#4f46e5', highlight: '#818cf8' }
-};
-
-// 节点类型图标
-const typeIcons = {
-    'PERSON': '👤',
-    'PROJECT': '📁',
-    'FILE': '📄',
-    'CONCEPT': '💡',
-    'EVENT': '⚡',
-    'default': '🔵'
-};
-
-// 初始化图谱
-async function initGraph() {
-    const container = document.getElementById('graph-container');
-    if (!container) return;
-    
-    console.log('[GraphViz] vis-network 初始化...');
+const GraphViz = {
+  // Three.js 核心对象
+  scene: null,
+  camera: null,
+  renderer: null,
+  composer: null,
+  controls: null,
+  
+  // 粒子系统
+  brainParticles: null,
+  particleCount: 5000,
+  
+  // 知识图谱
+  graphData: { nodes: [], edges: [] },
+  nodeObjects: [],
+  connectionLines: [],
+  
+  // 动画
+  animationId: null,
+  time: 0,
+  mouse: { x: 0, y: 0 },
+  
+  // 类型颜色映射 (porweb 风格)
+  typeColors: {
+    'PERSON': 0x22d3ee,    // 青色
+    'PROJECT': 0xa855f7,   // 紫色
+    'FILE': 0x10b981,      // 绿色
+    'CONCEPT': 0xff8a00,   // 橙色
+    'DATE': 0x6366f1,      // 靛蓝
+    'ENTITY': 0xec4899,    // 粉色
+    'DEFAULT': 0x64748b    // 灰色
+  },
+  
+  async init() {
+    console.log("[GraphViz] 初始化 3D 全息大脑");
     
     try {
-        // 加载数据
-        const response = await fetch('/api/graph');
-        const data = await response.json();
-        
-        if (!data || !data.nodes || data.nodes.length === 0) {
-            showEmptyGraph();
-            return;
-        }
-        
-        console.log(`[GraphViz] 获取到节点: ${data.nodes.length} 边: ${data.edges?.length || 0}`);
-        
-        // 创建节点数据集
-        const nodeArray = data.nodes.map(n => {
-            const type = n.type || 'default';
-            const colors = typeColors[type] || typeColors.default;
-            const accessCount = n.access_count || 0;
-            const size = Math.max(20, Math.min(40, 20 + accessCount * 2));
-            
-            return {
-                id: n.name || n.id,
-                label: n.name || n.canonical_name || n.id,
-                type: type,
-                value: accessCount,
-                size: size,
-                color: colors,
-                font: {
-                    color: '#e2e8f0',
-                    size: 14,
-                    face: 'Inter, sans-serif',
-                    strokeWidth: 2,
-                    strokeColor: '#0f172a'
-                },
-                borderWidth: 2,
-                shadow: {
-                    enabled: true,
-                    color: 'rgba(99, 102, 241, 0.4)',
-                    size: 15,
-                    x: 0,
-                    y: 0
-                },
-                shape: 'dot',
-                mass: 1 + accessCount * 0.1,
-                title: `<b>${n.name || n.id}</b><br>类型: ${type}<br>访问: ${accessCount}次`
-            };
-        });
-        
-        // 创建边数据集
-        const edgeArray = (data.edges || []).map((e, i) => {
-            return {
-                id: i,
-                from: e.source,
-                to: e.target,
-                label: e.relation || '',
-                color: {
-                    color: 'rgba(99, 102, 241, 0.3)',
-                    highlight: '#6366f1',
-                    hover: '#818cf8'
-                },
-                width: 1.5,
-                smooth: {
-                    enabled: true,
-                    type: 'continuous',
-                    roundness: 0.5
-                },
-                font: {
-                    color: '#94a3b8',
-                    size: 11,
-                    face: 'Inter, sans-serif',
-                    strokeWidth: 2,
-                    strokeColor: '#0f172a',
-                    align: 'middle'
-                },
-                arrows: {
-                    to: {
-                        enabled: true,
-                        scaleFactor: 0.5,
-                        type: 'arrow'
-                    }
-                },
-                dashes: false
-            };
-        });
-        
-        nodes = new vis.DataSet(nodeArray);
-        edges = new vis.DataSet(edgeArray);
-        
-        // 网络配置
-        const options = {
-            nodes: {
-                borderWidth: 2,
-                borderWidthSelected: 3,
-                shape: 'dot',
-                size: 25,
-                font: {
-                    color: '#e2e8f0',
-                    size: 14,
-                    face: 'Inter, sans-serif',
-                    strokeWidth: 2,
-                    strokeColor: '#0f172a'
-                },
-                shadow: {
-                    enabled: true,
-                    color: 'rgba(99, 102, 241, 0.4)',
-                    size: 15
-                }
-            },
-            edges: {
-                width: 1.5,
-                selectionWidth: 2,
-                hoverWidth: 2,
-                smooth: {
-                    enabled: true,
-                    type: 'continuous',
-                    roundness: 0.5
-                },
-                arrows: {
-                    to: {
-                        enabled: true,
-                        scaleFactor: 0.5
-                    }
-                },
-                color: {
-                    color: 'rgba(99, 102, 241, 0.3)',
-                    highlight: '#6366f1',
-                    hover: '#818cf8'
-                },
-                font: {
-                    color: '#94a3b8',
-                    size: 11,
-                    strokeWidth: 2,
-                    strokeColor: '#0f172a'
-                }
-            },
-            physics: {
-                enabled: true,
-                barnesHut: {
-                    gravitationalConstant: -2000,
-                    centralGravity: 0.3,
-                    springLength: 150,
-                    springConstant: 0.05,
-                    damping: 0.09,
-                    avoidOverlap: 0.5
-                },
-                stabilization: {
-                    enabled: true,
-                    iterations: 200,
-                    updateInterval: 25
-                }
-            },
-            interaction: {
-                hover: true,
-                tooltipDelay: 200,
-                zoomView: true,
-                dragView: true,
-                dragNodes: true,
-                navigationButtons: true,
-                keyboard: {
-                    enabled: true,
-                    speed: { x: 10, y: 10, zoom: 0.02 }
-                }
-            },
-            layout: {
-                improvedLayout: true,
-                clusterThreshold: 150
-            }
-        };
-        
-        // 创建网络
-        network = new vis.Network(container, { nodes, edges }, options);
-        
-        // 事件监听
-        network.on('click', (params) => {
-            if (params.nodes.length > 0) {
-                const nodeId = params.nodes[0];
-                console.log('[GraphViz] 点击节点:', nodeId);
-                // 可以触发详情面板
-            }
-        });
-        
-        network.on('doubleClick', (params) => {
-            if (params.nodes.length > 0) {
-                const nodeId = params.nodes[0];
-                console.log('[GraphViz] 双击节点:', nodeId);
-                // 可以触发搜索或展开
-            }
-        });
-        
-        network.on('stabilizationProgress', (params) => {
-            const progress = Math.round((params.iterations / params.total) * 100);
-            console.log(`[GraphViz] 布局进度: ${progress}%`);
-        });
-        
-        network.on('stabilizationIterationsDone', () => {
-            console.log('[GraphViz] 布局完成');
-            // 自动适配视图
-            network.fit({
-                animation: {
-                    duration: 500,
-                    easingFunction: 'easeInOutQuad'
-                }
-            });
-        });
-        
-        console.log('[GraphViz] vis-network 初始化完成');
-        
+      // 先加载统计数据
+      await this.loadStats();
+      
+      // 加载图谱数据
+      await this.loadGraph();
+      
+      // 初始化 3D 场景
+      this.initThreeJS();
+      
+      // 创建全息大脑粒子
+      this.createBrainParticles();
+      
+      // 创建知识图谱节点
+      this.createKnowledgeNodes();
+      
+      // 设置后处理
+      this.setupPostProcessing();
+      
+      console.log("[GraphViz] init() 完成，准备调用 animate()");
+      
+      // 开始动画
+      this.animate();
+      
+      console.log("[GraphViz] animate() 已调用");
     } catch (error) {
-        console.error('[GraphViz] 加载失败:', error);
-        showEmptyGraph();
+      console.error("[GraphViz] init() 错误:", error);
     }
-}
-
-// 显示空图谱
-function showEmptyGraph() {
-    const container = document.getElementById('graph-container');
-    if (!container) return;
+  },
+  
+  initThreeJS() {
+    const container = document.getElementById('graph-canvas');
+    if (!container) {
+      console.error('[GraphViz] 找不到 graph-canvas');
+      return;
+    }
     
-    container.innerHTML = `
-        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #64748b;">
-            <div style="font-size: 48px; margin-bottom: 16px; opacity: 0.5;">🕸️</div>
-            <div style="font-size: 18px; font-weight: 500;">神经图谱为空</div>
-            <div style="font-size: 14px; margin-top: 8px; opacity: 0.7;">开始与 Omnia 对话，构建记忆网络</div>
-        </div>
-    `;
-}
-
-// 刷新图谱
-async function refreshGraph() {
-    if (network) {
-        network.destroy();
-        network = null;
+    // 调试：输出容器尺寸
+    console.log('[GraphViz] 容器尺寸:', {
+      clientWidth: container.clientWidth,
+      clientHeight: container.clientHeight,
+      offsetWidth: container.offsetWidth,
+      offsetHeight: container.offsetHeight,
+      getBoundingClientRect: container.getBoundingClientRect()
+    });
+    
+    // 如果容器尺寸为0，强制设置
+    let width = container.clientWidth || container.offsetWidth || 300;
+    let height = container.clientHeight || container.offsetHeight || 280;
+    
+    if (width === 0 || height === 0) {
+      console.warn('[GraphViz] 容器尺寸为0，使用默认值 300x280');
+      width = 300;
+      height = 280;
     }
-    await initGraph();
-}
-
-// 适配视图
-function fitGraph() {
-    if (network) {
-        network.fit({
-            animation: {
-                duration: 500,
-                easingFunction: 'easeInOutQuad'
-            }
-        });
+    
+    console.log('[GraphViz] 使用尺寸:', width, 'x', height);
+    
+    // 清空容器
+    container.innerHTML = '';
+    
+    // 场景
+    this.scene = new THREE.Scene();
+    // this.scene.background = new THREE.Color(0x0a0e27); // 已移除背景
+    
+    // 相机
+    const aspect = width / height;
+    this.camera = new THREE.PerspectiveCamera(60, aspect, 0.1, 1000);
+    this.camera.position.set(0, 0, 5);
+    
+    console.log('[GraphViz] 相机设置:', { aspect, position: this.camera.position });
+    
+    // 渲染器
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    this.renderer.setSize(width, height);
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    container.appendChild(this.renderer.domElement);
+    
+    console.log('[GraphViz] 渲染器尺寸:', this.renderer.domElement.width, 'x', this.renderer.domElement.height);
+    
+    // 轨道控制器
+    if (typeof OrbitControls !== 'undefined') {
+      this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+      this.controls.enableDamping = true;
+      this.controls.dampingFactor = 0.05;
+      this.controls.enableZoom = true;
+      this.controls.autoRotate = true;
+      this.controls.autoRotateSpeed = 1.0;
+      console.log('[GraphViz] OrbitControls 已初始化');
+    } else {
+      console.error('[GraphViz] OrbitControls 未加载！');
     }
-}
-
-// 搜索节点
-function focusNode(nodeId) {
-    if (network && nodes) {
-        const node = nodes.get(nodeId);
-        if (node) {
-            network.focus(nodeId, {
-                scale: 1.5,
-                animation: {
-                    duration: 500,
-                    easingFunction: 'easeInOutQuad'
-                }
-            });
-            network.selectNodes([nodeId]);
+    
+    // 环境光
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
+    this.scene.add(ambientLight);
+    
+    // 点光源
+    const pointLight = new THREE.PointLight(0x00ffff, 1, 10);
+    pointLight.position.set(2, 2, 2);
+    this.scene.add(pointLight);
+    
+    const pointLight2 = new THREE.PointLight(0xff8a00, 1, 10);
+    pointLight2.position.set(-2, -2, 2);
+    this.scene.add(pointLight2);
+    
+    // 鼠标事件
+    container.addEventListener('mousemove', (e) => {
+      this.mouse.x = (e.clientX / container.clientWidth) * 2 - 1;
+      this.mouse.y = -(e.clientY / container.clientHeight) * 2 + 1;
+    });
+    
+    // 窗口大小调整
+    window.addEventListener('resize', () => {
+      if (!this.camera || !this.renderer) return;
+      
+      const w = container.clientWidth || 300;
+      const h = container.clientHeight || 280;
+      
+      this.camera.aspect = w / h;
+      this.camera.updateProjectionMatrix();
+      this.renderer.setSize(w, h);
+    });
+  },
+  
+  createBrainParticles() {
+    // porweb 风格的全息大脑粒子
+    const positions = new Float32Array(this.particleCount * 3);
+    const colors = new Float32Array(this.particleCount * 3);
+    
+    // 橙蓝配色
+    const colorOrange = new THREE.Color(0xff8a00);
+    const colorCyan = new THREE.Color(0x22d3ee);
+    
+    for (let i = 0; i < this.particleCount; i++) {
+      // 球形分布
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos(2 * Math.random() - 1);
+      const r = 1.5 + Math.random() * 0.5;
+      
+      positions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+      positions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+      positions[i * 3 + 2] = r * Math.cos(phi);
+      
+      // 随机颜色（橙或青）
+      const color = Math.random() > 0.5 ? colorOrange : colorCyan;
+      colors[i * 3] = color.r;
+      colors[i * 3 + 1] = color.g;
+      colors[i * 3 + 2] = color.b;
+    }
+    
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    
+    // 自定义着色器材质
+    const material = new THREE.ShaderMaterial({
+      uniforms: {
+        time: { value: 0 },
+        pointSize: { value: 1.0 }
+      },
+      vertexShader: `
+        attribute vec3 color;
+        varying vec3 vColor;
+        uniform float time;
+        uniform float pointSize;
+        
+        void main() {
+          vColor = color;
+          
+          vec3 pos = position;
+          pos += 0.1 * sin(time + position.x * 10.0) * normalize(position);
+          
+          vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+          gl_Position = projectionMatrix * mvPosition;
+          gl_PointSize = pointSize * (30.0 / -mvPosition.z);
         }
+      `,
+      fragmentShader: `
+        varying vec3 vColor;
+        
+        void main() {
+          float dist = length(gl_PointCoord - vec2(0.5));
+          if (dist > 0.5) discard;
+          
+          float alpha = 1.0 - smoothstep(0.3, 0.5, dist);
+          gl_FragColor = vec4(vColor, alpha * 0.5);
+        }
+      `,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+    
+    this.brainParticles = new THREE.Points(geometry, material);
+    this.scene.add(this.brainParticles);
+    
+    console.log('[GraphViz] 粒子系统已创建:', this.particleCount, '个粒子');
+  },
+  
+  async loadStats() {
+    try {
+      const response = await fetch('/api/graph/stats');
+      const data = await response.json();
+      
+      const nodesEl = document.getElementById('gs-nodes');
+      const edgesEl = document.getElementById('gs-edges');
+      
+      if (nodesEl) nodesEl.textContent = data.nodes || '—';
+      if (edgesEl) edgesEl.textContent = data.edges || '—';
+      
+      console.log('[GraphViz] 统计数据:', data);
+    } catch (error) {
+      console.error('[GraphViz] 加载统计失败:', error);
     }
-}
-
-// 导出为图片
-function exportAsImage() {
-    if (network) {
-        // vis-network 不直接支持导出，可以用 html2canvas
-        console.log('[GraphViz] 导出功能待实现');
+  },
+  
+  async loadGraph() {
+    try {
+      console.log('[GraphViz] 正在加载图谱数据...');
+      const response = await fetch('/api/graph');
+      const data = await response.json();
+      
+      this.graphData = {
+        nodes: data.nodes || [],
+        edges: data.edges || []
+      };
+      
+      console.log('[GraphViz] 加载图谱:', this.graphData.nodes.length, '节点');
+    } catch (error) {
+      console.error('[GraphViz] 加载图谱失败:', error);
     }
-}
+  },
+  
+  createKnowledgeNodes() {
+    const nodeMap = {};
+    
+    console.log('[GraphViz] 创建知识节点:', this.graphData.nodes.length, '个');
+    
+    // 创建节点
+    this.graphData.nodes.forEach((node, i) => {
+      // 兼容后端返回的字段名
+      node.label = node.label || node.name || node.id;
+      node.type = node.type || 'ENTITY';
+      const color = this.typeColors[node.type] || this.typeColors.DEFAULT;
+      
+      // 球体节点
+      const geometry = new THREE.SphereGeometry(0.15, 16, 16);
+      const material = new THREE.MeshStandardMaterial({
+        color: color,
+        emissive: color,
+        emissiveIntensity: 0.5,
+        metalness: 0.8,
+        roughness: 0.2
+      });
+      
+      const mesh = new THREE.Mesh(geometry, material);
+      
+      // 随机位置（球形分布）
+      const theta = (i / this.graphData.nodes.length) * Math.PI * 2;
+      const phi = Math.random() * Math.PI;
+      const r = 2;
+      
+      mesh.position.set(
+        r * Math.sin(phi) * Math.cos(theta),
+        r * Math.sin(phi) * Math.sin(theta),
+        r * Math.cos(phi)
+      );
+      
+      mesh.userData = node;
+      this.scene.add(mesh);
+      this.nodeObjects.push(mesh);
+      nodeMap[node.name || node.id] = mesh;
+    });
+    
+    // 创建连线
+    let edgeCount = 0;
+    this.graphData.edges.forEach(edge => {
+      const sourceNode = nodeMap[edge.source];
+      const targetNode = nodeMap[edge.target];
+      
+      if (sourceNode && targetNode) {
+        const points = [sourceNode.position, targetNode.position];
+        const geometry = new THREE.BufferGeometry().setFromPoints(points);
+        const material = new THREE.LineBasicMaterial({
+          color: 0x22d3ee,
+          transparent: true,
+          opacity: 0.3
+        });
+        
+        const line = new THREE.Line(geometry, material);
+        this.scene.add(line);
+        this.connectionLines.push(line);
+        edgeCount++;
+      }
+    });
+    
+    console.log('[GraphViz] 创建连线:', edgeCount, '条');
+  },
+  
+  setupPostProcessing() {
+    // Bloom 后处理
+    if (typeof EffectComposer === 'undefined') {
+      console.warn('[GraphViz] EffectComposer 未加载，跳过后处理');
+      return;
+    }
+    
+    this.composer = new EffectComposer(this.renderer);
+    
+    const renderPass = new RenderPass(this.scene, this.camera);
+    this.composer.addPass(renderPass);
+    
+    const bloomPass = new UnrealBloomPass(
+      new THREE.Vector2(window.innerWidth, window.innerHeight),
+      0.3,  // 强度
+      0.4,  // 半径
+      0.85  // 阈值
+    );
+    this.composer.addPass(bloomPass);
+    
+    console.log('[GraphViz] 后处理已设置');
+  },
+  
+  animate() {
+    console.log("[GraphViz] animate() 被调用");
+    this.animationId = requestAnimationFrame(() => this.animate());
+    
+    this.time += 0.01;
+    
+    // 调试：每秒输出一次
+    if (Math.floor(this.time) !== Math.floor(this.time - 0.01)) {
+      console.log("[GraphViz] 渲染中... time:", this.time.toFixed(1),
+        "scene.children:", this.scene ? this.scene.children.length : 0,
+        "nodes:", this.nodeObjects.length,
+        "particles:", this.brainParticles ? "yes" : "no",
+        "composer:", this.composer ? "yes" : "no");
+    }
+    
+    // 更新粒子着色器时间
+    if (this.brainParticles && this.brainParticles.material.uniforms) {
+      this.brainParticles.material.uniforms.time.value = this.time;
+    }
+    
+    // 节点脉动
+    this.nodeObjects.forEach((mesh, i) => {
+      const scale = 1 + Math.sin(this.time * 2 + i) * 0.1;
+      mesh.scale.setScalar(scale);
+    });
+    
+    // 更新控制器
+    if (this.controls) {
+      this.controls.update();
+    }
+    
+    // 渲染
+    if (this.composer) {
+      this.composer.render();
+    } else if (this.renderer) {
+      this.renderer.render(this.scene, this.camera);
+    }
+  },
+  
+  destroy() {
+    if (this.animationId) {
+      cancelAnimationFrame(this.animationId);
+    }
+    if (this.renderer) {
+      this.renderer.dispose();
+    }
+    if (this.scene) {
+      this.scene.clear();
+    }
+  }
+};
 
-// 页面加载后初始化
-document.addEventListener('DOMContentLoaded', () => {
-    setTimeout(initGraph, 500);
-});
+// 导出
+if (typeof window !== 'undefined') {
+  window.GraphViz = GraphViz;
+}

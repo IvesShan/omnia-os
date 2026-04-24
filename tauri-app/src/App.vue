@@ -149,6 +149,26 @@
           </div>
         </div>
       </div>
+
+      <!-- Neural Graph -->
+      <div v-if="currentTab === 'neural'" class="neural-panel">
+        <h2>🧠 神经图谱</h2>
+        <div class="neural-stats">
+          <div class="neural-stat">
+            <span class="stat-label">节点:</span>
+            <span class="stat-num">{{ neuralStats.nodes }}</span>
+          </div>
+          <div class="neural-stat">
+            <span class="stat-label">连接:</span>
+            <span class="stat-num">{{ neuralStats.edges }}</span>
+          </div>
+        </div>
+        <div ref="neuralGraphContainer" class="neural-graph-container"></div>
+        <div v-if="!neuralGraphLoaded" class="neural-loading">
+          <div class="spinner"></div>
+          <p>正在加载神经图谱...</p>
+        </div>
+      </div>
     </main>
 
     <!-- Footer -->
@@ -172,6 +192,7 @@ export default {
         { id: 'logs', name: '日志', icon: '📝' },
         { id: 'backup', name: '备份', icon: '💾' },
         { id: 'search', name: '搜索', icon: '🔍' },
+              { id: 'neural', name: '神经图谱', icon: '🧠' },
       ],
       stats: { facts: 0, relations: 0, habits: 0, timeline: 0 },
       daemonPid: null,
@@ -180,10 +201,15 @@ export default {
       backups: [],
       searchQuery: '',
       searchResults: [],
+      
+      neuralStats: { nodes: 0, edges: 0 },
+      neuralGraphLoaded: false,
+
     }
   },
   async mounted() {
     await this.loadStatus()
+    this.loadNeuralGraph()
     setInterval(this.loadStatus, 5000) // 每5秒刷新状态
   },
   methods: {
@@ -228,6 +254,142 @@ export default {
         console.error('Failed to load logs:', error)
       }
     },
+    
+    async loadNeuralGraph() {
+      try {
+        const response = await fetch('http://localhost:8765/api/memory/neural-graph')
+        const data = await response.json()
+        
+        this.neuralStats.nodes = data.nodes.length
+        this.neuralStats.edges = data.links.length
+        
+        // 简单的力导向布局可视化（使用 Canvas）
+        const container = this.$refs.neuralGraphContainer
+        if (!container) return
+        
+        const canvas = document.createElement('canvas')
+        canvas.width = container.clientWidth || 800
+        canvas.height = 500
+        container.appendChild(canvas)
+        const ctx = canvas.getContext('2d')
+        
+        // 初始化节点位置
+        const nodes = data.nodes.map((n, i) => ({
+          ...n,
+          x: Math.random() * canvas.width,
+          y: Math.random() * canvas.height,
+          vx: 0,
+          vy: 0
+        }))
+        
+        // 颜色映射
+        const colors = {
+          'fact': '#00d9ff',
+          'relation': '#ff6b6b',
+          'habit': '#4ecdc4',
+          'timeline': '#ffe66d'
+        }
+        
+        // 力导向模拟
+        function simulate() {
+          // 斥力
+          for (let i = 0; i < nodes.length; i++) {
+            for (let j = i + 1; j < nodes.length; j++) {
+              const dx = nodes[j].x - nodes[i].x
+              const dy = nodes[j].y - nodes[i].y
+              const dist = Math.sqrt(dx * dx + dy * dy) || 1
+              const force = 500 / (dist * dist)
+              nodes[i].vx -= dx / dist * force
+              nodes[i].vy -= dy / dist * force
+              nodes[j].vx += dx / dist * force
+              nodes[j].vy += dy / dist * force
+            }
+          }
+          
+          // 引力（边）
+          data.links.forEach(link => {
+            const source = nodes.find(n => n.id === link.source)
+            const target = nodes.find(n => n.id === link.target)
+            if (source && target) {
+              const dx = target.x - source.x
+              const dy = target.y - source.y
+              const dist = Math.sqrt(dx * dx + dy * dy) || 1
+              const force = (dist - 100) * 0.01
+              source.vx += dx / dist * force
+              source.vy += dy / dist * force
+              target.vx -= dx / dist * force
+              target.vy -= dy / dist * force
+            }
+          })
+          
+          // 更新位置
+          nodes.forEach(node => {
+            node.x += node.vx * 0.1
+            node.y += node.vy * 0.1
+            node.vx *= 0.9
+            node.vy *= 0.9
+            
+            // 边界约束
+            node.x = Math.max(20, Math.min(canvas.width - 20, node.x))
+            node.y = Math.max(20, Math.min(canvas.height - 20, node.y))
+          })
+        }
+        
+        // 渲染
+        function render() {
+          ctx.fillStyle = '#0a0a0f'
+          ctx.fillRect(0, 0, canvas.width, canvas.height)
+          
+          // 绘制边
+          ctx.strokeStyle = 'rgba(0, 217, 255, 0.2)'
+          ctx.lineWidth = 1
+          data.links.forEach(link => {
+            const source = nodes.find(n => n.id === link.source)
+            const target = nodes.find(n => n.id === link.target)
+            if (source && target) {
+              ctx.beginPath()
+              ctx.moveTo(source.x, source.y)
+              ctx.lineTo(target.x, target.y)
+              ctx.stroke()
+            }
+          })
+          
+          // 绘制节点
+          nodes.forEach(node => {
+            const color = colors[node.type] || '#00d9ff'
+            ctx.fillStyle = color
+            ctx.beginPath()
+            ctx.arc(node.x, node.y, 5 + (node.connections || 0) * 0.5, 0, Math.PI * 2)
+            ctx.fill()
+            
+            // 发光效果
+            ctx.shadowColor = color
+            ctx.shadowBlur = 10
+            ctx.fill()
+            ctx.shadowBlur = 0
+          })
+        }
+        
+        // 动画循环
+        let frame = 0
+        function animate() {
+          if (frame < 300) {
+            simulate()
+          }
+          render()
+          frame++
+          requestAnimationFrame(animate)
+        }
+        
+        this.neuralGraphLoaded = true
+        animate()
+        
+      } catch (error) {
+        console.error('Failed to load neural graph:', error)
+        this.neuralGraphLoaded = true
+      }
+    },
+
     async createBackup() {
       try {
         const result = await invoke('create_backup')

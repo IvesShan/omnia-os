@@ -6,10 +6,6 @@
     <title>Omnia 管理面板</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="/static/css/app.css">
-    
-    <!-- 3D Force Graph 依赖 -->
-    <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/3d-force-graph@1.73.0/dist/3d-force-graph.min.js"></script>
 </head>
 <body class="bg-gray-50 min-h-screen">
     <!-- 顶部导航 -->
@@ -64,12 +60,12 @@
                     <div class="flex items-center">
                         <div class="flex-shrink-0 bg-purple-100 rounded-md p-3">
                             <svg class="h-6 w-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
                             </svg>
                         </div>
                         <div class="ml-4">
-                            <p class="text-sm font-medium text-gray-500">记忆数量</p>
-                            <p id="memory-count" class="text-lg font-semibold text-gray-900">0</p>
+                            <p class="text-sm font-medium text-gray-500">记忆总数</p>
+                            <p id="memory-count" class="text-lg font-semibold text-gray-900">-</p>
                         </div>
                     </div>
                 </div>
@@ -79,50 +75,52 @@
                     <div class="flex items-center">
                         <div class="flex-shrink-0 bg-green-100 rounded-md p-3">
                             <svg class="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/>
                             </svg>
                         </div>
                         <div class="ml-4">
                             <p class="text-sm font-medium text-gray-500">技能数量</p>
-                            <p id="skills-count" class="text-lg font-semibold text-gray-900">0</p>
+                            <p id="skills-count" class="text-lg font-semibold text-gray-900">-</p>
                         </div>
                     </div>
                 </div>
 
-                <!-- 活跃任务 -->
+                <!-- 最后活动 -->
                 <div class="bg-white rounded-lg shadow p-6">
                     <div class="flex items-center">
-                        <div class="flex-shrink-0 bg-orange-100 rounded-md p-3">
-                            <svg class="h-6 w-6 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <div class="flex-shrink-0 bg-yellow-100 rounded-md p-3">
+                            <svg class="h-6 w-6 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
                             </svg>
                         </div>
                         <div class="ml-4">
-                            <p class="text-sm font-medium text-gray-500">活跃任务</p>
-                            <p id="active-tasks" class="text-lg font-semibold text-gray-900">0</p>
+                            <p class="text-sm font-medium text-gray-500">最后活动</p>
+                            <p id="last-activity" class="text-lg font-semibold text-gray-900">-</p>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- 快捷操作 -->
-            <div class="bg-white rounded-lg shadow mb-8">
-                <div class="p-6 border-b border-gray-200">
-                    <h3 class="text-lg font-medium text-gray-900">快捷操作</h3>
-                </div>
-                <div class="p-6 grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <button id="btn-add-memory" class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors">
-                        添加记忆
-                    </button>
-                    <button id="btn-query-memory" class="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors">
-                        查询记忆
-                    </button>
-                    <button id="btn-install-skill" class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors">
-                        安装技能
-                    </button>
-                    <button id="btn-view-logs" class="px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 transition-colors">
-                        查看日志
-                    </button>
+            <!-- 记忆分布 -->
+            <div class="bg-white rounded-lg shadow p-6">
+                <h3 class="text-lg font-medium text-gray-900 mb-4">记忆分布</h3>
+                <div id="memory-distribution" class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="text-center p-4 bg-indigo-50 rounded-lg">
+                        <p class="text-3xl font-bold text-indigo-600" id="facts-count">-</p>
+                        <p class="text-sm text-gray-600">Facts</p>
+                    </div>
+                    <div class="text-center p-4 bg-purple-50 rounded-lg">
+                        <p class="text-3xl font-bold text-purple-600" id="relations-count">-</p>
+                        <p class="text-sm text-gray-600">Relations</p>
+                    </div>
+                    <div class="text-center p-4 bg-green-50 rounded-lg">
+                        <p class="text-3xl font-bold text-green-600" id="habits-count">-</p>
+                        <p class="text-sm text-gray-600">Habits</p>
+                    </div>
+                    <div class="text-center p-4 bg-yellow-50 rounded-lg">
+                        <p class="text-3xl font-bold text-yellow-600" id="timeline-count">-</p>
+                        <p class="text-sm text-gray-600">Timeline</p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -131,43 +129,38 @@
         <div id="tab-memory" class="tab-content hidden">
             <div class="bg-white rounded-lg shadow">
                 <div class="p-6 border-b border-gray-200">
-                    <h3 class="text-lg font-medium text-gray-900">记忆搜索</h3>
-                </div>
-                <div class="p-6">
-                    <div class="flex gap-4 mb-6">
-                        <input type="text" id="memory-search" placeholder="搜索记忆..." class="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500">
-                        <select id="memory-layer" class="px-4 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500">
-                            <option value="">所有层级</option>
-                            <option value="facts">事实</option>
-                            <option value="relations">关系</option>
-                            <option value="habits">习惯</option>
-                            <option value="timeline">时间线</option>
-                        </select>
-                        <button id="memory-search-btn" class="px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-lg font-medium text-gray-900">记忆搜索</h3>
+                        <div class="flex space-x-2">
+                            <select id="memory-layer-filter" class="rounded-md border-gray-300 text-sm">
+                                <option value="">所有层</option>
+                                <option value="facts">Facts</option>
+                                <option value="relations">Relations</option>
+                                <option value="habits">Habits</option>
+                                <option value="timeline">Timeline</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mt-4 flex">
+                        <input type="text" id="memory-search-input" placeholder="搜索记忆..." 
+                               class="flex-1 rounded-l-md border-gray-300 focus:border-indigo-500 focus:ring-indigo-500">
+                        <button id="memory-search-btn" class="px-4 py-2 bg-indigo-600 text-white rounded-r-md hover:bg-indigo-700">
                             搜索
                         </button>
                     </div>
-                    <div id="memory-results" class="space-y-4">
-                        <p class="text-gray-500 text-center py-8">输入关键词搜索记忆</p>
-                    </div>
+                </div>
+                <div id="memory-results" class="p-6">
+                    <p class="text-gray-500 text-center">输入关键词搜索记忆</p>
                 </div>
             </div>
         </div>
 
         <!-- 神经图谱 -->
         <div id="tab-graph" class="tab-content hidden">
-            <div class="bg-white rounded-lg shadow">
-                <div class="p-6 border-b border-gray-200 flex justify-between items-center">
-                    <h3 class="text-lg font-medium text-gray-900">神经图谱</h3>
-                    <div class="flex items-center space-x-4">
-                        <span class="text-sm text-gray-500">3D Force Graph</span>
-                        <button id="graph-refresh" class="px-3 py-1 text-sm bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200">
-                            刷新
-                        </button>
-                    </div>
-                </div>
-                <div id="neural-graph-container" style="height: 600px; background: #0a0e27;">
-                    <p class="text-gray-400 text-center p-8">图谱加载中...</p>
+            <div class="bg-white rounded-lg shadow p-6">
+                <h3 class="text-lg font-medium text-gray-900 mb-4">神经图谱可视化</h3>
+                <div id="graph-container" class="w-full h-96 bg-gray-50 rounded-lg flex items-center justify-center">
+                    <p class="text-gray-500">图谱加载中...</p>
                 </div>
             </div>
         </div>

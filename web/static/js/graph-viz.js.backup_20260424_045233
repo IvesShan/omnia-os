@@ -14,7 +14,7 @@ const GraphViz = {
   
   // 粒子系统
   brainParticles: null,
-  particleCount: 3000,
+  particleCount: 50000,
   
   // 知识图谱
   graphData: { nodes: [], edges: [] },
@@ -38,28 +38,36 @@ const GraphViz = {
   },
   
   async init() {
-    console.log('[GraphViz] 初始化 3D 全息大脑');
+    console.log("[GraphViz] 初始化 3D 全息大脑");
     
-    // 先加载统计数据
-    await this.loadStats();
-    
-    // 加载图谱数据
-    await this.loadGraph();
-    
-    // 初始化 3D 场景
-    this.initThreeJS();
-    
-    // 创建全息大脑粒子
-    this.createBrainParticles();
-    
-    // 创建知识图谱节点
-    this.createKnowledgeNodes();
-    
-    // 设置后处理
-    this.setupPostProcessing();
-    
-    // 开始动画
-    this.animate();
+    try {
+      // 先加载统计数据
+      await this.loadStats();
+      
+      // 加载图谱数据
+      await this.loadGraph();
+      
+      // 初始化 3D 场景
+      this.initThreeJS();
+      
+      // 创建全息大脑粒子
+      this.createBrainParticles();
+      
+      // 创建知识图谱节点
+      this.createKnowledgeNodes();
+      
+      // 设置后处理
+      this.setupPostProcessing();
+      
+      console.log("[GraphViz] init() 完成，准备调用 animate()");
+      
+      // 开始动画
+      this.animate();
+      
+      console.log("[GraphViz] animate() 已调用");
+    } catch (error) {
+      console.error("[GraphViz] init() 错误:", error);
+    }
   },
   
   initThreeJS() {
@@ -191,7 +199,7 @@ const GraphViz = {
     const material = new THREE.ShaderMaterial({
       uniforms: {
         time: { value: 0 },
-        pointSize: { value: 1.0 }
+        pointSize: { value: 2.0 }
       },
       vertexShader: `
         attribute vec3 color;
@@ -207,7 +215,7 @@ const GraphViz = {
           
           vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
           gl_Position = projectionMatrix * mvPosition;
-          gl_PointSize = pointSize * (30.0 / -mvPosition.z);
+          gl_PointSize = pointSize * (300.0 / -mvPosition.z);
         }
       `,
       fragmentShader: `
@@ -218,7 +226,7 @@ const GraphViz = {
           if (dist > 0.5) discard;
           
           float alpha = 1.0 - smoothstep(0.3, 0.5, dist);
-          gl_FragColor = vec4(vColor, alpha * 0.5);
+          gl_FragColor = vec4(vColor, alpha * 0.8);
         }
       `,
       transparent: true,
@@ -346,7 +354,7 @@ const GraphViz = {
     
     const bloomPass = new UnrealBloomPass(
       new THREE.Vector2(window.innerWidth, window.innerHeight),
-      0.3,  // 强度
+      0.5,  // 强度
       0.4,  // 半径
       0.85  // 阈值
     );
@@ -356,9 +364,19 @@ const GraphViz = {
   },
   
   animate() {
+    console.log("[GraphViz] animate() 被调用");
     this.animationId = requestAnimationFrame(() => this.animate());
     
     this.time += 0.01;
+    
+    // 调试：每秒输出一次
+    if (Math.floor(this.time) !== Math.floor(this.time - 0.01)) {
+      console.log("[GraphViz] 渲染中... time:", this.time.toFixed(1),
+        "scene.children:", this.scene ? this.scene.children.length : 0,
+        "nodes:", this.nodeObjects.length,
+        "particles:", this.brainParticles ? "yes" : "no",
+        "composer:", this.composer ? "yes" : "no");
+    }
     
     // 更新粒子着色器时间
     if (this.brainParticles && this.brainParticles.material.uniforms) {

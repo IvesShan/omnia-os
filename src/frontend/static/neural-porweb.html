@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Omnia 神经图谱 - porweb 风格</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: #0a0a0f;
+            overflow: hidden;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+        }
+        
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+            position: fixed;
+            top: 0;
+            left: 0;
+        }
+        
+        /* 顶部信息栏 */
+        .info-bar {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 138, 0, 0.1);
+            border: 1px solid rgba(255, 138, 0, 0.3);
+            border-radius: 12px;
+            padding: 12px 24px;
+            color: #ff8a00;
+            font-size: 14px;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+        }
+        
+        /* 底部控制面板 */
+        .controls {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 12px;
+            z-index: 100;
+        }
+        
+        .control-btn {
+            background: rgba(0, 255, 255, 0.1);
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            color: #00ffff;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.3s ease;
+        }
+        
+        .control-btn:hover {
+            background: rgba(0, 255, 255, 0.2);
+            border-color: rgba(0, 255, 255, 0.5);
+        }
+        
+        /* 统计信息 */
+        .stats {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0, 21, 26, 0.8);
+            border: 1px solid rgba(255, 138, 0, 0.2);
+            border-radius: 12px;
+            padding: 16px;
+            color: #00ffff;
+            font-size: 12px;
+            z-index: 100;
+        }
+        
+        .stats h3 {
+            color: #ff8a00;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        
+        .stats p {
+            margin: 4px 0;
+        }
+        
+        /* 提示 */
+        .hint {
+            position: fixed;
+            top: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 12px;
+            z-index: 100;
+        }
+    </style>
+</head>
+<body>
+    <div id="canvas-container"></div>
+    
+    <div class="info-bar">
+        🧠 Omnia 神经图谱 - porweb 风格
+    </div>
+    
+    <div class="hint">
+        移动鼠标控制大脑旋转 | 滚轮缩放
+    </div>
+    
+    <div class="controls">
+        <button class="control-btn" onclick="resetView()">重置视角</button>
+        <button class="control-btn" onclick="toggleBloom()">切换泛光</button>
+        <button class="control-btn" onclick="window.location.href='/neural.html'">切换到原版</button>
+    </div>
+    
+    <div class="stats" id="stats">
+        <h3>📊 统计</h3>
+        <p>节点: <span id="node-count">加载中...</span></p>
+        <p>连接: <span id="edge-count">加载中...</span></p>
+    </div>
+    
+    <script type="module">
+        import { NeuralGraphPorweb } from './js/neural-graph-porweb.js';
+        
+        const container = document.getElementById('canvas-container');
+        const graph = new NeuralGraphPorweb(container);
+        
+        // 加载统计
+        async function loadStats() {
+            try {
+                const response = await fetch('http://localhost:8765/api/memory/stats');
+                const data = await response.json();
+                
+                document.getElementById('node-count').textContent = data.neural_nodes || 0;
+                document.getElementById('edge-count').textContent = data.neural_edges || 0;
+            } catch (error) {
+                console.error('加载统计失败:', error);
+            }
+        }
+        
+        loadStats();
+        
+        // 全局函数
+        window.resetView = () => {
+            graph.camera.position.set(0, 0, 5);
+            graph.controls.reset();
+        };
+        
+        window.toggleBloom = () => {
+            // 简单的泛光切换
+            const bloomPass = graph.composer.passes[1];
+            if (bloomPass) {
+                bloomPass.enabled = !bloomPass.enabled;
+            }
+        };
+    </script>
+</body>
+</html>

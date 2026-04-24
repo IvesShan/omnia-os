@@ -206,80 +206,41 @@ function startLogStream() {
     };
 }
 
-// ============ 神经图谱 ============
+
+// ============ 神经图谱 3D 大脑 ============
+
+let neuralBrainInstance = null;
 
 async function loadGraph() {
     const container = document.getElementById('graph-container');
     
-    // 简单的图谱可视化（使用 Canvas）
-    const canvas = document.createElement('canvas');
-    canvas.width = container.clientWidth;
-    canvas.height = container.clientHeight;
-    container.innerHTML = '';
-    container.appendChild(canvas);
-    
-    const ctx = canvas.getContext('2d');
-    
-    // 获取记忆数据
-    const facts = await fetchAPI('/memory/facts');
-    const relations = await fetchAPI('/memory/relations');
-    
-    if (!facts && !relations) {
-        container.innerHTML = '<p class="text-gray-500">无法加载图谱数据</p>';
+    if (!container) {
+        console.error('Graph container not found');
         return;
     }
     
-    // 简单的节点布局
-    const nodes = [];
-    const allData = { ...(facts?.data || {}), ...(relations?.data || {}) };
+    // 清理旧实例
+    if (neuralBrainInstance) {
+        neuralBrainInstance.destroy();
+        neuralBrainInstance = null;
+    }
     
-    Object.keys(allData).forEach((key, i) => {
-        const angle = (i / Object.keys(allData).length) * Math.PI * 2;
-        const radius = Math.min(canvas.width, canvas.height) * 0.35;
-        nodes.push({
-            x: canvas.width / 2 + Math.cos(angle) * radius,
-            y: canvas.height / 2 + Math.sin(angle) * radius,
-            label: key.length > 10 ? key.substring(0, 10) + '...' : key
-        });
-    });
+    // 清空容器
+    container.innerHTML = '<div class="flex items-center justify-center h-full"><div class="text-cyan-400 animate-pulse">🧠 加载神经图谱...</div></div>';
     
-    // 绘制
-    ctx.fillStyle = '#f9fafb';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
-    // 绘制连线
-    ctx.strokeStyle = 'rgba(99, 102, 241, 0.2)';
-    ctx.lineWidth = 1;
-    nodes.forEach((node, i) => {
-        nodes.forEach((other, j) => {
-            if (i < j && Math.random() > 0.7) {
-                ctx.beginPath();
-                ctx.moveTo(node.x, node.y);
-                ctx.lineTo(other.x, other.y);
-                ctx.stroke();
-            }
-        });
-    });
-    
-    // 绘制节点
-    nodes.forEach(node => {
-        ctx.beginPath();
-        ctx.arc(node.x, node.y, 6, 0, Math.PI * 2);
-        ctx.fillStyle = '#6366f1';
-        ctx.fill();
+    // 动态加载 neural-graph.js
+    try {
+        const module = await import('/static/js/neural-graph.js');  // 使用 3d-force-graph 库
         
-        ctx.fillStyle = '#374151';
-        ctx.font = '10px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(node.label, node.x, node.y + 16);
-    });
-    
-    // 中心节点
-    ctx.beginPath();
-    ctx.arc(canvas.width / 2, canvas.height / 2, 20, 0, Math.PI * 2);
-    ctx.fillStyle = '#8b5cf6';
-    ctx.fill();
-    ctx.fillStyle = '#fff';
+        if (module.NeuralGraphForce) {
+            neuralBrainInstance = new module.NeuralGraphForce(container);
+            console.log('🧠 Neural Graph Brain initialized');
+        }
+    } catch (error) {
+        console.error('Failed to load neural graph:', error);
+        container.innerHTML = '<p class="text-red-400 text-center p-8">3D 大脑加载失败: ' + error.message + '</p>';
+    }
+}
     ctx.font = 'bold 12px sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText('Omnia', canvas.width / 2, canvas.height / 2 + 4);

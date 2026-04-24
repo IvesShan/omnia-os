@@ -45,9 +45,9 @@ const CHAT_KEY = 'omnia_chat_history_v1';
 const MAX_CHAT_HISTORY = 200;
 
 const $ = (s) => document.querySelector(s);
-const messagesEl = $('#chat-messages');
-const scrollEl = $('#chat-messages');
-const composer = $('#user-input');
+const messagesEl = $('#messages');
+const scrollEl = $('#chat-scroll');
+const composer = $('#composer');
 const sendBtn = $('#send-btn');
 const attachBtn = $('#attach-btn');
 const imageInput = $('#image-input');
@@ -268,7 +268,7 @@ document.addEventListener('paste', (e) => {
 console.log('[Paste] 粘贴图片功能初始化完成');
 
 // --- 滚动监听 ---
-if (scrollEl) scrollEl.addEventListener('scroll', () => {
+scrollEl.addEventListener('scroll', () => {
   const { scrollTop, scrollHeight, clientHeight } = scrollEl;
   const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;  // 距离底部 100px 内算"在底部"
   
@@ -1150,9 +1150,8 @@ async function loadStatus() {
     pulseIfChanged($('#skill-val'), String((data.skills || {}).total || 0));
 
     const allOk = data.daemon_running && data.api_ready;
-    const linkFill = $("#link-strength");
-    const linkLabel = $("#link-label");
-    if (!linkFill || !linkLabel) return;
+    const linkFill = $('#link-strength');
+    const linkLabel = $('#link-label');
     if (allOk) {
       linkFill.style.width = '100%';
       linkFill.style.background = 'var(--success)';
@@ -1420,7 +1419,7 @@ function doReload(e) {
 
 // --- 自动滚动修复 ---
 // 注意：userScrolledUp 已在文件开头声明，这里不需要重复声明
-if (scrollEl) scrollEl.addEventListener('scroll', () => {
+scrollEl.addEventListener('scroll', () => {
   const threshold = 40;
   userScrolledUp = scrollEl.scrollTop + scrollEl.clientHeight < scrollEl.scrollHeight - threshold;
 });
@@ -1575,8 +1574,8 @@ async function submitConfirm(approved) {
   }
 }
 
-  if (btnDeny) btnDeny.addEventListener('click', () => submitConfirm(false));
-  if (btnAllow) btnAllow.addEventListener('click', () => submitConfirm(true));
+btnDeny.addEventListener('click', () => submitConfirm(false));
+btnAllow.addEventListener('click', () => submitConfirm(true));
 
 function restorePendingConfirm() {
   try {
@@ -1625,15 +1624,10 @@ async function doMemorySearch() {
   }
 }
 
-// 只有当元素存在时才绑定事件
-if (memSearchBtn) {
-  memSearchBtn.addEventListener('click', doMemorySearch);
-}
-if (memSearchInput) {
-  memSearchInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') doMemorySearch();
-  });
-}
+memSearchBtn.addEventListener('click', doMemorySearch);
+memSearchInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') doMemorySearch();
+});
 
 // --- API 选择器 ---
 let currentApiProvider = null;

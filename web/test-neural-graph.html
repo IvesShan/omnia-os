@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>神经图谱测试</title>
+  <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+  <style>
+    body { margin: 0; padding: 20px; background: #0f172a; color: #e2e8f0; font-family: sans-serif; }
+    #status { margin-bottom: 20px; padding: 10px; background: #1e293b; border-radius: 8px; }
+    #graph-canvas { width: 100%; height: 600px; background: #1e293b; border-radius: 8px; }
+    .success { color: #10b981; }
+    .error { color: #ef4444; }
+  </style>
+</head>
+<body>
+  <h1>神经图谱渲染测试</h1>
+  <div id="status">正在加载...</div>
+  <div id="graph-canvas"></div>
+  
+  <script>
+    async function testGraph() {
+      const statusEl = document.getElementById('status');
+      const canvas = document.getElementById('graph-canvas');
+      
+      try {
+        statusEl.innerHTML = '正在获取图谱数据...';
+        
+        const res = await fetch('/api/graph?limit=100');
+        const data = await res.json();
+        
+        statusEl.innerHTML = `<span class="success">✓ 数据获取成功: ${data.nodes?.length || 0} 节点, ${data.edges?.length || 0} 边</span>`;
+        
+        if (!data.nodes || data.nodes.length === 0) {
+          canvas.innerHTML = '<div style="padding:20px;">暂无图谱数据</div>';
+          return;
+        }
+        
+        // 创建ID映射
+        const nameToId = {};
+        data.nodes.forEach(n => {
+          nameToId[n.name] = n.id;
+          if (n.canonical_name) nameToId[n.canonical_name] = n.id;
+        });
+        
+        // 准备vis数据
+        const nodes = new vis.DataSet(
+          data.nodes.map(n => ({
+            id: n.id,
+            label: n.name || n.id,
+            color: {
+              background: n.type === 'PERSON' ? '#22d3ee' : 
+                          n.type === 'PROJECT' ? '#a855f7' :
+                          n.type === 'FILE' ? '#10b981' : '#64748b',
+              border: '#ffffff'
+            },
+            font: { color: '#ffffff', size: 12 },
+            shape: 'dot',
+            size: 15
+          }))
+        );
+        
+        const edges = new vis.DataSet(
+          data.edges
+            .filter(e => nameToId[e.source] && nameToId[e.target])
+            .map((e, i) => ({
+              id: i,
+              from: nameToId[e.source],
+              to: nameToId[e.target],
+              color: { color: '#475569' }
+            }))
+        );
+        
+        statusEl.innerHTML += `<br><span class="success">✓ 节点映射: ${nodes.length}, 边映射: ${edges.length}</span>`;
+        
+        // 渲染图谱
+        const network = new vis.Network(canvas, { nodes, edges }, {
+          physics: {
+            barnesHut: { gravitationalConstant: -3000 }
+          }
+        });
+        
+        statusEl.innerHTML += `<br><span class="success">✓ 图谱渲染完成！</span>`;
+        
+      } catch (err) {
+        statusEl.innerHTML = `<span class="error">✗ 错误: ${err.message}</span>`;
+        console.error(err);
+      }
+    }
+    
+    testGraph();
+  </script>
+</body>
+</html>

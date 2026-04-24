@@ -1395,7 +1395,7 @@ def main():
     print("Omnia Web UI 启动于 http://127.0.0.1:5001/")
     
     try:
-        app.run(host="127.0.0.1", port=5001, threaded=True)
+        app.run(host="0.0.0.0", port=5001, threaded=True)
     finally:
         # Cleanup MCP connections on shutdown
         print("[MCP] Shutting down...")
