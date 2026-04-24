@@ -37,6 +37,7 @@ class DaemonConfig:
     heartbeat_interval_minutes: int = 5
     log_file: str = ".omnia/daemon.log"
     state_file: str = str(OMNIA_HOME / "daemon_state.json")
+    pid_file: str = str(OMNIA_HOME / "daemon.pid")
     # Rules
     watch_memory_changes: bool = True
     watch_project_git_changes: bool = False
@@ -85,6 +86,29 @@ class PersonaDaemon:
 
         # Self-evolution scheduler
         self._evolution_scheduler = None
+
+    # ------------------------------------------------------------------
+    # PID File Management
+    # ------------------------------------------------------------------
+    def _write_pid(self) -> None:
+        """Write current PID to file for external monitoring."""
+        pid_path = OMNIA_HOME / "daemon.pid"
+        try:
+            pid_path.parent.mkdir(parents=True, exist_ok=True)
+            pid_path.write_text(str(os.getpid()))
+            self._log("PID", f"Wrote PID {os.getpid()} to {pid_path}")
+        except Exception as e:
+            self._log("ERROR", f"Failed to write PID file: {e}")
+
+    def _cleanup_pid(self) -> None:
+        """Remove PID file on shutdown."""
+        pid_path = OMNIA_HOME / "daemon.pid"
+        try:
+            if pid_path.exists():
+                pid_path.unlink()
+                self._log("PID", f"Removed PID file {pid_path}")
+        except Exception as e:
+            self._log("ERROR", f"Failed to cleanup PID file: {e}")
 
     # ------------------------------------------------------------------
     # IDE Bridge
@@ -166,37 +190,16 @@ class PersonaDaemon:
     def _start_evolution(self) -> None:
         """Start the self-evolution scheduler."""
         if not self.config.evolution_enabled:
-            self._log("INFO", "Self-evolution disabled by config.")
             return
 
         try:
-            from ..skill_forge.evolution_scheduler import EvolutionScheduler
-
-            # Determine paths
-            # memory_dir: workspace/memory (where conversation logs are stored)
-            # skills_dir: workspace/omnia-os/skills/auto-forge (where skills are saved)
-            memory_dir = self.workspace / self.config.memory_dir
-            skills_dir = self.workspace / "omnia-os" / "skills" / "auto-forge"
-
-            # Create skills dir if needed
-            skills_dir.mkdir(parents=True, exist_ok=True)
+            from .evolution_scheduler import EvolutionScheduler
 
             def on_evolution_complete(result):
-                """Callback when evolution cycle completes."""
-                if result.skills_approved:
-                    self._log("EVOLUTION", f"New skills learned: {result.skills_approved}")
-                    self._queue.push(
-                        "info",
-                        "evolution",
-                        f"Learned {len(result.skills_approved)} new skill(s)",
-                        f"Skills: {', '.join(result.skills_approved)}"
-                    )
-                if result.error:
-                    self._log("EVOLUTION", f"Errors during evolution: {result.error}")
+                self._log("EVOLUTION", f"Cycle complete: {result.patterns_found} patterns, {result.skills_generated} skills")
 
             self._evolution_scheduler = EvolutionScheduler(
-                memory_dir=memory_dir,
-                skills_dir=skills_dir,
+                workspace_root=self.workspace,
                 interval_hours=self.config.evolution_interval_hours,
                 on_evolution_complete=on_evolution_complete,
             )
@@ -323,6 +326,7 @@ class PersonaDaemon:
     def start(self) -> None:
         self._log("START", "Persona Daemon is waking up.")
         self.running = True
+        self._write_pid()
 
         # Bootstrap core features
         bootstrap_result = bootstrap_omnia(self.workspace)
@@ -380,6 +384,7 @@ class PersonaDaemon:
                 self._log("ERROR", f"Shutdown hook failed: {e}")
 
     def stop(self) -> None:
+        self._cleanup_pid()
         self.running = False
 
     def on_shutdown(self, hook: Callable[[], None]) -> Callable[[], None]:

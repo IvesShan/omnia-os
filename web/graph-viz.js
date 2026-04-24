@@ -14,7 +14,7 @@ const GraphViz = {
   
   // 粒子系统
   brainParticles: null,
-  particleCount: 3000,
+  particleCount: 2000,
   
   // 知识图谱
   graphData: { nodes: [], edges: [] },
@@ -158,26 +158,45 @@ const GraphViz = {
   },
   
   createBrainParticles() {
-    // porweb 风格的全息大脑粒子
+    // 大脑形状的全息粒子 - 两个半球 + 中间凹陷
     const positions = new Float32Array(this.particleCount * 3);
     const colors = new Float32Array(this.particleCount * 3);
     
-    // 橙蓝配色
+    // 橙青配色
     const colorOrange = new THREE.Color(0xff8a00);
     const colorCyan = new THREE.Color(0x22d3ee);
     
     for (let i = 0; i < this.particleCount; i++) {
-      // 球形分布
-      const theta = Math.random() * Math.PI * 2;
-      const phi = Math.acos(2 * Math.random() - 1);
-      const r = 1.5 + Math.random() * 0.5;
+      // 大脑形状分布
+      const theta = Math.random() * Math.PI * 2;  // 水平角度
+      const phi = Math.acos(2 * Math.random() - 1);  // 垂直角度
       
-      positions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
-      positions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
-      positions[i * 3 + 2] = r * Math.cos(phi);
+      // 基础半径
+      let r = 1.5 + Math.random() * 0.5;
       
-      // 随机颜色（橙或青）
-      const color = Math.random() > 0.5 ? colorOrange : colorCyan;
+      // 椭球形变 - 前后略长，上下略扁
+      const xBase = r * Math.sin(phi) * Math.cos(theta);
+      const yBase = r * Math.sin(phi) * Math.sin(theta) * 0.85;  // 上下压缩
+      const zBase = r * Math.cos(phi) * 1.1;  // 前后略长
+      
+      // 中间凹陷（胼胝体区域）- Y轴中间位置向内收缩
+      const yNorm = (yBase + 1.5) / 3;  // 归一化到 0-1
+      const grooveFactor = 1 - 0.3 * Math.exp(-Math.pow((yBase) / 0.3, 2));
+      
+      // 左右半球分离
+      const hemisphere = xBase > 0 ? 1 : -1;
+      const separation = 0.15;  // 两半球间隙
+      const xFinal = xBase * grooveFactor + hemisphere * separation * (1 - Math.abs(yBase) / 1.5);
+      
+      // 添加表面褶皱效果
+      const wrinkle = 0.05 * Math.sin(theta * 8 + phi * 6);
+      
+      positions[i * 3] = xFinal + wrinkle;
+      positions[i * 3 + 1] = yBase;
+      positions[i * 3 + 2] = zBase;
+      
+      // 颜色：左半球青色，右半球橙色
+      const color = hemisphere > 0 ? colorCyan : colorOrange;
       colors[i * 3] = color.r;
       colors[i * 3 + 1] = color.g;
       colors[i * 3 + 2] = color.b;
@@ -191,7 +210,7 @@ const GraphViz = {
     const material = new THREE.ShaderMaterial({
       uniforms: {
         time: { value: 0 },
-        pointSize: { value: 1.0 }
+        pointSize: { value: 1.2 }
       },
       vertexShader: `
         attribute vec3 color;
@@ -203,11 +222,11 @@ const GraphViz = {
           vColor = color;
           
           vec3 pos = position;
-          pos += 0.1 * sin(time + position.x * 10.0) * normalize(position);
+          pos += 0.08 * sin(time + position.x * 8.0) * normalize(position);
           
           vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
           gl_Position = projectionMatrix * mvPosition;
-          gl_PointSize = pointSize * (30.0 / -mvPosition.z);
+          gl_PointSize = pointSize * (25.0 / -mvPosition.z);
         }
       `,
       fragmentShader: `
@@ -217,8 +236,8 @@ const GraphViz = {
           float dist = length(gl_PointCoord - vec2(0.5));
           if (dist > 0.5) discard;
           
-          float alpha = 1.0 - smoothstep(0.3, 0.5, dist);
-          gl_FragColor = vec4(vColor, alpha * 0.5);
+          float alpha = 1.0 - smoothstep(0.2, 0.5, dist);
+          gl_FragColor = vec4(vColor, alpha * 0.7);
         }
       `,
       transparent: true,
@@ -229,7 +248,7 @@ const GraphViz = {
     this.brainParticles = new THREE.Points(geometry, material);
     this.scene.add(this.brainParticles);
     
-    console.log('[GraphViz] 粒子系统已创建:', this.particleCount, '个粒子');
+    console.log('[GraphViz] 大脑粒子系统已创建:', this.particleCount, '个粒子');
   },
   
   async loadStats() {
@@ -271,29 +290,28 @@ const GraphViz = {
     
     console.log('[GraphViz] 创建知识节点:', this.graphData.nodes.length, '个');
     
-    // 创建节点
+    // 创建节点 - 融入大脑内部，更小更亮
     this.graphData.nodes.forEach((node, i) => {
-      // 兼容后端返回的字段名
       node.label = node.label || node.name || node.id;
       node.type = node.type || 'ENTITY';
       const color = this.typeColors[node.type] || this.typeColors.DEFAULT;
       
-      // 球体节点
-      const geometry = new THREE.SphereGeometry(0.15, 16, 16);
+      // 更小的球体节点，融入大脑
+      const geometry = new THREE.SphereGeometry(0.08, 12, 12);
       const material = new THREE.MeshStandardMaterial({
         color: color,
         emissive: color,
-        emissiveIntensity: 0.5,
-        metalness: 0.8,
-        roughness: 0.2
+        emissiveIntensity: 1.2,
+        metalness: 0.9,
+        roughness: 0.1
       });
       
       const mesh = new THREE.Mesh(geometry, material);
       
-      // 随机位置（球形分布）
+      // 分布在大脑内部（半径 0.8-1.2）
       const theta = (i / this.graphData.nodes.length) * Math.PI * 2;
       const phi = Math.random() * Math.PI;
-      const r = 2;
+      const r = 0.8 + Math.random() * 0.4;
       
       mesh.position.set(
         r * Math.sin(phi) * Math.cos(theta),
@@ -307,29 +325,8 @@ const GraphViz = {
       nodeMap[node.name || node.id] = mesh;
     });
     
-    // 创建连线
-    let edgeCount = 0;
-    this.graphData.edges.forEach(edge => {
-      const sourceNode = nodeMap[edge.source];
-      const targetNode = nodeMap[edge.target];
-      
-      if (sourceNode && targetNode) {
-        const points = [sourceNode.position, targetNode.position];
-        const geometry = new THREE.BufferGeometry().setFromPoints(points);
-        const material = new THREE.LineBasicMaterial({
-          color: 0x22d3ee,
-          transparent: true,
-          opacity: 0.3
-        });
-        
-        const line = new THREE.Line(geometry, material);
-        this.scene.add(line);
-        this.connectionLines.push(line);
-        edgeCount++;
-      }
-    });
-    
-    console.log('[GraphViz] 创建连线:', edgeCount, '条');
+    // 不再创建连线 - 节点融入大脑
+    console.log('[GraphViz] 知识节点已融入大脑，无连线');
   },
   
   setupPostProcessing() {
@@ -346,7 +343,7 @@ const GraphViz = {
     
     const bloomPass = new UnrealBloomPass(
       new THREE.Vector2(window.innerWidth, window.innerHeight),
-      0.3,  // 强度
+      0.15, // 强度（降低避免光球效果）
       0.4,  // 半径
       0.85  // 阈值
     );
