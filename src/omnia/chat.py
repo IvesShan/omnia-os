@@ -266,7 +266,7 @@ def call_local_llm(messages: list, tools: list | None = None) -> dict:
         "model": model,
         "messages": messages,
         "temperature": 0.7,
-        "max_tokens": 4096,
+        "max_tokens": 8192,
     }
     
     if tools:
@@ -333,7 +333,7 @@ def _call_model_messages(api_key: str, provider: str, messages: list, tools: lis
         payload: dict = {
             "model": model,
             "messages": messages,
-            "max_tokens": 4096,
+            "max_tokens": 8192,
             "temperature": 0.7,
         }
         

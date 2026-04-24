@@ -56,14 +56,14 @@ def handle_chat(message: str, history: list, api_key: str, provider: str, system
     
     # ========== 自动加载历史（NEW - 解决对话连续性）==========
     # 如果前端传来的历史很短（< 5 条），从数据库加载
-    if len(history) < 20:  # 优化: 提高阈值，确保加载足够历史
+    if len(history) < 10:  # 优化: 提高阈值，确保加载足够历史
         print(f"[Chat] Frontend history too short ({len(history)}), loading from database...")
         db_history = load_recent_conversations(
-            limit=20,  # 优化: 加载更多历史
+            limit=40,  # 优化: 加载更多历史
             current_message=message,
-            min_similarity=0.5,  # 优化: 启用语义搜索
+            min_similarity=0.3,  # 优化: 启用语义搜索
         )
-        history = merge_histories(history, db_history, max_total=40)  # 优化: 增加上下文容量
+        history = merge_histories(history, db_history, max_total=80)  # 优化: 增加上下文容量
         print(f"[Chat] History merged: {len(history)} messages")
     
     # ========== 加载上次上下文（NEW）==========

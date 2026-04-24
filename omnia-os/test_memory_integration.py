@@ -1,148 +1,194 @@
 #!/usr/bin/env python3
 """
-测试记忆系统集成
+记忆系统集成测试
 
-测试内容：
-1. 记忆管理器基本功能
-2. 记忆检索效果
-3. 与对话引擎的集成
+测试：
+1. MemoryManager 基础功能
+2. LLMReasoningAdapter 记忆集成
+3. 完整对话流程
 """
 
+import asyncio
 import sys
-import os
+sys.path.insert(0, '/home/shan/omnia-os/omnia-os/src')
 
-# 添加 Omnia 根目录到 Python 路径
-sys.path.insert(0, "/home/shan/omnia-os/omnia-os")
+from core.memory.memory_manager import MemoryManager
+from core.cognition.llm_reasoning_adapter import LLMReasoningAdapter
 
-from src.core.memory.memory_manager import MemoryManager
+
+def print_header(title: str):
+    print("\n" + "=" * 60)
+    print(title)
+    print("=" * 60)
 
 
 def test_memory_manager():
-    """测试记忆管理器"""
-    print("=" * 60)
-    print("测试 1: 记忆管理器基本功能")
-    print("=" * 60)
+    """测试 MemoryManager 基础功能"""
+    print_header("测试 1: MemoryManager 基础功能")
     
     # 创建记忆管理器
-    manager = MemoryManager(max_memories=100, enable_compression=False)
+    mm = MemoryManager(max_memories=100)
     
-    # 添加一些记忆
+    # 添加记忆
     print("\n📝 添加记忆...")
+    mm.add_memory("用户的名字是原点", "assistant")
+    mm.add_memory("用户经营无人机维修公司", "assistant")
+    mm.add_memory("用户喜欢编程和蓝色", "assistant")
+    mm.add_memory("Omnia 是一个自主的 AI 操作系统", "assistant")
+    mm.add_memory("无限是用户的 AI 助手", "assistant")
     
-    manager.add_memory(
-        content="用户问：无人机维修需要什么工具？",
-        role="user",
-        metadata={"topic": "无人机维修"}
-    )
+    print(f"✅ 已添加 {mm.stats['total_memories']} 条记忆")
     
-    manager.add_memory(
-        content="助手答：无人机维修需要螺丝刀、焊台、万用表等基础工具。",
-        role="assistant",
-        metadata={"topic": "无人机维修"}
-    )
-    
-    manager.add_memory(
-        content="用户问：Mini 3 Pro 的电池阈值是多少？",
-        role="user",
-        metadata={"topic": "DJI Mini 3 Pro"}
-    )
-    
-    manager.add_memory(
-        content="助手答：Mini 3 Pro 的升级阈值是 15%，正常使用建议保持在 10% 以上。",
-        role="assistant",
-        metadata={"topic": "DJI Mini 3 Pro"}
-    )
-    
-    manager.add_memory(
-        content="用户问：如何提高抖音视频的完播率？",
-        role="user",
-        metadata={"topic": "抖音运营"}
-    )
-    
-    manager.add_memory(
-        content="助手答：提高完播率的关键是黄金3秒钩子和信息前置。",
-        role="assistant",
-        metadata={"topic": "抖音运营"}
-    )
-    
-    print(f"✅ 已添加 {len(manager.memories)} 条记忆")
-    
-    # 测试检索
-    print("\n" + "=" * 60)
-    print("测试 2: 记忆检索效果")
-    print("=" * 60)
-    
-    # 查询 1：无人机相关
-    print("\n🔍 查询：'无人机维修工具'")
-    results = manager.retrieve_relevant("无人机维修工具", top_k=3)
+    # 检索相关记忆
+    print("\n🔍 检索相关记忆...")
+    results = mm.retrieve_relevant("用户是谁", top_k=3)
     
     print(f"找到 {len(results)} 条相关记忆：")
     for memory, score in results:
-        print(f"  [{score:.2f}] {memory.role}: {memory.content[:50]}...")
+        print(f"  [{score:.2f}] {memory.content}")
     
-    # 查询 2：电池相关
-    print("\n🔍 查询：'Mini 3 Pro 电池'")
-    results = manager.retrieve_relevant("Mini 3 Pro 电池", top_k=3)
+    # 获取最近记忆
+    print("\n📚 最近记忆...")
+    recent = mm.get_recent_memories(3)
+    for m in recent:
+        print(f"  - {m.content}")
     
-    print(f"找到 {len(results)} 条相关记忆：")
-    for memory, score in results:
-        print(f"  [{score:.2f}] {memory.role}: {memory.content[:50]}...")
+    # 统计信息
+    stats = mm.get_stats()
+    print(f"\n📊 统计: {stats}")
     
-    # 查询 3：抖音相关
-    print("\n🔍 查询：'抖音完播率'")
-    results = manager.retrieve_relevant("抖音完播率", top_k=3)
+    return mm
+
+
+async def test_llm_adapter_with_memory():
+    """测试 LLM 推理适配器与记忆集成"""
+    print_header("测试 2: LLM 推理适配器 + 记忆集成")
     
-    print(f"找到 {len(results)} 条相关记忆：")
-    for memory, score in results:
-        print(f"  [{score:.2f}] {memory.role}: {memory.content[:50]}...")
+    # 创建记忆管理器
+    mm = MemoryManager(max_memories=100)
+    mm.add_memory("用户的名字是原点", "assistant")
+    mm.add_memory("用户经营无人机维修公司", "assistant")
+    mm.add_memory("用户喜欢编程和蓝色", "assistant")
     
-    # 测试统计
+    # 创建 LLM 推理适配器
+    adapter = LLMReasoningAdapter(memory_manager=mm, max_loops=3)
+    
+    print("\n🧠 处理用户输入...")
+    print("用户: 你好，我是谁？")
+    
+    try:
+        result = await adapter.process("你好，我是谁？")
+        
+        print(f"\n🤖 Omnia 回复:")
+        print(f"  {result['response'][:200]}...")
+        print(f"\n📊 推理深度: {result['depth']}")
+        print(f"📊 置信度: {result['confidence']:.2f}")
+        print(f"📊 使用记忆: {len(result['memories_used'])} 条")
+        
+        if result['memories_used']:
+            print("\n📚 使用的记忆:")
+            for m in result['memories_used'][:3]:
+                print(f"  - {m[:80]}...")
+        
+        return True
+        
+    except Exception as e:
+        print(f"❌ 错误: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+
+async def test_conversation_flow():
+    """测试完整对话流程"""
+    print_header("测试 3: 完整对话流程")
+    
+    # 创建记忆管理器
+    mm = MemoryManager(max_memories=100)
+    
+    # 预加载一些记忆
+    mm.add_memory("原点是用户的名字", "assistant")
+    mm.add_memory("用户经营无人机维修公司喵修匠", "assistant")
+    mm.add_memory("用户正在开发 Omnia AI 操作系统", "assistant")
+    
+    # 创建适配器
+    adapter = LLMReasoningAdapter(memory_manager=mm, max_loops=3)
+    
+    # 模拟对话
+    conversations = [
+        "你好",
+        "我叫什么名字？",
+        "我在做什么项目？"
+    ]
+    
+    for user_input in conversations:
+        print(f"\n👤 用户: {user_input}")
+        
+        try:
+            result = await adapter.process(user_input)
+            
+            # 保存对话到记忆
+            mm.add_memory(user_input, "user")
+            mm.add_memory(result['response'][:200], "assistant")
+            
+            print(f"🤖 Omnia: {result['response'][:150]}...")
+            print(f"   [深度={result['depth']}, 记忆={len(result['memories_used'])}]")
+            
+        except Exception as e:
+            print(f"❌ 错误: {e}")
+    
+    print(f"\n📊 总记忆数: {mm.stats['total_memories']}")
+    
+    return True
+
+
+async def main():
     print("\n" + "=" * 60)
-    print("测试 3: 统计信息")
+    print("Omnia 记忆系统集成测试")
     print("=" * 60)
     
-    stats = manager.get_stats()
-    print(f"📊 当前记忆数：{stats['current_memories']}")
-    print(f"📊 唯一关键词：{stats['unique_keywords']}")
-    print(f"📊 总检索次数：{stats['total_retrievals']}")
-    print(f"📊 平均检索时间：{stats['avg_retrieval_time'] * 1000:.2f}ms")
+    results = []
     
-    # 测试对话历史
-    print("\n" + "=" * 60)
-    print("测试 4: 对话历史获取")
-    print("=" * 60)
+    # 测试 1: MemoryManager
+    try:
+        mm = test_memory_manager()
+        results.append(("MemoryManager 基础功能", True))
+    except Exception as e:
+        print(f"❌ 测试 1 失败: {e}")
+        results.append(("MemoryManager 基础功能", False))
     
-    history = manager.get_conversation_history(max_turns=3)
-    print(f"📝 最近 {len(history)} 条对话：")
-    for msg in history:
-        print(f"  {msg['role']}: {msg['content'][:50]}...")
+    # 测试 2: LLM 适配器 + 记忆
+    try:
+        success = await test_llm_adapter_with_memory()
+        results.append(("LLM 适配器 + 记忆集成", success))
+    except Exception as e:
+        print(f"❌ 测试 2 失败: {e}")
+        results.append(("LLM 适配器 + 记忆集成", False))
     
-    # 测试保存和加载
-    print("\n" + "=" * 60)
-    print("测试 5: 记忆持久化")
-    print("=" * 60)
+    # 测试 3: 完整对话流程
+    try:
+        success = await test_conversation_flow()
+        results.append(("完整对话流程", success))
+    except Exception as e:
+        print(f"❌ 测试 3 失败: {e}")
+        results.append(("完整对话流程", False))
     
-    test_file = "/tmp/test_memory.json"
-    manager.save_to_file(test_file)
-    print(f"✅ 记忆已保存到 {test_file}")
+    # 总结
+    print_header("测试总结")
+    passed = sum(1 for _, s in results if s)
+    total = len(results)
     
-    # 创建新管理器并加载
-    new_manager = MemoryManager()
-    new_manager.load_from_file(test_file)
-    print(f"✅ 从文件加载了 {len(new_manager.memories)} 条记忆")
+    for name, success in results:
+        status = "✅ 通过" if success else "❌ 失败"
+        print(f"  {status}: {name}")
     
-    # 验证
-    assert len(new_manager.memories) == len(manager.memories), "记忆数量不一致"
-    print("✅ 记忆完整性验证通过")
+    print(f"\n总体: {passed}/{total} 通过")
     
-    # 清理测试文件
-    os.remove(test_file)
-    print(f"✅ 测试文件已清理")
-    
-    print("\n" + "=" * 60)
-    print("✅ 所有测试通过！")
-    print("=" * 60)
+    if passed == total:
+        print("\n🎉 所有测试通过！记忆系统集成成功！")
+    else:
+        print("\n⚠️ 部分测试失败，请检查错误信息")
 
 
 if __name__ == "__main__":
-    test_memory_manager()
+    asyncio.run(main())

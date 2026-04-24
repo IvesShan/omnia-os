@@ -7,7 +7,7 @@
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      background: transparent;  /* 移除背景色 */
+      background: transparent;
       color: #22d3ee;
       font-family: 'Inter', sans-serif;
       overflow: hidden;
@@ -104,8 +104,6 @@
     
     // 场景
     const scene = new THREE.Scene();
-    // 移除背景色，使用透明背景
-    // scene.background = new THREE.Color(0x0a0a1a);
     scene.fog = new THREE.FogExp2(0x0a0a1a, 0.015);
     
     // 容器
@@ -135,12 +133,12 @@
     );
     composer.addPass(bloomPass);
     
-    // 控制器 - 提高自动旋转速度
+    // 控制器
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
     controls.autoRotate = true;
-    controls.autoRotateSpeed = 1.0;  // 提高自动旋转速度
+    controls.autoRotateSpeed = 1.0;
     controls.minDistance = 20;
     controls.maxDistance = 100;
     controls.enablePan = true;
@@ -151,7 +149,7 @@
     // 创建大脑
     const brainGroup = new THREE.Group();
     
-    // 大脑轮廓
+    // 大脑轮廓 - 椭圆形
     const brainGeometry = new THREE.IcosahedronGeometry(15, 3);
     const brainMaterial = new THREE.MeshPhongMaterial({
       color: 0x1e293b,
@@ -163,37 +161,24 @@
     });
     brainGroup.add(new THREE.Mesh(brainGeometry, brainMaterial));
     
-    // 神经网络线条
-    const lineMaterial = new THREE.LineBasicMaterial({
+    // 左右半球分界线
+    const dividerGeometry = new THREE.PlaneGeometry(30, 30);
+    const dividerMaterial = new THREE.MeshBasicMaterial({
       color: 0x22d3ee,
       transparent: true,
-      opacity: 0.3
+      opacity: 0.15,
+      side: THREE.DoubleSide
     });
+    const divider = new THREE.Mesh(dividerGeometry, dividerMaterial);
+    divider.rotation.y = 0;
+    brainGroup.add(divider);
     
-    for (let i = 0; i < 50; i++) {
-      const points = [];
-      const startAngle = Math.random() * Math.PI * 2;
-      const endAngle = startAngle + Math.PI * (0.5 + Math.random());
-      
-      for (let j = 0; j <= 20; j++) {
-        const t = j / 20;
-        const angle = startAngle + (endAngle - startAngle) * t;
-        const radius = 10 + Math.sin(t * Math.PI) * 5;
-        points.push(new THREE.Vector3(
-          Math.cos(angle) * radius * (0.8 + Math.random() * 0.4),
-          (Math.random() - 0.5) * 20,
-          Math.sin(angle) * radius * (0.8 + Math.random() * 0.4)
-        ));
-      }
-      
-      const geometry = new THREE.BufferGeometry().setFromPoints(points);
-      brainGroup.add(new THREE.Line(geometry, lineMaterial));
-    }
+    // ✅ 已删除装饰性神经网络线条
     
     scene.add(brainGroup);
     statusEl.textContent = '✓ 大脑模型创建完成';
     
-    // 创建粒子 - 移除上下摆动效果
+    // 创建粒子
     const particleCount = 2000;
     const positions = new Float32Array(particleCount * 3);
     const colors = new Float32Array(particleCount * 3);
@@ -242,14 +227,14 @@
     light2.position.set(-20, -20, 20);
     scene.add(light2);
     
-    // 知识节点
+    // 知识节点 - 融入大脑内部
     const knowledgeNodes = [];
     const typeColors = {
-      'PERSON': 0x06b6d4,
-      'PROJECT': 0xa855f7,
-      'FILE': 0x10b981,
-      'CONCEPT': 0xf59e0b,
-      'default': 0x6366f1
+      'PERSON': 0x06b6d4,    // 青色
+      'PROJECT': 0xa855f7,   // 紫色
+      'FILE': 0x10b981,      // 绿色
+      'CONCEPT': 0xf59e0b,   // 橙色
+      'default': 0x6366f1    // 靛蓝
     };
     
     fetch('/api/graph?limit=100')
@@ -262,17 +247,21 @@
             const type = node.type || 'default';
             const color = typeColors[type] || typeColors.default;
             
+            // 使用斐波那契球分布，但半径更小（融入大脑内部）
             const phi = Math.acos(-1 + (2 * index) / data.nodes.length);
             const theta = Math.sqrt(data.nodes.length * Math.PI) * phi;
-            const radius = 18 + Math.random() * 5;
             
-            const geometry = new THREE.SphereGeometry(0.8, 16, 16);
+            // 半径范围：8-14，让节点分布在大脑内部
+            const radius = 8 + Math.random() * 6;
+            
+            // 更小的节点，更强的发光效果
+            const geometry = new THREE.SphereGeometry(0.3, 12, 12);
             const material = new THREE.MeshPhongMaterial({
               color: color,
               emissive: color,
-              emissiveIntensity: 0.5,
+              emissiveIntensity: 1.2,  // 更强的发光
               transparent: true,
-              opacity: 0.9
+              opacity: 0.95
             });
             
             const mesh = new THREE.Mesh(geometry, material);
@@ -298,23 +287,22 @@
         loadingEl.style.display = 'none';
       });
     
-    // 动画 - 移除大脑和粒子的额外旋转，只使用 OrbitControls 的 autoRotate
+    // 动画
     let time = 0;
     function animate() {
       requestAnimationFrame(animate);
       
       time += 0.01;
       
-      // 移除大脑额外旋转（使用 OrbitControls 的 autoRotate）
-      // brainGroup.rotation.y += 0.002;
-      
-      // 移除粒子额外旋转
-      // particles.rotation.y += 0.0005;
-      
-      // 节点脉动
+      // 节点脉动 - 更柔和
       knowledgeNodes.forEach((node, i) => {
-        const scale = 1 + Math.sin(time * 2 + i) * 0.1;
+        const scale = 1 + Math.sin(time * 1.5 + i * 0.3) * 0.15;
         node.scale.setScalar(scale);
+        
+        // 发光强度脉动
+        if (node.material) {
+          node.material.emissiveIntensity = 1.0 + Math.sin(time * 2 + i * 0.5) * 0.4;
+        }
       });
       
       controls.update();

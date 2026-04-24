@@ -26,6 +26,34 @@ class ReasoningState:
     tool_calls: List[Dict] = field(default_factory=list)
     insights: List[str] = field(default_factory=list)
     metadata: Dict[str, Any] = field(default_factory=dict)
+    
+    def decay(self, rate: float):
+        """衰减状态（用于 LTI 更新）"""
+        self.confidence *= rate
+        # 衰减 insights（保留最近的重要信息）
+        if len(self.insights) > 5:
+            self.insights = self.insights[-5:]
+    
+    def inject(self, other: 'ReasoningState', strength: float):
+        """注入其他状态（用于 LTI 更新）"""
+        # 注入置信度
+        self.confidence = max(self.confidence, other.confidence * strength)
+        # 注入洞察
+        for insight in other.insights:
+            if insight not in self.insights:
+                self.insights.append(insight)
+    
+    def merge(self, other: 'ReasoningState'):
+        """合并其他状态"""
+        self.depth = max(self.depth, other.depth)
+        self.confidence = max(self.confidence, other.confidence)
+        self.output = other.output or self.output
+        self.plan_steps.extend(other.plan_steps)
+        self.memory_queries.extend(other.memory_queries)
+        self.tool_calls.extend(other.tool_calls)
+        for insight in other.insights:
+            if insight not in self.insights:
+                self.insights.append(insight)
 
 
 @dataclass

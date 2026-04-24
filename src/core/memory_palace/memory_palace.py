@@ -264,20 +264,62 @@ class MemoryPalace:
         title: str = None,
         tags: str = None,
         metadata: dict = None,
-    ) -> None:
-        """Store a timeline event with semantic embedding."""
-        from datetime import date
+    ) -> Optional[int]:
+        """Store a timeline event with semantic embedding.
         
+        Returns:
+            rowid if successful, None if skipped (duplicate or invalid)
+        """
+        from datetime import date
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        # === 数据验证 ===
+        # 过滤异常格式的数据
+        if not content or not content.strip():
+            logger.warning(f"[MemoryPalace] 跳过空内容")
+            return None
+        
+        # 过滤 "Sender (untrusted metadata)" 等异常格式
+        if 'Sender (untrusted metadata)' in content:
+            logger.warning(f"[MemoryPalace] 跳过异常数据: {content[:50]}...")
+            return None
+        
+        # 过滤代码块格式的异常数据
+        if content.strip().startswith('```') and 'label' in content.lower():
+            logger.warning(f"[MemoryPalace] 跳过代码块异常数据: {content[:50]}...")
+            return None
+        
+        # 过滤过短的无意义内容
+        if len(content.strip()) < 3:
+            logger.warning(f"[MemoryPalace] 跳过过短内容: {content}")
+            return None
+        
+        # 生成标题
+        title = title or content[:100]  # 增加标题长度
+        
+        # === 去重检查 ===
+        conn = self._connect()
+        
+        # 检查是否已存在相同标题的记忆
+        existing = conn.execute(
+            "SELECT id FROM timeline WHERE title = ? LIMIT 1",
+            (title,)
+        ).fetchone()
+        
+        if existing:
+            logger.info(f"[MemoryPalace] 跳过重复记忆: {title[:50]}...")
+            return existing['id']
+        
+        # === 存储记忆 ===
         # Generate embedding for the content
         embedding = self.vector_service.encode(content)
         embedding_blob = embedding.tobytes()
         
-        title = title or content[:50]
         event_date = date.today().isoformat()
         tags = tags or event_type
         
-        conn = self._connect()
-        conn.execute(
+        cursor = conn.execute(
             """
             INSERT INTO timeline (event_date, event_type, title, description, tags, embedding)
             VALUES (?, ?, ?, ?, ?, ?)
@@ -285,6 +327,10 @@ class MemoryPalace:
             (event_date, event_type, title, content, tags, embedding_blob),
         )
         conn.commit()
+        
+        rowid = cursor.lastrowid
+        logger.debug(f"[MemoryPalace] 存储记忆 #{rowid}: {title[:50]}...")
+        return rowid
 
 
     def remember_relation(
