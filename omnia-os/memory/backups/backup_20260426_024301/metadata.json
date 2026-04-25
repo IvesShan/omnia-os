@@ -1,0 +1,21 @@
+{
+  "created_at": "2026-04-26T02:43:01.405752",
+  "stats": {
+    "layers": {
+      "facts": {
+        "count": 22,
+        "size_bytes": 7719
+      },
+      "relations": {
+        "count": 0,
+        "size_bytes": 2562
+      },
+      "timeline": {
+        "count": 0,
+        "size_bytes": 2344
+      }
+    },
+    "total_entries": 22,
+    "total_size_bytes": 12625
+  }
+}

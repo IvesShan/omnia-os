@@ -227,6 +227,12 @@ def chat(message: str) -> None:
 def _build_model_config(provider: str) -> tuple[str, str]:
     print(f"[_build_model_config] provider={provider}")
     if provider == "local":
+        # Check if local mode is enabled
+        env_mode = os.environ.get("OMNIA_MODEL_MODE", "cloud").lower()
+        if env_mode not in ("local", "local_only"):
+            print(f"[_build_model_config] ERROR: Local model requested but OMNIA_MODEL_MODE={env_mode}")
+            raise RuntimeError(f"本地模型未启用 (OMNIA_MODEL_MODE={env_mode})，请先启动本地模型服务或切换到云端模式")
+        
         # Local LLM (llama.cpp with GPU acceleration)
         url = os.environ.get("LOCAL_LLM_URL", "http://localhost:8080/v1/chat/completions")
         model = os.environ.get("LOCAL_LLM_MODEL", "gemma-4-E4B-it-OBLITERATED-Q8_0.gguf")
@@ -254,6 +260,12 @@ def _build_model_config(provider: str) -> tuple[str, str]:
 def call_local_llm(messages: list, tools: list | None = None) -> dict:
     """Call local LLM server (llama.cpp with GPU acceleration)."""
     import requests
+    
+    # Check if local mode is enabled
+    env_mode = os.environ.get("OMNIA_MODEL_MODE", "cloud").lower()
+    if env_mode not in ("local", "local_only"):
+        print(f"[call_local_llm] ERROR: Local model requested but OMNIA_MODEL_MODE={env_mode}")
+        raise RuntimeError(f"本地模型未启用 (OMNIA_MODEL_MODE={env_mode})，请先启动本地模型服务或切换到云端模式")
     
     url = os.environ.get("LOCAL_LLM_URL", "http://localhost:8080/v1/chat/completions")
     model = os.environ.get("LOCAL_LLM_MODEL", "Qwen2.5-Coder-7B")

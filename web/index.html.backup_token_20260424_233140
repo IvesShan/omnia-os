@@ -193,13 +193,6 @@
             </button>
           </div>
           <div class="composer-hint">
-          <div class="token-status" id="token-status">
-            <span class="token-label">上下文</span>
-            <div class="token-bar">
-              <div class="token-fill" id="token-fill" style="width: 0%"></div>
-            </div>
-            <span class="token-value" id="token-value">0%</span>
-          </div>
             <kbd>Enter</kbd> 发送 · <kbd>Shift + Enter</kbd> 换行 · 点击 📷 上传图片
           </div>
           <div id="image-preview" class="image-preview" style="display:none;">

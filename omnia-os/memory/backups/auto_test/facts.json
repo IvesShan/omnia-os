@@ -1,0 +1,35 @@
+{
+  "test_key": {
+    "key": "test_key",
+    "value": "test_value",
+    "source": "test",
+    "created_at": "2026-04-26T01:26:03.922897",
+    "access_count": 1,
+    "priority": 1,
+    "tags": [],
+    "last_accessed": "2026-04-26T01:26:03.923252"
+  },
+  "memory_user_2026-04-26T00:55:15.964677": {
+    "key": "memory_user_2026-04-26T00:55:15.964677",
+    "value": {
+      "content": "测试内容",
+      "role": "user",
+      "metadata": {}
+    },
+    "source": "conversation",
+    "created_at": "2026-04-26T00:55:15.964684",
+    "access_count": 0,
+    "priority": 0,
+    "tags": []
+  },
+  "test_next": {
+    "key": "test_next",
+    "value": "testing_next_step",
+    "source": "test",
+    "created_at": "2026-04-26T01:26:15.256025",
+    "access_count": 1,
+    "priority": 1,
+    "tags": [],
+    "last_accessed": "2026-04-26T01:26:15.256404"
+  }
+}

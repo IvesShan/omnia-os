@@ -58,11 +58,6 @@ atexit.register(_cleanup_mcp)
 # API Provider selection
 _current_provider = None  # Will be set based on env or user selection
 
-# Safety: reset to qianfan if it was local (prevent localhost:8080 errors)
-if _current_provider == "local":
-    print("[web_server] WARNING: _current_provider was local, resetting to qianfan")
-    _current_provider = "qianfan"
-
 
 def _load_pending() -> dict[str, dict]:
     if PENDING_CONF_PATH.exists():
@@ -711,55 +706,6 @@ def create_app() -> Flask:
             "cloud_online": cloud_online,
             "current_mode": _current_provider or "cloud",
         })
-    @app.route("/api/token/status", methods=["POST"])
-    def get_token_status():
-        """Estimate token usage for current conversation context.
-        
-        Frontend calls this to display token utilization in the UI.
-        Returns estimated token count based on message content length.
-        """
-        try:
-            data = request.get_json() or {}
-            messages = data.get("messages", [])
-            model = data.get("model", "kimi")
-            
-            # Estimate tokens: ~4 chars per token for Chinese, ~0.75 words for English
-            # This is a rough estimation; actual tokenization depends on the model
-            total_chars = 0
-            for msg in messages:
-                content = msg.get("content", "")
-                total_chars += len(content)
-            
-            # Rough token estimation: 1 token ≈ 4 characters (mixed CN/EN average)
-            estimated_tokens = total_chars // 4
-            
-            # Model context limits (approximate)
-            model_limits = {
-                "kimi": 128000,
-                "openai": 128000,
-                "anthropic": 200000,
-                "qianfan": 8000,
-            }
-            
-            limit = model_limits.get(model, 128000)
-            utilization = min(estimated_tokens / limit * 100, 100)
-            
-            return jsonify({
-                "total_tokens": estimated_tokens,
-                "limit": limit,
-                "utilization": round(utilization, 1),
-                "status": "ok" if utilization < 80 else "warning" if utilization < 95 else "critical",
-                "model": model,
-            })
-        except Exception as e:
-            return jsonify({
-                "total_tokens": 0,
-                "utilization": 0,
-                "status": "error",
-                "error": str(e),
-            }), 500
-
-
 
     @app.route("/api/providers", methods=["GET"])
     def get_providers_route():
@@ -1341,70 +1287,6 @@ def create_app() -> Flask:
     # === 启动飞书长连接 ===
     _start_feishu_adapter(app)
 
-
-    # === Token 状态 API ===
-    
-    @app.route("/api/token/status", methods=["POST"])
-    def token_status():
-        """检查当前上下文的 Token 状态"""
-        try:
-            from core.cognition.token_manager import TokenManager, MODEL_LIMITS
-        except ImportError:
-            return jsonify({"error": "TokenManager not available", "status": "unavailable"}), 503
-        
-        data = request.get_json(force=True, silent=True) or {}
-        messages = data.get("messages") or []
-        model = data.get("model", "kimi")
-        
-        if not messages:
-            return jsonify({
-                "total_tokens": 0,
-                "max_tokens": MODEL_LIMITS.get(model, 128000),
-                "utilization": 0,
-                "status": "empty"
-            })
-        
-        try:
-            manager = TokenManager(model=model)
-            result = manager.check_overflow(messages)
-            
-            return jsonify({
-                "total_tokens": result["total_tokens"],
-                "max_tokens": result["max_tokens"],
-                "utilization": result["utilization"],
-                "remaining": result["remaining"],
-                "status": result["status"],
-                "message_count": len(messages),
-                "model": model
-            })
-        except Exception as e:
-            return jsonify({"error": str(e), "status": "error"}), 500
-    
-    @app.route("/api/models", methods=["GET"])
-    def list_models():
-        """获取支持的模型列表"""
-        try:
-            from core.cognition.token_manager import MODEL_LIMITS
-        except ImportError:
-            return jsonify({"models": [{"id": "kimi", "max_tokens": 128000, "name": "Kimi"}], "default": "kimi"})
-        
-        models = []
-        for model_id, max_tokens in MODEL_LIMITS.items():
-            models.append({
-                "id": model_id,
-                "max_tokens": max_tokens,
-                "name": {
-                    "kimi": "Kimi (Moonshot)",
-                    "deepseek": "DeepSeek",
-                    "qianfan": "百度千帆",
-                    "openai": "OpenAI GPT-4",
-                    "anthropic": "Anthropic Claude",
-                    "local": "本地模型"
-                }.get(model_id, model_id)
-            })
-        
-        return jsonify({"models": models, "default": "kimi"})
-
     return app
 
 
@@ -1526,3 +1408,93 @@ if __name__ == "__main__":
 
     # === Token 状态 API ===
     
+    @app.route("/api/token/status", methods=["POST"])
+    def token_status():
+        """检查当前上下文的 Token 状态"""
+        from core.cognition.token_manager import TokenManager, MODEL_LIMITS
+        
+        data = request.get_json(force=True, silent=True) or {}
+        messages = data.get("messages") or []
+        model = data.get("model", "kimi")
+        
+        if not messages:
+            return jsonify({
+                "error": "消息列表为空",
+                "total_tokens": 0,
+                "max_tokens": MODEL_LIMITS.get(model, 128000),
+                "utilization": 0,
+                "status": "empty"
+            })
+        
+        try:
+            manager = TokenManager(model=model)
+            result = manager.check_overflow(messages)
+            
+            return jsonify({
+                "total_tokens": result["total_tokens"],
+                "max_tokens": result["max_tokens"],
+                "utilization": result["utilization"],
+                "remaining": result["remaining"],
+                "status": result["status"],
+                "message_count": len(messages),
+                "model": model
+            })
+        except Exception as e:
+            return jsonify({
+                "error": str(e),
+                "status": "error"
+            }), 500
+    
+    @app.route("/api/token/compress", methods=["POST"])
+    def token_compress():
+        """压缩消息历史"""
+        from core.cognition.token_manager import TokenManager
+        
+        data = request.get_json(force=True, silent=True) or {}
+        messages = data.get("messages") or []
+        model = data.get("model", "kimi")
+        strategy = data.get("strategy", "auto")
+        
+        if not messages:
+            return jsonify({"error": "消息列表为空"}), 400
+        
+        try:
+            manager = TokenManager(model=model)
+            compressed = manager.compress_messages(messages, strategy=strategy)
+            
+            return jsonify({
+                "original_count": len(messages),
+                "compressed_count": len(compressed),
+                "original_tokens": manager.estimate_tokens(messages),
+                "compressed_tokens": manager.estimate_tokens(compressed),
+                "saved_tokens": manager.estimate_tokens(messages) - manager.estimate_tokens(compressed),
+                "messages": compressed
+            })
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+    
+    @app.route("/api/models", methods=["GET"])
+    def list_models():
+        """获取支持的模型列表"""
+        from core.cognition.token_manager import MODEL_LIMITS
+        
+        models = []
+        for model_id, max_tokens in MODEL_LIMITS.items():
+            models.append({
+                "id": model_id,
+                "max_tokens": max_tokens,
+                "name": {
+                    "kimi": "Kimi (Moonshot)",
+                    "deepseek": "DeepSeek",
+                    "qianfan": "百度千帆",
+                    "openai": "OpenAI GPT-4",
+                    "anthropic": "Anthropic Claude",
+                    "local": "本地模型"
+                }.get(model_id, model_id)
+            })
+        
+        return jsonify({
+            "models": models,
+            "default": "kimi"
+        })
+

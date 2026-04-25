@@ -22,7 +22,7 @@ from pydantic import BaseModel
 sys.path.insert(0, str(Path(__file__).parent))
 
 from core.cognition.chat_integration import OmniaChatEngine
-from core.memory.memory_manager import MemoryManager
+from core.memory.memory_manager_v2 import MemoryManagerV2
 
 # 配置日志
 logging.basicConfig(
@@ -63,7 +63,7 @@ class ChatResponse(BaseModel):
 
 # 全局引擎实例
 engine: Optional[OmniaChatEngine] = None
-memory_manager: Optional[MemoryManager] = None
+memory_manager: Optional[MemoryManagerV2] = None
 
 
 @app.on_event("startup")
@@ -80,11 +80,8 @@ async def startup_event():
         enable_mla=True  # 启用 MLA 压缩
     )
     
-    # 初始化记忆管理器
-    memory_manager = MemoryManager(
-        max_memories=10000,
-        enable_compression=True
-    )
+    # 初始化记忆管理器（修复：移除不支持的参数）
+    memory_manager = MemoryManagerV2()
     
     logger.info("✅ 引擎初始化完成")
 
@@ -137,13 +134,10 @@ async def chat(request: ChatRequest):
         
         # 存储到记忆
         if memory_manager:
-            memory_manager.add_memory(
-                content=f"User: {request.message}",
-                role="user"
-            )
-            memory_manager.add_memory(
-                content=f"Assistant: {result['response']}",
-                role="assistant"
+            memory_manager.add_fact(
+                key=f"chat_{datetime.now().isoformat()}",
+                value={"user": request.message, "assistant": result['response']},
+                source="chat"
             )
         
         return ChatResponse(
@@ -163,33 +157,26 @@ async def stats():
     if not engine:
         raise HTTPException(status_code=503, detail="Engine not initialized")
     
-    return engine.get_stats()
+    return {
+        "engine": engine.get_stats(),
+        "memory": memory_manager.get_stats() if memory_manager else {}
+    }
 
 
-@app.post("/reset")
-async def reset():
-    """重置引擎状态"""
-    global engine
+@app.get("/memory/search")
+async def search_memory(query: str, layer: str = "facts"):
+    """搜索记忆"""
+    if not memory_manager:
+        raise HTTPException(status_code=503, detail="Memory manager not initialized")
     
-    if engine:
-        engine = OmniaChatEngine(
-            max_loops=8,
-            halt_threshold=0.85,
-            enable_mla=True
-        )
-    
-    return {"status": "reset", "timestamp": datetime.now().isoformat()}
+    results = memory_manager.retrieve_relevant(query, layer=layer)
+    return {
+        "query": query,
+        "layer": layer,
+        "results": results
+    }
 
 
 if __name__ == "__main__":
     import uvicorn
-    
-    port = int(os.getenv("OMNIA_PORT", 8765))
-    
-    uvicorn.run(
-        "api_server:app",
-        host="0.0.0.0",
-        port=port,
-        reload=False,
-        log_level="info"
-    )
+    uvicorn.run(app, host="0.0.0.0", port=8000)

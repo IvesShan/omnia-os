@@ -18,6 +18,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 import json
 import re
+import jieba
 from collections import defaultdict
 
 
@@ -221,10 +222,7 @@ class MemoryManager:
         """
         提取关键词
         
-        简单实现：
-        1. 分词（按空格和标点）
-        2. 过滤停用词
-        3. 保留有意义的词
+        使用 jieba 中文分词器进行智能分词
         
         Args:
             text: 文本
@@ -238,20 +236,38 @@ class MemoryManager:
             "不", "人", "都", "一", "一个", "上", "也", "很",
             "到", "说", "要", "去", "你", "会", "着", "没有",
             "看", "好", "自己", "这", "那", "什么", "怎么",
-            "可以", "能", "吗", "呢", "吧", "啊", "嗯", "哦"
+            "可以", "能", "吗", "呢", "吧", "啊", "嗯", "哦",
+            "这个", "那个", "他", "她", "它", "我们", "你们",
+            "他们", "她们", "它们", "但是", "因为", "所以",
+            "如果", "虽然", "还是", "或者", "而且", "然后"
         }
         
-        # 分词（简单实现）
-        words = re.findall(r'[\u4e00-\u9fa5]+|[a-zA-Z]+|[0-9]+', text.lower())
+        keywords = []
         
-        # 过滤
-        keywords = [
-            word for word in words
-            if len(word) >= 2 and word not in stop_words
-        ]
+        try:
+            # 使用 jieba 分词
+            import jieba
+            words = list(jieba.cut(text))
+            
+            # 过滤：停用词、单字、纯数字
+            keywords = [
+                word for word in words
+                if len(word) >= 2 
+                and word not in stop_words
+                and not word.isdigit()
+                and not word.isspace()
+            ]
+            
+        except ImportError:
+            # jieba 未安装，回退到正则
+            words = re.findall(r'[\u4e00-\u9fa5]+|[a-zA-Z]+|[0-9]+', text.lower())
+            keywords = [
+                word for word in words
+                if len(word) >= 2 and word not in stop_words
+            ]
         
         return list(set(keywords))
-    
+
     def _cleanup_old_memories(self):
         """清理旧记忆"""
         # 保留最近 80% 的记忆

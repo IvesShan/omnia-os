@@ -77,10 +77,16 @@ class SmartModelRouter:
         self.config = config or RouterConfig()
         self._mode = self._parse_mode(env_mode) or self.config.default_mode
         
-        # 初始化本地客户端
-        self.local_client = LocalLLMClient(LocalModelConfig(
-            model_id=self.config.local_model
-        ))
+        # 初始化本地客户端（仅在 local 模式下）
+        env_mode = os.getenv("OMNIA_MODEL_MODE", "auto").lower()
+        if env_mode in ("local", "local_only"):
+            self.local_client = LocalLLMClient(LocalModelConfig(
+                model_id=self.config.local_model
+            ))
+        else:
+            # 云端模式下不初始化本地客户端，避免连接 localhost:8080
+            self.local_client = None
+            print(f"[SmartRouter] Cloud mode: local client disabled")
         
         self._local_available: Optional[bool] = None
         self._last_check: float = 0
@@ -119,6 +125,10 @@ class SmartModelRouter:
     
     async def is_local_available(self) -> bool:
         """检查本地模型是否可用"""
+        # 如果本地客户端未初始化，直接返回 False
+        if self.local_client is None:
+            return False
+        
         import time
         now = time.time()
         

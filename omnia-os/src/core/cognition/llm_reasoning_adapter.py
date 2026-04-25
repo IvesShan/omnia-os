@@ -10,7 +10,7 @@ LLM Reasoning Adapter - 将 LLM 客户端集成到循环推理引擎
 from typing import Dict, Any, Optional, List
 from .recurrent_reasoning import RecurrentReasoning, ReasoningResult, create_reasoning_engine
 from ..llm_client import LLMClient, create_llm_client
-from ..memory.memory_manager import MemoryManager
+from ..memory.memory_manager_v2 import MemoryManagerV2
 
 
 class LLMReasoningAdapter:
@@ -23,7 +23,7 @@ class LLMReasoningAdapter:
     def __init__(
         self,
         llm_client: Optional[LLMClient] = None,
-        memory_manager: Optional[MemoryManager] = None,
+        memory_manager: Optional[MemoryManagerV2] = None,
         max_loops: int = 8
     ):
         self.llm_client = llm_client or create_llm_client()
@@ -170,7 +170,7 @@ class LLMReasoningAdapter:
 
 def create_llm_reasoning_adapter(
     llm_client: Optional[LLMClient] = None,
-    memory_manager: Optional[MemoryManager] = None,
+    memory_manager: Optional[MemoryManagerV2] = None,
     max_loops: int = 8
 ) -> LLMReasoningAdapter:
     """创建 LLM 推理适配器实例"""

@@ -18,7 +18,7 @@ from .act_planner import ACTPlanner, TaskComplexity
 from .depth_adapter import DepthAdapter, DepthStyle
 
 # 导入记忆管理器
-from ..memory.memory_manager import MemoryManager
+from ..memory.memory_manager_v2 import MemoryManagerV2
 
 
 @dataclass
@@ -70,10 +70,7 @@ class OmniaChatEngine:
             self.compressor = None
         
         # 记忆管理器
-        self.memory_manager = MemoryManager(
-            max_memories=1000,
-            enable_compression=enable_mla
-        )
+        self.memory_manager = MemoryManagerV2()
         
         # 统计信息
         self.stats = {

@@ -1,8 +1,34 @@
 # Omnia 自我认知地图
 
-> **最后更新**: 2026-04-24
-> **版本**: 1.1
-> **状态**: P0 修复完成
+> **最后更新**: 2026-04-26
+> **版本**: 1.2
+> **状态**: 补充启动信息
+
+---
+
+## 🚀 启动方式（最重要！）
+
+### 启动命令
+```bash
+cd /home/shan/omnia-os
+bash start.sh              # 后台启动（推荐）
+bash start_omnia.sh        # 前台启动（调试用）
+```
+
+### 端口
+| 服务 | 端口 | 说明 |
+|------|------|------|
+| **Web Server** | **5001** | 主入口，WebUI |
+| API Server | 8765 | REST API（备用） |
+
+### 主程序入口
+```
+src/omnia/web_server.py    # 5001 端口的主服务
+```
+
+### 访问地址
+- **WebUI**: http://localhost:5001/
+- **API**: http://localhost:8765/
 
 ---
 
@@ -10,36 +36,39 @@
 
 ```
 omnia-os/
+├── start.sh                  # ⭐ 后台启动脚本
+├── start_omnia.sh            # ⭐ 前台启动脚本
+│
 ├── src/
-│   ├── omnia/              # 主程序入口
-│   │   ├── main.py         # CLI 入口
-│   │   └── stream_chat.py  # 对话处理
+│   ├── omnia/
+│   │   ├── web_server.py     # ⭐ Web Server (5001)
+│   │   ├── main.py           # CLI 入口
+│   │   └── stream_chat.py    # 对话处理
 │   │
-│   ├── core/               # 核心模块
-│   │   ├── memory_palace/  # 记忆宫殿 ✅
-│   │   ├── neural_graph/   # 神经图谱 ✅
-│   │   ├── mla/            # MLA 压缩器 ⚠️ 未接入
-│   │   ├── reasoning/      # 推理引擎 ⚠️ 未接入
-│   │   └── config.py       # 统一配置
+│   ├── core/
+│   │   ├── memory_palace/    # 记忆宫殿 ✅
+│   │   ├── neural_graph/     # 神经图谱 ✅
+│   │   ├── mla/              # MLA 压缩器 ⚠️ 未接入
+│   │   ├── reasoning/        # 推理引擎 ⚠️ 未接入
+│   │   └── config.py         # 统一配置
 │   │
-│   ├── skills/             # 技能系统
-│   │   ├── auto_forge.py   # 自动技能发现 ✅
-│   │   └── imported/       # 导入的技能
+│   ├── skills/
+│   │   ├── auto_forge.py     # 自动技能发现 ✅
+│   │   └── imported/         # 导入的技能
 │   │
-│   └── api/                # Web API
-│       └── app.py          # FastAPI 服务
+│   └── api/
+│       └── app.py            # FastAPI 服务 (8765)
 │
-├── web/                    # WebUI
-│   └── index.html          # 神经图谱可视化 ✅
+├── web/
+│   └── index.html            # WebUI 神经图谱可视化 ✅
 │
-├── data/                   # 数据目录（空）
+├── data/
+├── scripts/
+│   ├── self_diagnosis.py
+│   └── clean_duplicate_memories.py
 │
-├── scripts/                # 工具脚本
-│   ├── self_diagnosis.py   # 自检脚本 ✅
-│   └── clean_duplicate_memories.py  # 清理脚本 ✅
-│
-└── knowledge/              # 知识库
-    └── DJI/               # 大疆知识 ✅
+└── knowledge/
+    └── DJI/
 ```
 
 ---
@@ -125,6 +154,10 @@ python3 scripts/clean_duplicate_memories.py --execute
 ---
 
 ## 📊 最近修复记录
+
+### 2026-04-26: 补充启动信息
+- **新增**: 启动命令、端口、主程序入口
+- **修复**: 认知地图缺失关键信息
 
 ### 2026-04-24: P0 修复
 - **清理重复记忆**: 5710 → 1902 (减少 66.7%)
