@@ -26,7 +26,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 # 使用优化版本的引擎
 from core.cognition.chat_integration_optimized import OmniaChatEngineOptimized
-from core.memory.memory_manager_v2 import MemoryManagerV2
+from core.memory.memory_adapter import MemoryAdapter as MemoryManagerV2
 from core.cognition.token_manager import (
     estimate_messages_tokens,
     check_context_overflow,

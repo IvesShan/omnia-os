@@ -10,7 +10,7 @@ LLM Reasoning Adapter - 将 LLM 客户端集成到循环推理引擎
 from typing import Dict, Any, Optional, List
 from .recurrent_reasoning import RecurrentReasoning, ReasoningResult, create_reasoning_engine
 from ..llm_client import LLMClient, create_llm_client
-from ..memory.memory_manager_v2 import MemoryManagerV2
+from ..memory.memory_adapter import MemoryAdapter as MemoryManagerV2
 
 
 class LLMReasoningAdapter:

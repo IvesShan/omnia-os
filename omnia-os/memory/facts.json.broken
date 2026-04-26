@@ -10,11 +10,7 @@
     "created_at": "2025-04-19T00:35:00",
     "access_count": 0,
     "priority": 1,
-    "tags": [
-      "identity",
-      "person",
-      "原点"
-    ]
+    "tags": ["identity", "person", "原点"]
   },
   "identity_person_无限": {
     "key": "identity_person_无限",
@@ -27,11 +23,7 @@
     "created_at": "2025-04-19T00:35:00",
     "access_count": 0,
     "priority": 1,
-    "tags": [
-      "identity",
-      "person",
-      "无限"
-    ]
+    "tags": ["identity", "person", "无限"]
   },
   "business_company_物熵科技": {
     "key": "business_company_物熵科技",
@@ -44,11 +36,7 @@
     "created_at": "2025-04-19T00:35:00",
     "access_count": 0,
     "priority": 1,
-    "tags": [
-      "business",
-      "company",
-      "物熵科技"
-    ]
+    "tags": ["business", "company", "物熵科技"]
   },
   "business_website_njuosun": {
     "key": "business_website_njuosun",
@@ -61,11 +49,7 @@
     "created_at": "2025-04-19T00:35:00",
     "access_count": 0,
     "priority": 1,
-    "tags": [
-      "business",
-      "website",
-      "njuosun"
-    ]
+    "tags": ["business", "website", "njuosun"]
   },
   "business_services_无人机": {
     "key": "business_services_无人机",
@@ -78,11 +62,7 @@
     "created_at": "2025-04-19T00:35:00",
     "access_count": 0,
     "priority": 1,
-    "tags": [
-      "business",
-      "services",
-      "无人机"
-    ]
+    "tags": ["business", "services", "无人机"]
   },
   "business_course_主推课程": {
     "key": "business_course_主推课程",
@@ -95,11 +75,7 @@
     "created_at": "2025-04-19T00:35:00",
     "access_count": 0,
     "priority": 1,
-    "tags": [
-      "business",
-      "course",
-      "培训"
-    ]
+    "tags": ["business", "course", "培训"]
   },
   "business_course_技术课程": {
     "key": "business_course_技术课程",
@@ -112,11 +88,7 @@
     "created_at": "2025-04-19T00:35:00",
     "access_count": 0,
     "priority": 1,
-    "tags": [
-      "business",
-      "course",
-      "培训"
-    ]
+    "tags": ["business", "course", "培训"]
   },
   "business_strategy_愿景路径": {
     "key": "business_strategy_愿景路径",
@@ -129,11 +101,7 @@
     "created_at": "2025-04-19T00:35:00",
     "access_count": 0,
     "priority": 1,
-    "tags": [
-      "business",
-      "strategy",
-      "愿景"
-    ]
+    "tags": ["business", "strategy", "愿景"]
   },
   "business_pain_point_核心痛点": {
     "key": "business_pain_point_核心痛点",
@@ -146,11 +114,7 @@
     "created_at": "2025-04-19T00:35:00",
     "access_count": 0,
     "priority": 1,
-    "tags": [
-      "business",
-      "pain_point",
-      "招生"
-    ]
+    "tags": ["business", "pain_point", "招生"]
   },
   "business_channel_抖音账号": {
     "key": "business_channel_抖音账号",
@@ -163,11 +127,7 @@
     "created_at": "2025-04-19T00:35:00",
     "access_count": 0,
     "priority": 1,
-    "tags": [
-      "business",
-      "channel",
-      "抖音"
-    ]
+    "tags": ["business", "channel", "抖音"]
   },
   "opportunity_opc_概念": {
     "key": "opportunity_opc_概念",
@@ -180,11 +140,7 @@
     "created_at": "2025-04-19T00:35:00",
     "access_count": 0,
     "priority": 1,
-    "tags": [
-      "opportunity",
-      "opc",
-      "一人公司"
-    ]
+    "tags": ["opportunity", "opc", "一人公司"]
   },
   "opportunity_opc_无人机契合": {
     "key": "opportunity_opc_无人机契合",
@@ -197,11 +153,7 @@
     "created_at": "2025-04-19T00:35:00",
     "access_count": 0,
     "priority": 1,
-    "tags": [
-      "opportunity",
-      "opc",
-      "无人机"
-    ]
+    "tags": ["opportunity", "opc", "无人机"]
   },
   "strategy_pivot_转型方向": {
     "key": "strategy_pivot_转型方向",
@@ -214,11 +166,7 @@
     "created_at": "2025-04-19T00:35:00",
     "access_count": 0,
     "priority": 1,
-    "tags": [
-      "strategy",
-      "pivot",
-      "opc"
-    ]
+    "tags": ["strategy", "pivot", "opc"]
   },
   "business_product_喵修匠": {
     "key": "business_product_喵修匠",
@@ -231,11 +179,7 @@
     "created_at": "2025-04-19T00:35:00",
     "access_count": 0,
     "priority": 1,
-    "tags": [
-      "business",
-      "product",
-      "喵修匠"
-    ]
+    "tags": ["business", "product", "喵修匠"]
   },
   "business_product_懂机帝": {
     "key": "business_product_懂机帝",
@@ -248,11 +192,7 @@
     "created_at": "2025-04-19T00:35:00",
     "access_count": 0,
     "priority": 1,
-    "tags": [
-      "business",
-      "product",
-      "懂机帝"
-    ]
+    "tags": ["business", "product", "懂机帝"]
   },
   "project_omnia_系统": {
     "key": "project_omnia_系统",
@@ -265,11 +205,7 @@
     "created_at": "2025-04-19T00:35:00",
     "access_count": 0,
     "priority": 1,
-    "tags": [
-      "project",
-      "omnia",
-      "AIOS"
-    ]
+    "tags": ["project", "omnia", "AIOS"]
   },
   "preference_用户偏好": {
     "key": "preference_用户偏好",
@@ -278,140 +214,28 @@
     "created_at": "2026-04-26T01:00:00",
     "access_count": 0,
     "priority": 1,
-    "tags": [
-      "preference"
-    ]
-  },
-  "omnia_web_port": {
+    "tags": ["preference"]
+  }
+}
+,
+  {
     "key": "omnia_web_port",
     "value": "5001",
     "source": "user_correction",
     "timestamp": "2026-04-25",
     "context": "Omnia WebUI 运行在 5001 端口，由 web_server.py 提供"
   },
-  "omnia_start_command": {
+  {
     "key": "omnia_start_command",
     "value": "bash start.sh",
     "source": "user_correction",
     "timestamp": "2026-04-25",
     "context": "启动 Omnia 的正确命令"
   },
-  "omnia_web_server": {
+  {
     "key": "omnia_web_server",
     "value": "src/omnia/web_server.py",
     "source": "user_correction",
     "timestamp": "2026-04-25",
     "context": "Omnia 的 Web 服务器入口文件"
-  },
-  "memory_user_2026-04-26T11:43:24.545481": {
-    "key": "memory_user_2026-04-26T11:43:24.545481",
-    "value": {
-      "content": "你好",
-      "role": "user",
-      "metadata": {
-        "complexity": "simple"
-      }
-    },
-    "source": "conversation",
-    "created_at": "2026-04-26T11:43:24.545493",
-    "access_count": 0,
-    "priority": 0,
-    "tags": []
-  },
-  "memory_assistant_2026-04-26T11:43:24.546245": {
-    "key": "memory_assistant_2026-04-26T11:43:24.546245",
-    "value": {
-      "content": "推理结果如下：\n\n1.  **意图细化：** 确定为标准的社交寒暄，无具体任务指派。\n2.  **响应策略：** 热情回应并主动询问需求，引导用户进入实质对话。\n3.  **状态判定：** 系统处于待命状态，准备接收具体指令。\n\n置信度：1.0",
-      "role": "assistant",
-      "metadata": {
-        "reasoning_depth": 2,
-        "response_style": "quick"
-      }
-    },
-    "source": "conversation",
-    "created_at": "2026-04-26T11:43:24.546259",
-    "access_count": 0,
-    "priority": 0,
-    "tags": []
-  },
-  "memory_user_2026-04-26T11:44:39.526087": {
-    "key": "memory_user_2026-04-26T11:44:39.526087",
-    "value": {
-      "content": "帮我写一个 Python 函数计算斐波那契数列",
-      "role": "user",
-      "metadata": {
-        "complexity": "simple"
-      }
-    },
-    "source": "conversation",
-    "created_at": "2026-04-26T11:44:39.526099",
-    "access_count": 0,
-    "priority": 0,
-    "tags": []
-  },
-  "memory_assistant_2026-04-26T11:44:39.526576": {
-    "key": "memory_assistant_2026-04-26T11:44:39.526576",
-    "value": {
-      "content": "**推理分析：**\n\n1.  **算法效率评估**：上一轮采用的迭代法是最优解，时间复杂度为 $O(n)$，空间复杂度为 $O(1)$。\n3.  **代码健壮性**：保留了输入验证逻辑，确保代码的稳定性。",
-      "role": "assistant",
-      "metadata": {
-        "reasoning_depth": 2,
-        "response_style": "quick"
-      }
-    },
-    "source": "conversation",
-    "created_at": "2026-04-26T11:44:39.526585",
-    "access_count": 0,
-    "priority": 0,
-    "tags": []
-  },
-  "memory_user_2026-04-26T11:46:37.309408": {
-    "key": "memory_user_2026-04-26T11:46:37.309408",
-    "value": {
-      "content": "分析一下量子计算的基本原理和应用前景",
-      "role": "user",
-      "metadata": {
-        "complexity": "medium"
-      }
-    },
-    "source": "conversation",
-    "created_at": "2026-04-26T11:46:37.309418",
-    "access_count": 0,
-    "priority": 0,
-    "tags": []
-  },
-  "memory_assistant_2026-04-26T11:46:37.309869": {
-    "key": "memory_assistant_2026-04-26T11:46:37.309869",
-    "value": {
-      "content": "1. **纠错架构的“逻辑跨越”**：突破NISQ瓶颈的关键在于“量子纠错”。从物理比特迈向逻辑比特需采用表面码等拓扑编码方案，利用冗余纠缠态分散量子信息。核心挑战在于错误率需低于“容错阈值”（约0.1%-1%），目前“纠错开销”巨大（需千级物理比特构建一个逻辑比特），这是实现通用容错计算的工程天堑。\n2. **量子模拟的“费曼愿景”落地**：在化学与材料科学领域，量子计算机利用自身量子态直接模拟分子哈密顿量，解决了经典计算机在指数级增长的希尔伯特空间中内存溢出的难题。重点应用包括固氮酶催化剂设计（降低化肥能耗）及新型高温超导体探索，这是短期内最确定的“物理优势”转化路径。\n3. **安全格局的重塑与PQC迁移**：Shor算法对RSA/ECC加密体系的威胁本质在于利用量子傅里叶变换（QFT）快速求解离散对数问题。鉴于“现在窃取，未来解密”的攻击策略，当前安全防御已进入向后量子密码学（PQC）迁移的关键窗口期，这构成了量子计算应用前景中的“破坏性”侧面。\n\n置信度：0.96",
-      "role": "assistant",
-      "metadata": {
-        "reasoning_depth": 4,
-        "response_style": "balanced"
-      }
-    },
-    "source": "conversation",
-    "created_at": "2026-04-26T11:46:37.309875",
-    "access_count": 0,
-    "priority": 0,
-    "tags": []
-  },
-  "architecture_memory_path": {
-    "key": "architecture_memory_path",
-    "value": {
-      "type": "architecture",
-      "category": "memory",
-      "content": "记忆系统主数据库位于 ~/.omnia/memory_palace.db (SQLite)，JSON 导出在 omnia-os/memory/"
-    },
-    "source": "verification_20260426",
-    "created_at": "2026-04-26T12:06:23.557663",
-    "access_count": 0,
-    "priority": 10,
-    "tags": [
-      "architecture",
-      "memory",
-      "path",
-      "database"
-    ]
   }
-}

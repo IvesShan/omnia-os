@@ -26,7 +26,7 @@ from pydantic import BaseModel
 sys.path.insert(0, str(Path(__file__).parent))
 
 from core.cognition.chat_integration import OmniaChatEngine
-from core.memory.memory_manager_v2 import MemoryManagerV2
+from core.memory.memory_adapter import MemoryAdapter as MemoryManagerV2
 from core.embedding.local_embedding import LocalEmbedding, IntentClassifier
 
 # 配置日志

@@ -18,7 +18,7 @@ from .act_planner import ACTPlanner, TaskComplexity
 from .depth_adapter import DepthAdapter, DepthStyle
 
 # 导入记忆管理器
-from ..memory.memory_manager_v2 import MemoryManagerV2
+from ..memory.memory_adapter import MemoryAdapter as MemoryManagerV2
 
 
 @dataclass
