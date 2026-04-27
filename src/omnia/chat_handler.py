@@ -12,24 +12,29 @@ def should_require_tool(user_message: str) -> str | None:
     """
     智能判断是否应该强制调用工具。
     
+    注意：DeepSeek reasoning 模型不支持 tool_choice: "required"，
+    所以统一返回 "auto" 让模型自行决定。
+    硬规矩 + 系统提示中的 Tool Use Capability 已足够引导模型。
+    
     Returns:
-        "required" - 强制必须调用工具
-        None - 不强制，使用 API 默认行为（保留创造性）
+        "auto" - 建议模型考虑调用工具（不强制）
+        None - 不传此参数，使用 API 默认行为
     """
     trigger_keywords = [
         # 中文关键词
         "检查", "确认", "验证", "查看", "读取", "读文件",
         "改好了吗", "生效了吗", "有没有", "状态",
         "检查一下", "看一下", "看一下代码", "看看代码",
+        "分析", "重新分析", "完整分析", "全面分析",
         # 英文关键词
-        "check", "verify", "confirm", "read",
+        "check", "verify", "confirm", "read", "analyze",
     ]
     
     user_lower = user_message.lower()
     
     for kw in trigger_keywords:
         if kw in user_lower:
-            return "required"
+            return "auto"
     
     return None
 
@@ -204,10 +209,10 @@ def handle_chat(message: str, history: list, api_key: str, provider: str, system
         # 调用模型
         use_tools = tools_schema if not tool_calls_executed else None
         
-        # 智能判断是否强制调用工具
+        # 智能判断 tool_choice（不传 None 即为 API 默认行为）
         tool_choice = should_require_tool(message) if use_tools else None
         if tool_choice:
-            print(f"[Chat] Tool choice: {tool_choice} (forced)")
+            print(f"[Chat] Tool choice: {tool_choice}")
         
         data = _call_model_messages(api_key, provider, messages, tools=use_tools, tool_choice=tool_choice)
         msg = data["choices"][0]["message"]

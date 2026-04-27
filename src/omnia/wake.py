@@ -352,24 +352,6 @@ def assemble_wake_prompt(
     if memory_parts:
         memory_text = "## Recalled Memory\n" + "\n".join(memory_parts)
         components.append(PromptComponent("memory", memory_text, priority=4))
-
-    # Tool Use Capability - format examples and guidance (RESTORED)
-    tool_cap_text = (
-        "## Tool Use Capability\n"
-        "Omnia has access to the following tools. When you need to read/write files, run shell commands, list directories, or search the web, output a JSON block exactly like this:\n\n"
-        "```tool_calls\n"
-        '[{"name": "read_file", "arguments": {"path": "..."}}]\n'
-        "```\n\n"
-        "Available tools:\n"
-        "- read_file(path): read text file contents\n"
-        "- write_file(path, content): write or overwrite a file\n"
-        "- execute_shell(command): run a shell command in the workspace\n"
-        "- list_directory(path): list files and folders\n"
-        "- web_search(query): search the web via Kimi\n\n"
-        "If no tool is needed, reply naturally in the same language as the user."
-    )
-    components.append(PromptComponent("tools", tool_cap_text, priority=3))
-
     # Token budget - enforce_system_prompt returns (text, evicted, total)
     budget = TokenBudget(system_limit=8192)
     final_prompt, evicted, total_tokens = budget.enforce_system_prompt(components)
