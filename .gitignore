@@ -76,3 +76,28 @@ temp/
 *.pem
 *.key
 secrets/
+
+# ===========================================
+# Omnia — cleanup additions (2026-04-28)
+# ===========================================
+
+# Runtime data — not for version control
+data/
+logs/
+
+# Test debris in root — belongs in tests/
+test_*.py
+quick_*.py
+diagnose_*.py
+debug_*.html
+verify_*.sh
+test_*.html
+
+# Nested omnia-os directory (misplaced)
+/omnia-os/
+
+# Empty shell modules
+neural_map_test/
+
+# Skill dependencies (too large, installed by runtime)
+skills/imported/*/node_modules/
