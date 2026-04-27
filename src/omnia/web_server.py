@@ -37,6 +37,7 @@ from core.neuro_center.notification_queue import NotificationQueue
 from core.plugin import get_hook_registry  # Auto-register hooks
 from omnia.chat import _load_api_key, _call_model_messages
 from omnia.wake import assemble_wake_prompt
+from omnia.tool_preroll import check_and_run, should_force_tool_check
 
 WEB_DIR = PROJECT_ROOT / "web"
 WORKSPACE = PROJECT_ROOT  # Git repo is here, not parent
@@ -1245,6 +1246,21 @@ def create_app() -> Flask:
                 
                 # 组装系统提示
                 system_prompt = assemble_wake_prompt(message)
+                
+                # ========== 前置工具检查钩子（方案A）==========
+                # 在消息发给 LLM 之前，强制检查是否需要工具验证
+                import os as _os
+                _tool_result = check_and_run(message)
+                if _tool_result:
+                    print(f"[tool_preroll] 命中关键词，注入工具检查结果")
+                    _tool_warning = "\n\n[系统强制工具检查结果 - 请基于以下实际数据回答用户]\n"
+                    _tool_warning += _tool_result
+                    _tool_warning += "\n[/系统强制工具检查结果]\n"
+                    system_prompt += _tool_warning
+                else:
+                    print(f"[tool_preroll] 未命中关键词，正常处理")
+                # ========== 前置工具检查结束 ==========
+                
                 
                 # 使用 chat_handler 处理（包含对话记录）
                 result = handle_chat(

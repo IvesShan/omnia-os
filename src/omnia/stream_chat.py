@@ -209,7 +209,7 @@ def _stream_chat_unified(
         # 流式请求
         try:
             import requests
-            response = requests.post(url, headers=headers, json=payload, stream=True, timeout=60)
+            response = requests.post(url, headers=headers, json=payload, stream=True, timeout=120)
         except ImportError:
             yield f"data: {json.dumps({'type': 'error', 'message': 'requests module not available'})}\n\n"
             return

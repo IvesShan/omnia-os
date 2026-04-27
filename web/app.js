@@ -800,7 +800,7 @@ async function sendMessage() {
 
           else if (data.type === 'tool_call') {
             // 工具调用开始
-            appendToolCard(data.name, data.args, 'running');
+            appendToolCard(data.name, data.arguments, 'running');
           }
 
           else if (data.type === 'tool_result') {
@@ -950,7 +950,7 @@ function appendToolCard(name, args, status = 'running') {
     error: '<span class="tool-status-dot error"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></span>'
   };
   
-  const argsPreview = args ? args.slice(0, 100) + (args.length > 100 ? '...' : '') : '';
+  const argsPreview = args ? (typeof args === 'string' ? args : JSON.stringify(args)).slice(0, 100) + ((typeof args === 'string' ? args : JSON.stringify(args)).length > 100 ? '...' : '') : '';
   const id = 'tool-' + Date.now() + '-' + name.replace(/[^a-z0-9]/gi, '');
   
   const html = `
@@ -2120,7 +2120,7 @@ function updateTokenDisplay(status) {
   
   if (!tokenStatus || !tokenFill || !tokenValue) return;
   
-  const percent = Math.round(status.utilization * 100);
+  const percent = Math.round(status.utilization);
   
   // 更新进度条
   tokenFill.style.width = `${percent}%`;
