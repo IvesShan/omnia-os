@@ -107,3 +107,6 @@ neural_map_test/
 
 # Skill dependencies (too large, installed by runtime)
 skills/imported/*/node_modules/
+
+# Skills runtime data
+skills/.omnia/

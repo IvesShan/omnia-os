@@ -154,6 +154,9 @@ def restart_web_server():
 
 
 def main():
+    # 系统启动时等待 Web 服务完全就绪，避免与 systemd 并行启动冲突
+    time.sleep(10)
+    log("启动延迟结束，开始健康检查")
     log("=" * 60)
     log("🐕 Omnia Watchdog 启动")
     log(f"检查间隔: {CHECK_INTERVAL}s, 最大失败次数: {MAX_FAILURES}")

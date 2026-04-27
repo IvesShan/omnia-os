@@ -376,6 +376,15 @@ def create_app() -> Flask:
             filename = filename.rstrip('/') + '/index.html'
         return send_from_directory(str(WEB_DIR), filename)
 
+
+    @app.route("/health", methods=["GET"])
+    def health_check():
+        """轻量级健康检查端点 - 供看门狗和负载均衡使用"""
+        return jsonify({
+            "status": "ok",
+            "timestamp": datetime.now().isoformat(timespec="seconds"),
+        })
+
     @app.route("/api/status", methods=["GET"])
     def status():
         # Get MCP tools count if available
@@ -1634,10 +1643,20 @@ def _check_port_in_use(port: int, host: str = "127.0.0.1") -> bool:
 
 
 def main():
-    # Check if port 5001 is already in use
+    # Wait for port to be available (helps with systemd restart race)
+    import time
+    max_wait = 30  # seconds
+    waited = 0
+    
+    while _check_port_in_use(5001) and waited < max_wait:
+        if waited == 0:
+            print("[web_server] 端口 5001 被占用，等待释放...")
+        time.sleep(1)
+        waited += 1
+    
     if _check_port_in_use(5001):
         print("=" * 60)
-        print("⚠️  端口 5001 已被占用!")
+        print("⚠️  端口 5001 已被占用且等待超时!")
         print("=" * 60)
         print("\n可能原因:")
         print("  1. 另一个 Omnia web 服务器正在运行")
@@ -1646,9 +1665,11 @@ def main():
         print("  1. 查找并终止占用进程:")
         print("     lsof -i :5001")
         print("     kill -9 <PID>")
-        print("  2. 或者等待几秒后重试")
         print("=" * 60)
         sys.exit(1)
+    
+    if waited > 0:
+        print(f"[web_server] 端口已释放，等待了 {waited} 秒")
     
     app = create_app()
     print("Omnia Web UI 启动于 http://127.0.0.1:5001/")
