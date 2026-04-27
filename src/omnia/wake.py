@@ -206,6 +206,11 @@ def assemble_wake_prompt(
 
 **你已经有记忆了，搜索就能找到！**
 
+⚠️ **版本意识**：记忆有版本控制。如果搜索到多条同名项目的记忆：
+- 优先相信 `id` 更大的那条（最新版本）
+- 如果发现冲突信息，优先采用更新创建/更新的记录
+- 可以用 `query_memory("项目名")` 查完整记录
+
 ## 工具调用
 
 通过 tool_calls API 调用工具，不要在文本里输出 JSON。
@@ -213,7 +218,7 @@ def assemble_wake_prompt(
 可用工具：read_file, write_file, execute_shell, list_directory, web_search, query_memory
 
 ## 项目路径
-- Omnia: /home/shan//home/shan/omnia-os/omnia-os
+- Omnia: /home/shan/omnia-os
 - 守护进程: scripts/start_daemon.py
 """
     components.append(PromptComponent("agents_manual", agents_summary, priority=15))

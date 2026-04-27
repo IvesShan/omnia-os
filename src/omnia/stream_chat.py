@@ -12,7 +12,7 @@ import json
 import os
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
-from typing import Optional, Generator
+from typing import Optional, Generator, Dict
 from datetime import datetime
 from pathlib import Path
 
@@ -47,6 +47,7 @@ _current_provider = None
 _optimizer = None
 _executor = ThreadPoolExecutor(max_workers=4)  # 并行执行线程池
 
+
 def get_optimizer():
     """获取优化器实例"""
     global _optimizer
@@ -60,7 +61,8 @@ def get_optimizer():
         )
     return _optimizer
 
-def stream_chat(message: str, history: list = None) -> Generator[str, None, None]:
+
+def stream_chat(message: str, history: list = None, provider: str = None) -> Generator[str, None, None]:
     """
     流式聊天处理 - 支持长任务
     
@@ -80,17 +82,22 @@ def stream_chat(message: str, history: list = None) -> Generator[str, None, None
         api_key = None  # 本地模型不需要 API key
     else:
         # 云端模型：加载API配置
-        key_name, api_key = _load_api_key()
+        # 如果传入了provider，优先加载对应key；否则自动检测
+        key_name, api_key = _load_api_key(prefer_provider=provider)
         if not api_key:
             yield f"data: {json.dumps({'type': 'error', 'message': 'No API key configured'})}\n\n"
             return
         
-        # 检测provider
-        provider = "kimi"
-        if "QIANFAN" in key_name.upper():
-            provider = "qianfan"
-        elif "OPENAI" in key_name.upper():
-            provider = "openai"
+        # 检测provider (基于 .env 配置自动检测)
+        if not provider:
+            if "DEEPSEEK" in key_name.upper():
+                provider = "deepseek"
+            elif "QIANFAN" in key_name.upper():
+                provider = "qianfan"
+            elif "OPENAI" in key_name.upper():
+                provider = "openai"
+            else:
+                provider = "kimi"  # 默认 fallback
     
     # === 统一流程 ===
     # 不判断复杂度，直接执行
@@ -114,290 +121,350 @@ def _get_dynamic_limit(analysis: Dict) -> int:
     
     # 更激进的策略：给足够的空间完成任务
     if estimated <= 2:
-        base_limit = 20  # 简单任务也提高上限
+        return DYNAMIC_LIMITS["simple"]
     elif estimated <= 5:
-        base_limit = 50   # 中等任务
-    elif estimated <= 10:
-        base_limit = 100  # 复杂任务
-    elif estimated <= 20:
-        base_limit = 200  # 很复杂的任务
+        return DYNAMIC_LIMITS["medium"]
+    elif is_complex or estimated > 10:
+        return DYNAMIC_LIMITS["complex"]
     else:
-        base_limit = 500  # 超复杂任务
-    
-    # 如果检测到复杂关键词，额外增加 50%
-    if is_complex:
-        return min(int(base_limit * 1.5), 500)
-    
-    return base_limit
+        return DYNAMIC_LIMITS["unlimited"]
 
 
-def _stream_chat_unified(message: str, history: list, api_key: str, provider: str, max_iterations: int = None, analysis: Dict = None, session_id: str = None) -> Generator[str, None, None]:
-    """统一流程：所有任务持续输出思考过程"""
-    # 收集助手回复
-    assistant_reply = ""
-    max_iterations = max_iterations or MAX_TOOL_ITERATIONS
-    analysis = analysis or {}
+def _stream_chat_unified(
+    message: str,
+    history: list,
+    api_key: str,
+    provider: str,
+    max_iterations: int,
+    context: dict,
+    session_id: str = None
+) -> Generator[str, None, None]:
+    """
+    统一流式聊天处理 (支持工具调用 + 长任务 + 并行执行)
     
-    # Token 统计
+    参数:
+        message: 用户消息
+        history: 历史消息列表
+        api_key: API密钥
+        provider: 提供商名称 (deepseek/kimi/openai/qianfan/local)
+        max_iterations: 最大迭代轮数
+        context: 上下文信息
+        session_id: 会话ID
+    """
+    # 消息历史
+    messages = list(history)
+    
+    # 组装系统提示词 (wake prompt)
+    try:
+        system_prompt = assemble_wake_prompt()
+    except Exception as e:
+        print(f"[stream_chat] Failed to assemble wake prompt: {e}")
+        system_prompt = "You are Omnia, an AI assistant."
+    
+    # 添加系统消息
+    system_message = {"role": "system", "content": system_prompt}
+    if messages and messages[0].get("role") == "system":
+        messages[0] = system_message
+    else:
+        messages.insert(0, system_message)
+    
+    # 添加用户消息
+    messages.append({"role": "user", "content": message})
+    
+    # 获取模型配置
+    url, model = _build_model_config(provider)
+    
     total_input_tokens = 0
     total_output_tokens = 0
+    full_content = ""  # 累积完整回复内容
+    assistant_reply = ""  # 当前轮次助手回复
     
-    # 构建系统提示词
-    system_prompt = assemble_wake_prompt(message)
+    # === DeepSeek 思考模式追踪 ===
+    # 一旦模型进入过思考模式（返回过非空 reasoning_content），
+    # 所有后续 assistant 消息都必须包含 reasoning_content 字段
+    thinking_mode_active = False
     
-    # 初始化消息
-    messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": message}
-    ]
-    
-    # 添加上下文（简化版）
-    if history:
-        for h in history[-5:]:
-            if isinstance(h, dict) and "role" in h:
-                messages.insert(-1, h)
-    
-    full_content = ""
+    # === 工具迭代循环 ===
     iteration = 0
-    
-    # === 使用动态上限 ===
-    hard_limit = max_iterations
-    
-    while iteration < MAX_TOOL_ITERATIONS:
+    while iteration < max_iterations:
         iteration += 1
         
-        # 硬性上限检测（使用动态限制）
-        if iteration >= hard_limit:
-            summary = f"【执行总结】\n已完成 {iteration} 轮执行\n内容长度：{len(full_content)} 字符"
-            status_msg = f'⚠️ 已达到执行上限 ({hard_limit}轮)'
-            yield f"data: {json.dumps({'type': 'status', 'message': status_msg})}\n\n"
-            yield f"data: {json.dumps({'type': 'token', 'content': summary})}\n\n"
-            yield f"data: {json.dumps({'type': 'done', 'full_content': full_content + '\n\n' + summary})}\n\n"
+        # === 构建请求参数 ===
+        # url, model already set above
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}"
+        }
+        
+        payload = {
+            "model": model,
+            "messages": messages,
+            "tools": TOOLS_SCHEMA,
+            "temperature": 0.7,
+            "stream": True,
+            # stream_options only supported by OpenAI, not DeepSeek/Kimi/Qianfan
+            **({"stream_options": {"include_usage": True}} if provider == "openai" else {}),
+        }
+        
+        # 流式请求
+        try:
+            import requests
+            response = requests.post(url, headers=headers, json=payload, stream=True, timeout=60)
+        except ImportError:
+            yield f"data: {json.dumps({'type': 'error', 'message': 'requests module not available'})}\n\n"
+            return
+        except Exception as e:
+            yield f"data: {json.dumps({'type': 'error', 'message': f'Request failed: {str(e)}'})}\n\n"
             return
         
-        # 调用模型
-        try:
-            url, model = _build_model_config(provider)
-            
-            # 准备请求
-            import requests
-            headers = {
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json"
-            }
-            payload = {
-                "model": model,
-                "messages": messages,
-                "tools": TOOLS_SCHEMA,
-                "temperature": 0.7,
-                "stream": True,
-                "stream_options": {"include_usage": True}  # 启用 token 统计
-            }
-            
-            # 流式请求
-            response = requests.post(url, headers=headers, json=payload, stream=True, timeout=60)
-            
-            if response.status_code != 200:
-                error_msg = f"API error {response.status_code}"
-                yield f"data: {json.dumps({'type': 'error', 'message': error_msg})}\n\n"
-                return
-            
-            # 解析流式响应
-            tool_calls_buffer = {}  # 用字典合并增量
-            content = ""
-            finish_reason = None
-            
-            for line in response.iter_lines():
-                if not line:
-                    continue
-                
-                line = line.decode('utf-8')
-                
-                if line.startswith('data: '):
-                    data_str = line[6:]
-                    
-                    
-                    if data_str == '[DONE]':
-                        break
-                    
-                    try:
-                        data = json.loads(data_str)
-                        
-                        # 捕获 token usage（流式响应的最后一个 chunk）
-                        if 'usage' in data:
-                            usage = data.get('usage', {})
-                            total_input_tokens = usage.get('prompt_tokens', 0)
-                            total_output_tokens = usage.get('completion_tokens', 0)
-                            print(f"[Stream] Token usage - Input: {total_input_tokens}, Output: {total_output_tokens}")
-                        
-                        if 'choices' in data and len(data['choices']) > 0:
-                            choice = data['choices'][0]
-                            delta = choice.get('delta', {})
-                            
-                            # 文本内容
-                            if 'content' in delta and delta['content']:
-                                content += delta['content']
-                                full_content += delta['content']
-                                assistant_reply += delta['content']
-                                yield f"data: {json.dumps({'type': 'token', 'content': delta['content']})}\n\n"
-                            
-                            # 工具调用 - 增量合并
-                            if 'tool_calls' in delta:
-                                for tc in delta['tool_calls']:
-                                    tc_id = tc.get('id', '')
-                                    tc_index = tc.get('index', 0)
-                                    
-                                    # 使用 index 作为 key 来合并
-                                    if tc_index not in tool_calls_buffer:
-                                        tool_calls_buffer[tc_index] = {
-                                            'id': tc_id,
-                                            'type': 'function',
-                                            'function': {
-                                                'name': '',
-                                                'arguments': ''
-                                            }
-                                        }
-                                    
-                                    # 增量更新
-                                    if tc.get('function'):
-                                        if tc['function'].get('name'):
-                                            tool_calls_buffer[tc_index]['function']['name'] += tc['function']['name']
-                                        if tc['function'].get('arguments'):
-                                            tool_calls_buffer[tc_index]['function']['arguments'] += tc['function']['arguments']
-                                    if tc_id:
-                                        tool_calls_buffer[tc_index]['id'] = tc_id
-                            
-                            # 结束原因
-                            if choice.get('finish_reason'):
-                                finish_reason = choice['finish_reason']
-                    
-                    except json.JSONDecodeError:
-                        continue
-            
-            # 将合并后的 tool_calls 转换为列表
-            tool_calls = list(tool_calls_buffer.values())
-            
-            # 检查是否有工具调用
-            has_tool_calls = tool_calls and any(tc.get("function", {}).get("name") for tc in tool_calls)
-            
-            if not has_tool_calls:
-                # 没有工具调用，检查是否完成
-                if finish_reason == "stop":
-                    # 正常完成，发送 done 事件
-                    # 记录助手回复
-                    if session_id and full_content:
-                        try:
-                            mp = MemoryPalace(db_path=str(MEMORY_PALACE_DB))
-                            mp.initialize()
-                            mp.log_conversation(session_id, 1, "assistant", full_content)
-                        except Exception as e:
-                            print(f"[stream_chat] Failed to log assistant reply: {e}")
-                    token_info = f"\n\n---\n📊 **Token 使用**: 输入 {total_input_tokens} | 输出 {total_output_tokens} | 总计 {total_input_tokens + total_output_tokens}"
-                    yield f"data: {json.dumps({'type': 'done', 'full_content': full_content + token_info})}\n\n"
-                    return
-                
-                # 没有工具调用但也没完成
-                if content.strip():
-                    messages.append({"role": "assistant", "content": content})
-                    # 记录助手回复
-                    if session_id and full_content:
-                        try:
-                            mp = MemoryPalace(db_path=str(MEMORY_PALACE_DB))
-                            mp.initialize()
-                            mp.log_conversation(session_id, 1, "assistant", full_content)
-                        except Exception as e:
-                            print(f"[stream_chat] Failed to log assistant reply: {e}")
-                    # 添加 token 统计到响应
-                    token_info = f"\n\n---\n📊 **Token 使用**: 输入 {total_input_tokens} | 输出 {total_output_tokens} | 总计 {total_input_tokens + total_output_tokens}"
-                    yield f"data: {json.dumps({'type': 'done', 'full_content': full_content + token_info})}\n\n"
-                    return
-                
+        if response.status_code != 200:
+            # 记录详细的错误信息
+            error_text = response.text
+            error_msg = f"API error {response.status_code}: {error_text[:500]}"
+            print(f"[stream_chat] API Error Details: {error_text}")
+            print(f"[stream_chat] Request payload: model={payload.get('model')}, messages={len(messages)}, tools={len(TOOLS_SCHEMA)}")
+            print(f"[stream_chat] Last message role: {messages[-1].get('role') if messages else 'N/A'}")
+            if messages and messages[-1].get('role') == 'assistant':
+                print(f"[stream_chat] Last assistant message keys: {list(messages[-1].keys())}")
+            yield f"data: {json.dumps({'type': 'error', 'message': error_msg})}\n\n"
+            return
+        
+        # 解析流式响应
+        tool_calls_buffer = {}  # 用字典合并增量
+        content = ""
+        reasoning_content = ""  # DeepSeek V4 思考模式需要
+        has_seen_reasoning = False  # 追踪本轮是否进入过思考模式
+        finish_reason = None
+        
+        for line in response.iter_lines():
+            if not line:
                 continue
             
-            # 有工具调用，执行
-            assistant_message = {"role": "assistant", "content": content or ""}
-            if tool_calls:
-                assistant_message["tool_calls"] = tool_calls
-            messages.append(assistant_message)
+            line = line.decode('utf-8')
             
-            # 使用优化器执行工具（支持并行 + 缓存）
-            optimizer = get_optimizer()
+            if line.startswith('data: '):
+                data_str = line[6:]
+                
+                
+                if data_str == '[DONE]':
+                    break
+                
+                try:
+                    data = json.loads(data_str)
+                    if data is None:
+                        print("[Stream] Warning: data is None")
+                        continue
+                    
+                    # 捕获 token usage（流式响应的最后一个 chunk）
+                    if 'usage' in data:
+                        usage = data.get('usage') or {}
+                        total_input_tokens = usage.get('prompt_tokens', 0)
+                        total_output_tokens = usage.get('completion_tokens', 0)
+                        print(f"[Stream] Token usage - Input: {total_input_tokens}, Output: {total_output_tokens}")
+                    
+                    if 'choices' in data and len(data['choices']) > 0:
+                        choice = data['choices'][0]
+                        if choice is None:
+                            print("[Stream] Warning: choice is None")
+                            continue
+                        delta = choice.get('delta', {})
+                        
+                        # 文本内容 - 支持 content 和 reasoning_content (Gemma 3 / DeepSeek thinking mode)
+                        text_chunk = ""
+                        if 'content' in delta and delta['content']:
+                            text_chunk = delta['content']
+                        if 'reasoning_content' in delta and delta['reasoning_content']:
+                            # DeepSeek V4 / Gemma 3 thinking mode: 收集并输出到前端
+                            reasoning_content += delta["reasoning_content"]
+                            has_seen_reasoning = True
+                            thinking_mode_active = True  # 全局追踪：进入思考模式
+                            # 将思考内容作为 'thinking' 事件输出
+                            yield "data: " + json.dumps({"type": "thinking", "content": delta["reasoning_content"]}) + "\n\n"
+                        
+                        if text_chunk:
+                            content += text_chunk
+                            full_content += text_chunk
+                            assistant_reply += text_chunk
+                            yield f"data: {json.dumps({'type': 'token', 'content': text_chunk})}\n\n"
+                        
+                        # 工具调用 - 增量合并
+                        if 'tool_calls' in delta:
+                            for tc in delta['tool_calls']:
+                                tc_id = tc.get('id', '')
+                                tc_index = tc.get('index', 0)
+                                
+                                # 使用 index 作为 key 来合并
+                                if tc_index not in tool_calls_buffer:
+                                    tool_calls_buffer[tc_index] = {
+                                        'id': tc_id,
+                                        'type': 'function',
+                                        'function': {
+                                            'name': '',
+                                            'arguments': ''
+                                        }
+                                    }
+                                
+                                # 增量更新
+                                if tc.get('function'):
+                                    if tc['function'].get('name'):
+                                        tool_calls_buffer[tc_index]['function']['name'] += tc['function']['name']
+                                    if tc['function'].get('arguments'):
+                                        tool_calls_buffer[tc_index]['function']['arguments'] += tc['function']['arguments']
+                                if tc_id:
+                                    tool_calls_buffer[tc_index]['id'] = tc_id
+                        
+                        # 结束原因
+                        if choice.get('finish_reason'):
+                            finish_reason = choice['finish_reason']
+                    
+                    # 也处理 reasoning_content 出现在 delta 顶层但不是 choices 中的情况
+                    if 'reasoning_content' in data and data['reasoning_content'] and 'choices' not in data:
+                        # 某些 API 实现可能将 reasoning_content 放在顶层
+                        reasoning_content += data["reasoning_content"]
+                        has_seen_reasoning = True
+                        thinking_mode_active = True
+                
+                except json.JSONDecodeError:
+                    continue
+        
+        # 将合并后的 tool_calls 转换为列表
+        tool_calls = list(tool_calls_buffer.values())
+        
+        # 检查是否有工具调用
+        has_tool_calls = tool_calls and any((tc.get("function") or {}).get("name") for tc in tool_calls)
+        
+        if not has_tool_calls:
+            # 没有工具调用，检查是否完成
+            if finish_reason == "stop":
+                # 正常完成，发送 done 事件
+                # 记录助手回复
+                if session_id and full_content:
+                    try:
+                        mp = MemoryPalace(db_path=str(MEMORY_PALACE_DB))
+                        mp.initialize()
+                        mp.log_conversation(session_id, 1, "assistant", full_content)
+                    except Exception as e:
+                        print(f"[stream_chat] Failed to log assistant reply: {e}")
+                token_info = f"\n\n---\n📊 **Token 使用**: 输入 {total_input_tokens} | 输出 {total_output_tokens} | 总计 {total_input_tokens + total_output_tokens}"
+                yield f"data: {json.dumps({'type': 'done', 'full_content': full_content + token_info})}\n\n"
+                return
             
-            # 预处理工具调用：解析 arguments JSON 字符串
-            processed_tool_calls = []
+            # 没有工具调用但也没完成
+            if content.strip():
+                messages.append({"role": "assistant", "content": content})
+                # 记录助手回复
+                if session_id and full_content:
+                    try:
+                        mp = MemoryPalace(db_path=str(MEMORY_PALACE_DB))
+                        mp.initialize()
+                        mp.log_conversation(session_id, 1, "assistant", full_content)
+                    except Exception as e:
+                        print(f"[stream_chat] Failed to log assistant reply: {e}")
+                # 添加 token 统计到响应
+                token_info = f"\n\n---\n📊 **Token 使用**: 输入 {total_input_tokens} | 输出 {total_output_tokens} | 总计 {total_input_tokens + total_output_tokens}"
+                yield f"data: {json.dumps({'type': 'done', 'full_content': full_content + token_info})}\n\n"
+                return
+            
+            continue
+        
+        # 有工具调用，执行
+        assistant_message = {"role": "assistant", "content": content or ""}
+        
+        # ███████████████████████████████████████████████████████████████████████
+        # DeepSeek 思考模式修复：一旦进入思考模式，所有 assistant 消息
+        # 都必须包含 reasoning_content 字段（即使是空字符串）
+        # 参考: https://api-docs.deepseek.com/zh-cn/quick_start/error_codes
+        # 错误: "The reasoning_content in the thinking mode must be passed back"
+        # ███████████████████████████████████████████████████████████████████████
+        if reasoning_content:
+            assistant_message["reasoning_content"] = reasoning_content
+        elif thinking_mode_active:
+            # 思考模式已激活，但本轮没有 reasoning_content
+            # 必须传回空字符串以满足 DeepSeek API 要求
+            assistant_message["reasoning_content"] = ""
+        
+        if tool_calls:
+            assistant_message["tool_calls"] = tool_calls
+        messages.append(assistant_message)
+        
+        # 使用优化器执行工具（支持并行 + 缓存）
+        optimizer = get_optimizer()
+        
+        # 预处理工具调用：解析 arguments JSON 字符串
+        processed_tool_calls = []
+        for tc in tool_calls:
+            fn = tc.get("function") or {}
+            tool_name = fn.get("name", "")
+            args_str = fn.get("arguments", "{}")
+            try:
+                args = json.loads(args_str) if args_str else {}
+            except:
+                args = {}
+            processed_tool_calls.append({
+                "name": tool_name,
+                "arguments": args
+            })
+        
+        # 分析是否可并行执行
+        can_parallel, groups = ParallelToolExecutor.can_execute_in_parallel(processed_tool_calls)
+        # groups 是分组的索引列表，如果不冲突且有多于1个工具，则可并行
+        
+        if can_parallel and len(tool_calls) > 1:
+            # 并行执行
+            yield f"data: {json.dumps({'type': 'status', 'message': f'⚡ 并行执行 {len(tool_calls)} 个工具...'})}\n\n"
+            
+            results = optimizer.execute_tools_parallel(tool_calls)
+            
+            for tool_call, result in zip(tool_calls, results):
+                function_name = (tool_call.get("function") or {}).get("name", "unknown")
+                yield f"data: {json.dumps({'type': 'tool_result', 'name': function_name, 'content': str(result.result)[:200] if result.success else str(result.error)[:200]})}\n\n"
+                
+                # 添加工具结果到消息历史
+                tool_call_id = tool_call.get("id", "")
+                messages.append({
+                    "role": "tool",
+                    "tool_call_id": tool_call_id,
+                    "content": str(result.result) if result.success else str(result.error)
+                })
+        else:
+            # 逐个执行
             for tc in tool_calls:
-                fn = tc.get("function", {})
+                fn = tc.get("function") or {}
                 tool_name = fn.get("name", "")
                 args_str = fn.get("arguments", "{}")
                 try:
                     args = json.loads(args_str) if args_str else {}
                 except:
                     args = {}
-                processed_tool_calls.append({
-                    "name": tool_name,
-                    "arguments": args
+                
+                yield f"data: {json.dumps({'type': 'tool_call', 'name': tool_name, 'arguments': args})}\n\n"
+                
+                # 执行工具
+                result = optimizer.execute_tool(tool_name, args)
+                
+                yield f"data: {json.dumps({'type': 'tool_result', 'name': tool_name, 'content': str(result.result)[:200] if result.success else str(result.error)[:200]})}\n\n"
+                
+                # 添加工具结果到消息历史
+                tool_call_id = tc.get("id", "")
+                messages.append({
+                    "role": "tool",
+                    "tool_call_id": tool_call_id,
+                    "content": str(result.result) if result.success else str(result.error)
                 })
-            
-            # 分析是否可并行执行
-            can_parallel, groups = ParallelToolExecutor.can_execute_in_parallel(processed_tool_calls)
-            # groups 是分组的索引列表，如果不冲突且有多于1个工具，则可并行
-            
-            if can_parallel and len(tool_calls) > 1:
-                # 并行执行
-                yield f"data: {json.dumps({'type': 'status', 'message': f'⚡ 并行执行 {len(tool_calls)} 个工具...'})}\n\n"
-                
-                results = optimizer.execute_tools_parallel(tool_calls)
-                
-                for tool_call, result in zip(tool_calls, results):
-                    function_name = tool_call.get("function", {}).get("name", "")
-                    result_str = json.dumps(result.result) if isinstance(result.result, (dict, list)) else str(result.result)
-                    
-                    messages.append({
-                        "role": "tool",
-                        "tool_call_id": tool_call.get("id", ""),
-                        "name": function_name,
-                        "content": result_str[:4000]
-                    })
-                    
-                    yield f"data: {json.dumps({'type': 'status', 'message': f'✅ {function_name}'})}\n\n"
-            else:
-                # 串行执行（带缓存）
-                for tool_call in tool_calls:
-                    function_name = tool_call.get("function", {}).get("name", "")
-                    arguments_str = tool_call.get("function", {}).get("arguments", "{}")
-                    
-                    try:
-                        arguments = json.loads(arguments_str) if arguments_str else {}
-                    except:
-                        arguments = {}
-                    
-                    # 使用优化器执行（带缓存）
-                    result = optimizer.execute_tool(function_name, arguments)
-                    result_str = json.dumps(result.result) if isinstance(result.result, (dict, list)) else str(result.result)
-                    
-                    messages.append({
-                        "role": "tool",
-                        "tool_call_id": tool_call.get("id", ""),
-                        "name": function_name,
-                        "content": result_str[:4000]
-                    })
-                    
-                    yield f"data: {json.dumps({'type': 'status', 'message': f'✅ {function_name}'})}\n\n"
-            
-            continue
-            
-        except Exception as e:
-            yield f"data: {json.dumps({'type': 'error', 'message': f'处理错误: {str(e)}'})}\n\n"
-            return
+        
+        # 记录中间步骤
+        if session_id:
+            try:
+                mp = MemoryPalace(db_path=str(MEMORY_PALACE_DB))
+                mp.initialize()
+                mp.log_conversation(session_id, iteration, "assistant", f"[Tool calls executed: {len(tool_calls)} tools]")
+            except Exception as e:
+                pass
+        
+        # 重置当前轮次内容，准备下一轮
+        content = ""
+        reasoning_content = ""
+        assistant_reply = ""
     
-    # 达到最大轮次
-    # token_info = (已移除重复发送) f"\n\n---\n📊 **Token 使用**: 输入 {total_input_tokens} | 输出 {total_output_tokens} | 总计 {total_input_tokens + total_output_tokens}"
-    # 记录助手回复
-    if session_id and assistant_reply:
-        try:
-            mp = MemoryPalace(db_path=str(MEMORY_PALACE_DB))
-            mp.initialize()
-            mp.log_conversation(session_id, 1, "assistant", assistant_reply)
-        except Exception as e:
-            print(f"[stream_chat] Failed to log assistant reply: {e}")
-
+    # 达到最大迭代次数
+    yield f"data: {json.dumps({'type': 'done', 'full_content': full_content + '\n\n⚠️ 已达到最大迭代次数，任务可能未完全完成。'})}\n\n"

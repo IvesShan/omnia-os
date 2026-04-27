@@ -44,6 +44,55 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
+
+// ============ API 提供商切换 ============
+
+async function loadProviders() {
+    const result = await fetchAPI("/providers");
+    const statusEl = document.getElementById("api-status");
+    const listEl = document.getElementById("api-list");
+    
+    if (result && result.providers) {
+        // 更新状态
+        const active = result.providers.find(p => p.id === result.active);
+        if (active) {
+            statusEl.innerHTML = "<span style=\"color: #22c55e;\">●</span> " + active.name + " / " + active.model;
+        }
+        
+        // 渲染提供商列表
+        listEl.innerHTML = result.providers.map(p => {
+            const isActive = p.id === result.active;
+            const isConfigured = p.configured;
+            let btnClass = "api-btn";
+            if (isActive) btnClass += " active";
+            if (!isConfigured) btnClass += " disabled";
+            
+            return "<button class=\"" + btnClass + "\" onclick=\"switchProvider(\"" + p.id + "\")\"" + (isConfigured ? "" : " disabled") + ">" +
+                "<span class=\"api-name\">" + p.name + "</span>" +
+                "<span class=\"api-model\">" + p.model + "</span>" +
+                (isActive ? "<span class=\"api-check\">✓</span>" : "") +
+                "</button>";
+        }).join("");
+    }
+}
+
+async function switchProvider(providerId) {
+    const result = await fetchAPI("/providers", {
+        method: "POST",
+        body: JSON.stringify({ provider: providerId })
+    });
+    
+    if (result && result.ok) {
+        console.log("[API] Switched to", providerId);
+        loadProviders();
+        loadDashboard();
+    } else {
+        console.error("[API] Failed to switch:", result);
+        alert("切换失败: " + (result ? result.error : "未知错误"));
+    }
+}
+
+
 // ============ 仪表盘 ============
 
 async function loadDashboard() {

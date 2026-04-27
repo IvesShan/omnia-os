@@ -101,6 +101,7 @@ MODEL_CONTEXT_WINDOWS = {
     
     # DeepSeek 模型
     "deepseek-chat": 64000,
+    "deepseek-v4-flash": 128000,
     "deepseek-coder": 16000,
     
     # 本地模型（默认）

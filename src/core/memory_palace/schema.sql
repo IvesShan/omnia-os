@@ -1,6 +1,7 @@
 -- Memory Palace 2.0 Schema
 -- Six layers of memory: facts, relations, habits, timeline, conversation_logs, tool_logs
 -- With vector embeddings for semantic search
+-- Version 2.1: Added versioning, conflict detection, and status tracking
 
 -- ============================================
 -- Layer 1: Facts (entities and their attributes)
@@ -15,7 +16,15 @@ CREATE TABLE IF NOT EXISTS facts (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     strength REAL DEFAULT 1.0,        -- memory strength, decays over time if not reinforced
     embedding BLOB,                   -- 384-dim vector for semantic search
-    UNIQUE(category, key)
+    
+    -- 版本控制（新增）
+    version INTEGER DEFAULT 1,        -- 版本号，每次更新递增
+    status TEXT DEFAULT 'active',     -- 'active', 'deprecated', 'archived'
+    supersedes INTEGER,               -- 被此版本取代的旧版本 ID
+    tags TEXT,                        -- JSON array of tags
+    priority INTEGER DEFAULT 0,       -- 优先级（越高越重要）
+    
+    UNIQUE(category, key, version)
 );
 
 -- ============================================
@@ -28,7 +37,14 @@ CREATE TABLE IF NOT EXISTS relations (
     object TEXT NOT NULL,             -- e.g. 'njuosun.com'
     context TEXT,                     -- why this relation exists
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    strength REAL DEFAULT 1.0
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    strength REAL DEFAULT 1.0,
+    
+    -- 版本控制（新增）
+    version INTEGER DEFAULT 1,
+    status TEXT DEFAULT 'active',     -- 'active', 'deprecated', 'archived'
+    supersedes INTEGER,
+    evidence TEXT                     -- 具体证据
 );
 
 -- ============================================
@@ -43,7 +59,13 @@ CREATE TABLE IF NOT EXISTS habits (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     last_observed_at TIMESTAMP,
-    embedding BLOB                    -- 384-dim vector for semantic search
+    embedding BLOB,                   -- 384-dim vector for semantic search
+    
+    -- 版本控制（新增）
+    version INTEGER DEFAULT 1,
+    status TEXT DEFAULT 'active',
+    supersedes INTEGER,
+    observation_count INTEGER DEFAULT 1
 );
 
 -- ============================================
@@ -58,7 +80,12 @@ CREATE TABLE IF NOT EXISTS timeline (
     tags TEXT,                        -- comma-separated for easy search
     related_facts TEXT,               -- JSON array of related fact IDs
     session_key TEXT,                 -- link back to the conversation that produced this
-    embedding BLOB                    -- 384-dim vector for semantic search
+    embedding BLOB,                   -- 384-dim vector for semantic search
+    
+    -- 版本控制（新增）
+    version INTEGER DEFAULT 1,
+    status TEXT DEFAULT 'active',
+    supersedes INTEGER
 );
 
 -- ============================================
@@ -73,7 +100,9 @@ CREATE TABLE IF NOT EXISTS conversation_logs (
     persona TEXT,                     -- which persona responded (if assistant)
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     embedding BLOB,                   -- 384-dim vector for semantic search
-    metadata TEXT                     -- JSON: context, detected_intent, etc.
+    metadata TEXT,                    -- JSON: context, detected_intent, etc.
+    extracted INTEGER DEFAULT 0,      -- 是否已提取为核心记忆
+    extraction_notes TEXT             -- 提取备注
 );
 
 CREATE INDEX IF NOT EXISTS idx_conversation_session ON conversation_logs(session_id);
@@ -99,6 +128,24 @@ CREATE TABLE IF NOT EXISTS tool_logs (
 CREATE INDEX IF NOT EXISTS idx_tool_session ON tool_logs(session_id);
 CREATE INDEX IF NOT EXISTS idx_tool_name ON tool_logs(tool_name);
 CREATE INDEX IF NOT EXISTS idx_tool_created ON tool_logs(created_at);
+
+-- ============================================
+-- 冲突检测表（新增）
+-- ============================================
+CREATE TABLE IF NOT EXISTS conflicts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    layer TEXT NOT NULL,              -- 'facts', 'relations', 'habits', 'timeline'
+    entity_key TEXT NOT NULL,         -- 冲突实体的标识（如 category:key）
+    old_id INTEGER,                   -- 旧版本 ID
+    new_id INTEGER,                   -- 新版本 ID
+    old_value TEXT,                   -- 旧值摘要
+    new_value TEXT,                   -- 新值摘要
+    source TEXT,                      -- 冲突来源
+    resolved TEXT DEFAULT 'pending',  -- 'pending', 'resolved', 'ignored'
+    resolution_notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    resolved_at TIMESTAMP
+);
 
 -- ============================================
 -- Full-text search virtual table for timeline
@@ -153,9 +200,15 @@ END;
 -- ============================================
 CREATE INDEX IF NOT EXISTS idx_facts_category ON facts(category);
 CREATE INDEX IF NOT EXISTS idx_facts_strength ON facts(strength DESC);
+CREATE INDEX IF NOT EXISTS idx_facts_status ON facts(status);
 
 CREATE INDEX IF NOT EXISTS idx_timeline_date ON timeline(event_date DESC);
 CREATE INDEX IF NOT EXISTS idx_timeline_type ON timeline(event_type);
+CREATE INDEX IF NOT EXISTS idx_timeline_status ON timeline(status);
 
 CREATE INDEX IF NOT EXISTS idx_habits_domain ON habits(domain);
 CREATE INDEX IF NOT EXISTS idx_habits_certainty ON habits(certainty DESC);
+CREATE INDEX IF NOT EXISTS idx_habits_status ON habits(status);
+
+CREATE INDEX IF NOT EXISTS idx_relations_status ON relations(status);
+CREATE INDEX IF NOT EXISTS idx_conflicts_resolved ON conflicts(resolved);

@@ -12,5 +12,5 @@ local:
 # 云端模型配置
 cloud:
   enabled: true
-  provider: qianfan
-  model: "ERNIE-4.0-8K"
+  provider: deepseek
+  model: "deepseek-v4-flash"

@@ -716,7 +716,7 @@ async function sendMessage() {
   attachBtn.disabled = true;
   
   // 构建历史消息
-  const history = chatHistory.slice(-10).map(m => ({
+  const history = chatHistory.slice(-50).map(m => ({
     role: m.role,
     content: m.content
   }));
@@ -793,12 +793,12 @@ async function sendMessage() {
 
           else if (data.type === 'tool_result') {
             // 工具执行成功
-            updateToolCard(data.name, data.result, 'done');
+            updateToolCard(data.name, data.content, 'done');
           }
 
           else if (data.type === 'tool_error') {
             // 工具执行失败
-            updateToolCard(data.name, data.error, 'error');
+            updateToolCard(data.name, data.content, 'error');
           }
 
           else if (data.type === 'done') {
@@ -1383,10 +1383,10 @@ function handlePanelClick(action) {
     
     case 'api-selector':
       // 切换 API 提供商
-      var currentApi = localStorage.getItem('omnia_api_provider') || 'baidu';
+      var currentApi = localStorage.getItem('omnia_api_provider') || 'deepseek';
       var nextApi = currentApi === 'baidu' ? 'kimi' : 'baidu';
       localStorage.setItem('omnia_api_provider', nextApi);
-      appendOmnia('[系统] API 已切换为: ' + nextApi.toUpperCase() + '，下次对话将使用新的 API。');
+      appendOmnia('[系统] API 已切换为: ' + (nextApi === 'deepseek' ? 'DeepSeek' : nextApi.toUpperCase()) + '，下次对话将使用新的 API。');
       var apiLabel = document.querySelector('#api-panel .api-current');
       if (apiLabel) apiLabel.textContent = nextApi.toUpperCase();
       break;
@@ -1696,6 +1696,7 @@ async function loadApiProviders() {
 function getProviderName(id) {
   const names = {
     local: '本地 GPU',
+    deepseek: 'DeepSeek',
     qianfan: '百度千帆',
     kimi: 'Moonshot',
     openai: 'OpenAI',
@@ -1720,7 +1721,7 @@ async function selectProvider(providerId, configured) {
     if (res.ok) {
       currentApiProvider = providerId;
       loadApiProviders(); // 刷新列表
-      addMessage('system', `已切换到: ${getProviderName(providerId)}`);
+      appendOmnia(`[系统] 已切换到: ${getProviderName(providerId)}`);
     } else {
       const data = await res.json();
       alert('切换失败: ' + (data.error || '未知错误'));
@@ -2129,7 +2130,7 @@ function updateTokenDisplay(status) {
 // 检查 Token 状态
 async function checkTokenStatus() {
   // 从 chatHistory 构建消息列表
-  const messages = chatHistory.slice(-20).map(m => ({
+  const messages = chatHistory.slice(-50).map(m => ({
     role: m.role,
     content: m.content
   }));
@@ -2143,7 +2144,7 @@ async function checkTokenStatus() {
     const response = await fetch(`${API_BASE}/api/token/status`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages: messages, model: 'kimi' })
+      body: JSON.stringify({ messages: messages, model: currentApiProvider || 'deepseek' })
     });
     
     if (response.ok) {

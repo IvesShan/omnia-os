@@ -317,7 +317,7 @@ def tool_query_memory(query: str, layer: str = "all") -> Dict[str, Any]:
         # Search in facts table
         if layer in ("all", "facts"):
             cursor.execute(
-                "SELECT id, category, key, value, created_at FROM facts WHERE value LIKE ? OR key LIKE ? ORDER BY id DESC LIMIT 10",
+                "SELECT id, category, key, value, created_at FROM facts WHERE (value LIKE ? OR key LIKE ?) AND status = 'active' ORDER BY id DESC LIMIT 10",
                 (search_pattern, search_pattern)
             )
             for row in cursor.fetchall():
@@ -333,7 +333,7 @@ def tool_query_memory(query: str, layer: str = "all") -> Dict[str, Any]:
         # Search in timeline table
         if layer in ("all", "timeline"):
             cursor.execute(
-                "SELECT id, event_date, event_type, title, description FROM timeline WHERE title LIKE ? OR description LIKE ? ORDER BY id DESC LIMIT 10",
+                "SELECT id, event_date, event_type, title, description FROM timeline WHERE (title LIKE ? OR description LIKE ?) AND status = 'active' ORDER BY id DESC LIMIT 10",
                 (search_pattern, search_pattern)
             )
             for row in cursor.fetchall():
@@ -349,7 +349,7 @@ def tool_query_memory(query: str, layer: str = "all") -> Dict[str, Any]:
         # Search in relations table
         if layer in ("all", "relations"):
             cursor.execute(
-                "SELECT id, subject, predicate, object, context FROM relations WHERE subject LIKE ? OR object LIKE ? OR context LIKE ? ORDER BY id DESC LIMIT 10",
+                "SELECT id, subject, predicate, object, context FROM relations WHERE (subject LIKE ? OR object LIKE ? OR context LIKE ?) AND status = 'active' ORDER BY id DESC LIMIT 10",
                 (search_pattern, search_pattern, search_pattern)
             )
             for row in cursor.fetchall():

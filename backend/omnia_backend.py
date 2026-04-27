@@ -609,6 +609,7 @@ def get_providers():
     """
     try:
         # 从环境变量读取配置
+deepseek_key = os.environ.get('DEEPSEEK_API_KEY', '')
         baidu_key = os.environ.get('QIANFAN_API_KEY', '')
         kimi_key = os.environ.get('MOONSHOT_API_KEY', '')
         
@@ -619,6 +620,12 @@ def get_providers():
             kimi_key = config_manager.api_keys.get('kimi_api_key', '')
         
         providers = [
+            {
+                'id': 'deepseek',
+                'name': 'DeepSeek',
+                'model': 'deepseek-v4-flash',
+                'configured': bool(deepseek_key)
+            },
             {
                 'id': 'baidu',
                 'name': '百度千帆',
@@ -640,7 +647,7 @@ def get_providers():
         ]
         
         # 获取当前激活的提供商
-        active = config_manager.get('api.provider', 'baidu')
+        active = config_manager.get('api.provider', 'deepseek')
         
         return jsonify({
             'providers': providers,
@@ -667,7 +674,7 @@ def switch_provider():
         data = request.get_json()
         provider_id = data.get('provider', 'baidu')
         
-        valid_providers = ['baidu', 'kimi', 'local']
+        valid_providers = ['deepseek', 'baidu', 'kimi', 'local']
         if provider_id not in valid_providers:
             return jsonify({
                 'success': False,
@@ -682,7 +689,7 @@ def switch_provider():
         # 如果切换到本地，同时切换模型模式
         if provider_id == 'local' and model_router:
             model_router.set_mode('local_only')
-        elif provider_id in ['baidu', 'kimi'] and model_router:
+        elif provider_id in ['deepseek', 'baidu', 'kimi'] and model_router:
             model_router.set_mode('cloud_only')
         
         logger.info(f"Switched to provider: {provider_id}")

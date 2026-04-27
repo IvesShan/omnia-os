@@ -907,6 +907,7 @@ html, body {
   border-radius: 50%;
   flex-shrink: 0;
 }
+.api-dot.deepseek { background: var(--cyan); box-shadow: 0 0 6px var(--cyan); }
 .api-dot.qianfan { background: var(--success); box-shadow: 0 0 6px var(--success); }
 
 /* 千帆选中状态 */

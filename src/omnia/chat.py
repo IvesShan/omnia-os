@@ -103,8 +103,24 @@ def _aws_signature_v4(
 def _load_api_key(prefer_provider: str | None = None) -> Tuple[Optional[str], Optional[str]]:
     """Try to load API key from .env file first, then environment variables.
     
-    This ensures user configuration in .env takes precedence over system env.
+    If prefer_provider is set, load the key for that specific provider.
+    Otherwise, return the first configured key (original behavior).
+    
+    Provider mapping:
+      - deepseek  -> DEEPSEEK_API_KEY
+      - qianfan   -> QIANFAN_API_KEY / QIANFAN_ACCESS_KEY
+      - kimi      -> MOONSHOT_API_KEY / KIMI_API_KEY
+      - openai    -> OPENAI_API_KEY
+      - anthropic -> ANTHROPIC_API_KEY
     """
+    PROVIDER_KEY_MAP = {
+        "deepseek": ["DEEPSEEK_API_KEY"],
+        "qianfan": ["QIANFAN_API_KEY", "QIANFAN_ACCESS_KEY"],
+        "kimi": ["MOONSHOT_API_KEY", "KIMI_API_KEY"],
+        "openai": ["OPENAI_API_KEY"],
+        "anthropic": ["ANTHROPIC_API_KEY"],
+    }
+    
     # Priority 1: .env file in project root (user explicit config)
     env_file = PROJECT_ROOT / ".env"
     env_vars = {}
@@ -117,20 +133,32 @@ def _load_api_key(prefer_provider: str | None = None) -> Tuple[Optional[str], Op
                 key, val = line.split("=", 1)
                 env_vars[key] = val.strip().strip('"').strip("'")
     
+    # If a specific provider is preferred, look up its key first
+    if prefer_provider and prefer_provider in PROVIDER_KEY_MAP:
+        candidates = PROVIDER_KEY_MAP[prefer_provider]
+        # Check .env first
+        for key in candidates:
+            if key in env_vars:
+                return key, env_vars[key]
+        # Then check environment variables
+        for key in candidates:
+            val = os.environ.get(key)
+            if val:
+                return key, val
+    
+    # Fallback: return the first configured key (original behavior)
     # Check .env first
-    for key in ["QIANFAN_API_KEY", "QIANFAN_ACCESS_KEY", "MOONSHOT_API_KEY", "KIMI_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY"]:
+    for key in ["DEEPSEEK_API_KEY", "QIANFAN_API_KEY", "QIANFAN_ACCESS_KEY", "MOONSHOT_API_KEY", "KIMI_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY"]:
         if key in env_vars:
             return key, env_vars[key]
     
     # Priority 2: Environment variables (fallback)
-    for key in ["QIANFAN_API_KEY", "QIANFAN_ACCESS_KEY", "MOONSHOT_API_KEY", "KIMI_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY"]:
+    for key in ["DEEPSEEK_API_KEY", "QIANFAN_API_KEY", "QIANFAN_ACCESS_KEY", "MOONSHOT_API_KEY", "KIMI_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY"]:
         val = os.environ.get(key)
         if val:
             return key, val
     
     return None, None
-
-
 def _try_chat_with_fallback(message: str, system_prompt: str, primary_key: str, primary_name: str) -> str | None:
     """Try to chat with primary provider, fallback to others if fails."""
     # Try primary first
@@ -138,7 +166,9 @@ def _try_chat_with_fallback(message: str, system_prompt: str, primary_key: str, 
         key_name, api_key = _load_api_key()
         if api_key:
             provider = "kimi"
-            if key_name in ("QIANFAN_API_KEY", "QIANFAN_ACCESS_KEY"):
+            if key_name == "DEEPSEEK_API_KEY":
+                provider = "deepseek"
+            elif key_name in ("QIANFAN_API_KEY", "QIANFAN_ACCESS_KEY"):
                 provider = "qianfan"
             elif key_name == "OPENAI_API_KEY":
                 provider = "openai"
@@ -248,6 +278,11 @@ def _build_model_config(provider: str) -> tuple[str, str]:
         url = "https://api.kimi.com/coding/v1/messages"
         model = "kimi-code"  # 使用 OpenClaw 相同的模型名
         print(f"[_build_model_config] Using Kimi Coding: url={url}, model={model}")
+    elif provider == "deepseek":
+        # DeepSeek API
+        url = "https://api.deepseek.com/v1/chat/completions"
+        model = os.environ.get("DEEPSEEK_MODEL", "deepseek-v4-flash")
+        print(f"[_build_model_config] Using DeepSeek: url={url}, model={model}")
     else:
         url = "https://api.openai.com/v1/chat/completions"
         model = os.environ.get("OPENAI_MODEL", "gpt-4o")

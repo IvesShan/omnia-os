@@ -58,10 +58,10 @@ atexit.register(_cleanup_mcp)
 # API Provider selection
 _current_provider = None  # Will be set based on env or user selection
 
-# Safety: reset to qianfan if it was local (prevent localhost:8080 errors)
+# Safety: reset to deepseek if it was local (prevent localhost:8080 errors)
 if _current_provider == "local":
-    print("[web_server] WARNING: _current_provider was local, resetting to qianfan")
-    _current_provider = "qianfan"
+    print("[web_server] WARNING: _current_provider was local, resetting to deepseek")
+    _current_provider = "deepseek"
 
 
 def _load_pending() -> dict[str, dict]:
@@ -255,6 +255,7 @@ def _env_snapshot() -> dict:
     
     # Provider 和模型映射
     provider_models = {
+        "deepseek": ("DEEPSEEK_MODEL", "deepseek-v4-flash"),
         "qianfan": ("QIANFAN_MODEL", "qianfan-code-latest"),
         "kimi": ("KIMI_MODEL", "K2.6-code-preview"),
         "openai": ("OPENAI_MODEL", "gpt-4o"),
@@ -388,7 +389,7 @@ def create_app() -> Flask:
         return jsonify(
             {
                 "daemon_running": _daemon_status(),
-                "api_ready": _load_api_key()[1] is not None,
+                "api_ready": _load_api_key(prefer_provider=_current_provider)[1] is not None,
                 "memory": _memory_counts(),
                 "ide_context": _ide_context(),
                 "git": _git_snapshot(),
@@ -586,8 +587,8 @@ def create_app() -> Flask:
         try:
             from core.neural_graph import build_neural_graph
             
-            key_name, api_key = _load_api_key()
-            provider = "qianfan" if "QIANFAN" in (key_name or "") else "kimi"
+            key_name, api_key = _load_api_key(prefer_provider=_current_provider)
+            provider = _current_provider or ("deepseek" if "DEEPSEEK" in (key_name or "") else ("qianfan" if "QIANFAN" in (key_name or "") else "kimi"))
             
             stats = build_neural_graph(api_key=api_key, provider=provider)
             
@@ -676,6 +677,121 @@ def create_app() -> Flask:
             return jsonify({"error": str(e)}), 500
 
 
+
+    # === Neural Graph Advanced Algorithms API ===
+    # 集成高级图算法：路径查找、中心度分析、社区发现
+    
+    @app.route("/api/graph/path", methods=["GET"])
+    def graph_find_path():
+        """查找两个节点之间的最短路径"""
+        start_id = request.args.get("start_id", "")
+        end_id = request.args.get("end_id", "")
+        max_depth = request.args.get("max_depth", 4, type=int)
+        
+        if not start_id or not end_id:
+            return jsonify({"error": "start_id and end_id are required"}), 400
+        
+        try:
+            from core.neural_graph_algorithms import algorithms
+            path = algorithms.find_path(start_id, end_id, max_depth)
+            if path is None:
+                return jsonify({"found": False, "message": "No path found"})
+            return jsonify({"found": True, "path": path})
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+    
+    @app.route("/api/graph/paths", methods=["GET"])
+    def graph_find_all_paths():
+        """查找两个节点之间的所有路径"""
+        start_id = request.args.get("start_id", "")
+        end_id = request.args.get("end_id", "")
+        max_depth = request.args.get("max_depth", 3, type=int)
+        limit = request.args.get("limit", 5, type=int)
+        
+        if not start_id or not end_id:
+            return jsonify({"error": "start_id and end_id are required"}), 400
+        
+        try:
+            from core.neural_graph_algorithms import algorithms
+            paths = algorithms.find_all_paths(start_id, end_id, max_depth, limit)
+            return jsonify({"found": len(paths) > 0, "paths": paths, "count": len(paths)})
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+    
+    @app.route("/api/graph/centrality/degree", methods=["GET"])
+    def graph_degree_centrality():
+        """获取度中心性最高的节点（连接数最多）"""
+        top_k = request.args.get("top_k", 10, type=int)
+        
+        try:
+            from core.neural_graph_algorithms import algorithms
+            results = algorithms.get_degree_centrality(top_k)
+            return jsonify({"centrality": results})
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+    
+    @app.route("/api/graph/centrality/pagerank", methods=["GET"])
+    def graph_pagerank():
+        """获取 PageRank 最高的节点（影响力最大）"""
+        top_k = request.args.get("top_k", 10, type=int)
+        
+        try:
+            from core.neural_graph_algorithms import algorithms
+            results = algorithms.get_pagerank(top_k)
+            return jsonify({"pagerank": results})
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+    
+    @app.route("/api/graph/centrality/betweenness", methods=["GET"])
+    def graph_betweenness_centrality():
+        """获取介数中心性最高的节点（作为桥梁最多）"""
+        top_k = request.args.get("top_k", 10, type=int)
+        
+        try:
+            from core.neural_graph_algorithms import algorithms
+            results = algorithms.get_betweenness_centrality(top_k)
+            return jsonify({"betweenness": results})
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+    
+    @app.route("/api/graph/communities", methods=["GET"])
+    def graph_find_communities():
+        """发现图谱中的社区结构"""
+        try:
+            from core.neural_graph_algorithms import algorithms
+            communities = algorithms.find_communities()
+            return jsonify({"communities": communities, "count": len(communities)})
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+    
+    @app.route("/api/graph/neighbors/<node_id>", methods=["GET"])
+    def graph_get_neighbors(node_id):
+        """获取节点的邻居信息"""
+        depth = request.args.get("depth", 1, type=int)
+        
+        try:
+            from core.neural_graph_algorithms import algorithms
+            neighbors = algorithms.get_neighbors(node_id, depth)
+            return jsonify(neighbors)
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+    
+    @app.route("/api/graph/search", methods=["GET"])
+    def graph_search_nodes():
+        """搜索节点"""
+        query = request.args.get("q", "")
+        limit = request.args.get("limit", 20, type=int)
+        
+        if not query:
+            return jsonify({"error": "Query parameter 'q' is required"}), 400
+        
+        try:
+            from core.neural_graph_algorithms import algorithms
+            results = algorithms.search_nodes(query, limit)
+            return jsonify({"query": query, "results": results, "count": len(results)})
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
     @app.route("/api/model/status", methods=["GET"])
     def get_model_status():
         """Return model service status for frontend."""
@@ -686,6 +802,7 @@ def create_app() -> Flask:
         
         # Check if any provider is configured
         env_vars = {
+            "deepseek": "DEEPSEEK_API_KEY",
             "qianfan": "QIANFAN_API_KEY",
             "kimi": "MOONSHOT_API_KEY", 
             "openai": "OPENAI_API_KEY",
@@ -738,7 +855,8 @@ def create_app() -> Flask:
                 "kimi": 128000,
                 "openai": 128000,
                 "anthropic": 200000,
-                "qianfan": 8000,
+                "qianfan": 128000,
+                "deepseek": 64000,
             }
             
             limit = model_limits.get(model, 128000)
@@ -768,6 +886,7 @@ def create_app() -> Flask:
         
         providers = []
         env_vars = {
+            "deepseek": ("DEEPSEEK_API_KEY", "DeepSeek", "deepseek-v4-flash"),
             "qianfan": ("QIANFAN_API_KEY", "百度千帆", "baiduqianfancodingplan/qianfan-code-latest"),
             "kimi": ("MOONSHOT_API_KEY", "Moonshot", "K2.6-code-preview"),
             "openai": ("OPENAI_API_KEY", "OpenAI", "gpt-4o"),
@@ -840,12 +959,13 @@ def create_app() -> Flask:
         data = request.get_json(force=True, silent=True) or {}
         provider = data.get("provider")
         
-        valid_providers = ["qianfan", "kimi", "openai", "anthropic"]
+        valid_providers = ["deepseek", "qianfan", "kimi", "openai", "anthropic"]
         if provider not in valid_providers:
             return jsonify({"error": f"Invalid provider: {provider}"}), 400
         
         # Check if provider is configured
         env_key = {
+            "deepseek": "DEEPSEEK_API_KEY",
             "qianfan": "QIANFAN_API_KEY",
             "kimi": "MOONSHOT_API_KEY",
             "openai": "OPENAI_API_KEY",
@@ -1096,22 +1216,25 @@ def create_app() -> Flask:
             from omnia.chat_handler import handle_chat
             from core.actuator.tool_registry import get_all_tools_schema
             
-            key_name, api_key = _load_api_key()
-            if not api_key:
-                return jsonify({"error": "No API key configured"}), 500
-            
-            # Provider 检测
+            # Provider 检测（先检测，再加载对应 key）
             global _current_provider
             if _current_provider:
                 provider = _current_provider
             else:
+                # 自动检测：从 .env 或环境变量找第一个可用的
+                key_name, api_key = _load_api_key()
                 provider = "kimi"
+                if key_name == "DEEPSEEK_API_KEY":
+                    provider = "deepseek"
                 if key_name in ("QIANFAN_API_KEY", "QIANFAN_ACCESS_KEY"):
                     provider = "qianfan"
                 elif key_name == "OPENAI_API_KEY":
                     provider = "openai"
                 elif key_name == "ANTHROPIC_API_KEY":
                     provider = "anthropic"
+            
+            # 根据选中的 provider 加载对应的 API key
+            key_name, api_key = _load_api_key(prefer_provider=provider)
             
             if provider == "anthropic":
                 return jsonify({"error": "Web UI 暂不支持 Anthropic"}), 501
@@ -1153,8 +1276,12 @@ def create_app() -> Flask:
         if not message:
             return jsonify({"error": "消息不能为空"}), 400
         
+        # Provider 选择：优先使用全局设置
+        global _current_provider
+        provider = _current_provider or "deepseek"
+        
         def generate():
-            for event in stream_chat(message, history):
+            for event in stream_chat(message, history, provider=provider):
                 yield event
         
         return Response(
@@ -1175,11 +1302,9 @@ def create_app() -> Flask:
         from omnia.discuss_api import handle_start_discussion
         
         data = request.get_json(force=True, silent=True) or {}
-        key_name, api_key = _load_api_key()
-        
-        # Provider 检测
         global _current_provider
         provider = _current_provider or "qianfan"
+        key_name, api_key = _load_api_key(prefer_provider=provider)
         
         result = handle_start_discussion(data, api_key, provider)
         if isinstance(result, tuple):
@@ -1192,8 +1317,8 @@ def create_app() -> Flask:
         from omnia.discuss_api import handle_infinite_opinion
         
         data = request.get_json(force=True, silent=True) or {}
-        key_name, api_key = _load_api_key()
         provider = _current_provider or "qianfan"
+        key_name, api_key = _load_api_key(prefer_provider=provider)
         
         result = handle_infinite_opinion(data, api_key, provider)
         if isinstance(result, tuple):
@@ -1206,8 +1331,8 @@ def create_app() -> Flask:
         from omnia.discuss_api import handle_omnia_opinion
         
         data = request.get_json(force=True, silent=True) or {}
-        key_name, api_key = _load_api_key()
         provider = _current_provider or "qianfan"
+        key_name, api_key = _load_api_key(prefer_provider=provider)
         
         result = handle_omnia_opinion(data, api_key, provider)
         if isinstance(result, tuple):
@@ -1220,8 +1345,8 @@ def create_app() -> Flask:
         from omnia.discuss_api import handle_next_round
         
         data = request.get_json(force=True, silent=True) or {}
-        key_name, api_key = _load_api_key()
         provider = _current_provider or "qianfan"
+        key_name, api_key = _load_api_key(prefer_provider=provider)
         
         result = handle_next_round(data, api_key, provider)
         if isinstance(result, tuple):
