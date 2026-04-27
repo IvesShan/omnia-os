@@ -351,8 +351,16 @@ def call_local_llm(messages: list, tools: list | None = None) -> dict:
         raise RuntimeError("Local LLM timeout. Model may be loading or GPU memory full.")
 
 
-def _call_model_messages(api_key: str, provider: str, messages: list, tools: list | None = None) -> dict:
-    """调用模型，支持 OpenAI 和 Anthropic 格式"""
+def _call_model_messages(api_key: str, provider: str, messages: list, tools: list | None = None, tool_choice: str | None = None) -> dict:
+    """调用模型，支持 OpenAI 和 Anthropic 格式
+    
+    Args:
+        tool_choice: "auto" | "required" | "none" | None
+            - "auto": 模型自己决定是否调用工具（默认）
+            - "required": 强制必须调用至少一个工具
+            - "none": 禁止调用工具
+            - None: 不传此参数，使用 API 默认行为
+    """
     import requests
 
     # Local LLM - use local server
@@ -397,6 +405,11 @@ def _call_model_messages(api_key: str, provider: str, messages: list, tools: lis
         payload["tools"] = tools
         print(f"[_call_model_messages] Tools included: {len(tools)} tools")
         print(f"[_call_model_messages] First tool: {tools[0]['function']['name'] if tools else 'N/A'}")
+        
+        # 添加 tool_choice 参数
+        if tool_choice:
+            payload["tool_choice"] = tool_choice
+            print(f"[_call_model_messages] Tool choice: {tool_choice}")
     else:
         print(f"[_call_model_messages] No tools passed")
 

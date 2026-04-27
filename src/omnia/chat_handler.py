@@ -8,6 +8,33 @@ import uuid
 from typing import Any
 import re
 
+def should_require_tool(user_message: str) -> str | None:
+    """
+    智能判断是否应该强制调用工具。
+    
+    Returns:
+        "required" - 强制必须调用工具
+        None - 不强制，使用 API 默认行为（保留创造性）
+    """
+    trigger_keywords = [
+        # 中文关键词
+        "检查", "确认", "验证", "查看", "读取", "读文件",
+        "改好了吗", "生效了吗", "有没有", "状态",
+        "检查一下", "看一下", "看一下代码", "看看代码",
+        # 英文关键词
+        "check", "verify", "confirm", "read",
+    ]
+    
+    user_lower = user_message.lower()
+    
+    for kw in trigger_keywords:
+        if kw in user_lower:
+            return "required"
+    
+    return None
+
+
+
 def handle_chat(message: str, history: list, api_key: str, provider: str, system_prompt: str, all_tools_schema: list = None) -> dict:
     """
     融合 Hermes + FreeCode + OpenClaw 最佳实践的聊天处理器。
@@ -176,7 +203,13 @@ def handle_chat(message: str, history: list, api_key: str, provider: str, system
         
         # 调用模型
         use_tools = tools_schema if not tool_calls_executed else None
-        data = _call_model_messages(api_key, provider, messages, tools=use_tools)
+        
+        # 智能判断是否强制调用工具
+        tool_choice = should_require_tool(message) if use_tools else None
+        if tool_choice:
+            print(f"[Chat] Tool choice: {tool_choice} (forced)")
+        
+        data = _call_model_messages(api_key, provider, messages, tools=use_tools, tool_choice=tool_choice)
         msg = data["choices"][0]["message"]
         
         # 检查是否调用了工具
