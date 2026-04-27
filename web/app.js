@@ -458,6 +458,10 @@ function appendUser(text) {
       <div class="meta">原点 · 刚刚</div>
     </div>
   `;
+  // 🧹 消息上限控制：保留最近 50 条消息
+  while (messagesEl.children.length >= 50) {
+    messagesEl.removeChild(messagesEl.firstChild);
+  }
   messagesEl.insertAdjacentHTML('beforeend', html);
   addToHistory('user', text, html);
   scrollToBottom();
@@ -474,6 +478,10 @@ function appendUserWithImage(text, imageData) {
       <div class="meta">原点 · 刚刚</div>
     </div>
   `;
+  // 🧹 消息上限控制：保留最近 50 条消息
+  while (messagesEl.children.length >= 50) {
+    messagesEl.removeChild(messagesEl.firstChild);
+  }
   messagesEl.insertAdjacentHTML('beforeend', html);
   addToHistory('user', text || '[图片]', html);
   scrollToBottom();
@@ -664,6 +672,10 @@ function appendOmnia(text) {
       <div class="meta">Omnia · 刚刚</div>
     </div>
   `;
+  // 🧹 消息上限控制：保留最近 50 条消息
+  while (messagesEl.children.length >= 50) {
+    messagesEl.removeChild(messagesEl.firstChild);
+  }
   messagesEl.insertAdjacentHTML('beforeend', html);
   addToHistory('assistant', text, html);
   scrollToBottom();
@@ -813,7 +825,11 @@ async function sendMessage() {
             if (finalContent && finalContent !== '[未生成响应]') {
               if (omniaMsg) {
                 // 把 omniaMsg 移动到最后（确保在所有工具卡片之后）
-                messagesEl.appendChild(omniaMsg);
+                  // 🧹 消息上限控制：保留最近 50 条消息
+  while (messagesEl.children.length >= 50) {
+    messagesEl.removeChild(messagesEl.firstChild);
+  }
+  messagesEl.appendChild(omniaMsg);
                 updateOmniaMessage(omniaMsg, finalContent, true);
                 // 保存到聊天历史
                 const html = omniaMsg.outerHTML;

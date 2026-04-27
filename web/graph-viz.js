@@ -16,6 +16,9 @@ const GraphViz = {
   brainParticles: null,
   particleCount: 2000,
   
+  // 页面可见性控制（后台标签页时暂停渲染，省 GPU）
+  isPageVisible: true,
+  
   // 知识图谱
   graphData: { nodes: [], edges: [] },
   nodeObjects: [],
@@ -57,6 +60,11 @@ const GraphViz = {
     
     // 设置后处理
     this.setupPostProcessing();
+    
+    // 页面可见性变化时暂停/恢复渲染
+    document.addEventListener('visibilitychange', () => {
+      this.isPageVisible = !document.hidden;
+    });
     
     // 开始动画
     this.animate();
@@ -353,6 +361,11 @@ const GraphViz = {
   },
   
   animate() {
+    // 页面不可见时跳过渲染（省 GPU/CPU）
+    if (!this.isPageVisible) {
+      this.animationId = requestAnimationFrame(() => this.animate());
+      return;
+    }
     this.animationId = requestAnimationFrame(() => this.animate());
     
     this.time += 0.01;
