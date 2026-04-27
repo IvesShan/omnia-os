@@ -21,6 +21,7 @@ from flask_cors import CORS
 
 from core.config import MEMORY_PALACE_DB
 from omnia.wake import assemble_wake_prompt
+from omnia.tool_preroll import check_and_run
 from omnia.chat import _load_api_key, _build_model_config
 from omnia.tool_optimizer import ToolExecutionOptimizer, ToolResult, ParallelToolExecutor
 from omnia.long_task_handler import LongTaskHandler, handle_long_task_stream
@@ -160,6 +161,16 @@ def _stream_chat_unified(
     except Exception as e:
         print(f"[stream_chat] Failed to assemble wake prompt: {e}")
         system_prompt = "You are Omnia, an AI assistant."
+
+    # ========== 前置工具检查钩子（方案A）==========
+    _tool_result = check_and_run(message)
+    if _tool_result:
+        print(f"[stream_chat] 命中关键词，注入工具检查结果")
+        _tool_warning = "\n\n[系统强制工具检查结果 - 请基于以下实际数据回答用户]\n"
+        _tool_warning += _tool_result
+        _tool_warning += "\n[/系统强制工具检查结果]\n"
+        system_prompt += _tool_warning
+    # ========== 前置工具检查结束 ==========
     
     # 添加系统消息
     system_message = {"role": "system", "content": system_prompt}

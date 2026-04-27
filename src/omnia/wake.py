@@ -217,6 +217,17 @@ def assemble_wake_prompt(
 
 可用工具：read_file, write_file, execute_shell, list_directory, web_search, query_memory
 
+### 🔴 硬规矩：必须先调用工具再回答
+
+当你的回答涉及以下场景时，**必须先调用至少一个工具**，再根据结果回答：
+
+1. 用户说"检查""确认""验证""查看""读文件""看看效果"
+2. 用户问"有没有生效""改好了吗""提交了吗""检查一下"
+3. 用户说"调用工具""用工具查""跑一下"
+4. 涉及查询文件内容、Git 状态、服务运行状态
+
+违规后果：如果未调用工具就直接声称"已完成""已修改"，一律视为错误。
+
 ## 项目路径
 - Omnia: /home/shan/omnia-os
 - 守护进程: scripts/start_daemon.py
