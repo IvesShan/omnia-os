@@ -1291,7 +1291,14 @@ html, body {
 
 .tool-more {
   display: inline-block;
-  padding: 4px 10px;\n  background: rgba(255, 255, 255, 0.03);\n  border: 1px solid rgba(255, 255, 255, 0.06);\n  border-radius: 12px;\n  font-size: 11px;\n  color: var(--text-secondary);\n}\nEOF
+  padding: 4px 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+EOF
 
 .summary-tools {
   margin-top: 10px;
@@ -1326,7 +1333,33 @@ html, body {
    新消息提示条
    ========================================= */
 
-.new-message-indicator {\n  position: absolute;\n  bottom: 80px;\n  left: 50%;\n  transform: translateX(-50%);\n  z-index: 100;\n  padding: 8px 20px;\n  background: rgba(34, 211, 238, 0.9);\n  border-radius: 20px;\n  font-size: 13px;\n  font-weight: 500;\n  color: #000;\n  cursor: pointer;\n  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);\n  transition: all 0.2s ease;\n}\n\n.new-message-indicator:hover {\n  background: rgba(34, 211, 238, 1);\n  transform: translateX(-50%) translateY(-2px);\n  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);\n}\n\n.new-message-text::before {\n  content: ""; /* SVG icon added via JS */\n}\n
+.new-message-indicator {
+  position: absolute;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  padding: 8px 20px;
+  background: rgba(34, 211, 238, 0.9);
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #000;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  transition: all 0.2s ease;
+}
+
+.new-message-indicator:hover {
+  background: rgba(34, 211, 238, 1);
+  transform: translateX(-50%) translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+}
+
+.new-message-text::before {
+  content: ""; /* SVG icon added via JS */
+}
+
 
 /* =========================================
    图片上传功能
@@ -1391,7 +1424,12 @@ html, body {
   margin-bottom: 8px;
 }
 
-.user-image {\n  max-width: 240px;\n  max-height: 240px;\n  border-radius: 8px;\n  display: block;\n}
+.user-image {
+  max-width: 240px;
+  max-height: 240px;
+  border-radius: 8px;
+  display: block;
+}
 
 
 /* =========================================
@@ -1746,233 +1784,6 @@ html, body {
 .pause-selected {
   color: #30d158;
   font-weight: bold;
-}
-
-/* === 神经图谱可视化样式 === */
-
-.graph-controls {
-  display: flex;
-  gap: 0.5em;
-  margin-bottom: 0.8em;
-}
-
-.graph-controls input {
-  flex: 1;
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(34, 211, 238, 0.3);
-  border-radius: 4px;
-  padding: 0.4em 0.6em;
-  color: #e0e0e0;
-  font-size: 0.85em;
-}
-
-.graph-controls input:focus {
-  outline: none;
-  border-color: #22d3ee;
-  box-shadow: 0 0 8px rgba(34, 211, 238, 0.3);
-}
-
-.graph-controls button {
-  background: transparent;
-  border: 1px solid rgba(34, 211, 238, 0.5);
-  border-radius: 4px;
-  padding: 0.4em 1em;
-  color: #22d3ee;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.graph-controls button:hover {
-  background: rgba(34, 211, 238, 0.15);
-  border-color: #22d3ee;
-  color: #00f0ff;
-  box-shadow: 0 0 8px rgba(34, 211, 238, 0.3);
-}
-
-.graph-controls button:active {
-  background: rgba(34, 211, 238, 0.25);
-}
-
-.graph-stats {
-  display: flex;
-  gap: 1.5em;
-  margin-bottom: 0.8em;
-  padding: 0.5em;
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 4px;
-}
-
-.gs-item {
-  font-size: 0.85em;
-  color: #a0a0a0;
-}
-
-.gs-num {
-  color: #22d3ee;
-  font-weight: 700;
-  font-family: 'JetBrains Mono', monospace;
-  margin-right: 0.3em;
-}
-
-.graph-canvas {
-  width: 100%;
-  height: 280px;
-  background: rgba(0, 0, 0, 0.4);
-  border: 1px solid rgba(34, 211, 238, 0.2);
-  border-radius: 6px;
-  overflow: hidden;
-  position: relative;
-  cursor: grab;
-}
-
-.graph-canvas:active {
-  cursor: grabbing;
-}
-
-.graph-placeholder {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  color: #22d3ee;
-  font-size: 0.9em;
-  text-align: center;
-  cursor: pointer;
-  transition: all 0.2s;
-  text-shadow: 0 0 8px rgba(34, 211, 238, 0.5);
-}
-
-.graph-placeholder:hover {
-  color: #00f0ff;
-  text-shadow: 0 0 12px rgba(34, 211, 238, 0.8);
-  background: rgba(34, 211, 238, 0.05);
-}
-
-.graph-legend {
-  display: flex;
-  gap: 1em;
-  margin-top: 0.8em;
-  justify-content: center;
-  flex-wrap: wrap;
-}
-
-.legend-item {
-  display: flex;
-  align-items: center;
-  gap: 0.4em;
-  font-size: 0.75em;
-  color: #a0a0a0;
-}
-
-.legend-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  display: inline-block;
-}
-
-.legend-dot.person { background: #22d3ee; box-shadow: 0 0 6px #22d3ee; }
-.legend-dot.project { background: #a855f7; box-shadow: 0 0 6px #a855f7; }
-.legend-dot.file { background: #30d158; box-shadow: 0 0 6px #30d158; }
-.legend-dot.concept { background: #ff9f0a; box-shadow: 0 0 6px #ff9f0a; }
-.legend-dot.date { background: #0a84ff; box-shadow: 0 0 6px #0a84ff; }
-.legend-dot.location { background: #ff453a; box-shadow: 0 0 6px #ff453a; }
-.legend-dot.unknown { background: #8e8e93; box-shadow: 0 0 6px #8e8e93; }
-
-/* 图谱节点样式 */
-.graph-node {
-  position: absolute;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.7em;
-  font-weight: 600;
-  color: #fff;
-  cursor: pointer;
-  transition: all 0.2s;
-  text-overflow: ellipsis;
-  overflow: hidden;
-  white-space: nowrap;
-}
-
-.graph-node:hover {
-  transform: scale(1.2);
-  z-index: 100;
-}
-
-.graph-node.person {
-  background: linear-gradient(135deg, #22d3ee 0%, #06b6d4 100%);
-  box-shadow: 0 0 10px rgba(34, 211, 238, 0.4);
-}
-
-.graph-node.project {
-  background: linear-gradient(135deg, #a855f7 0%, #9333ea 100%);
-  box-shadow: 0 0 10px rgba(168, 85, 247, 0.4);
-}
-
-.graph-node.concept {
-  background: linear-gradient(135deg, #30d158 0%, #22c55e 100%);
-  box-shadow: 0 0 10px rgba(48, 209, 88, 0.4);
-}
-
-.graph-node.location {
-  background: linear-gradient(135deg, #ff9f0a 0%, #f59e0b 100%);
-  box-shadow: 0 0 10px rgba(255, 159, 10, 0.4);
-}
-
-.graph-node.organization {
-  background: linear-gradient(135deg, #ff375f 0%, #ef4444 100%);
-  box-shadow: 0 0 10px rgba(255, 55, 95, 0.4);
-}
-
-/* 图谱连线样式 */
-.graph-edge {
-  position: absolute;
-  height: 1px;
-  background: rgba(34, 211, 238, 0.3);
-  transform-origin: left center;
-  pointer-events: none;
-}
-
-.graph-edge.strong {
-  background: rgba(34, 211, 238, 0.6);
-  height: 2px;
-}
-
-/* 节点详情提示框 */
-.node-tooltip {
-  position: absolute;
-  background: rgba(20, 20, 35, 0.95);
-  border: 1px solid #22d3ee;
-  border-radius: 6px;
-  padding: 0.8em;
-  font-size: 0.8em;
-  color: #e0e0e0;
-  max-width: 200px;
-  z-index: 1000;
-  pointer-events: none;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-}
-
-.node-tooltip .tt-name {
-  font-weight: 700;
-  color: #22d3ee;
-  margin-bottom: 0.3em;
-}
-
-.node-tooltip .tt-type {
-  font-size: 0.85em;
-  color: #a0a0a0;
-  margin-bottom: 0.5em;
-}
-
-.node-tooltip .tt-rels {
-  font-size: 0.85em;
-  color: #30d158;
 }
 
 /* === 神经图谱 - 全息投影风格 === */
@@ -2376,356 +2187,3 @@ html, body {
   50% { opacity: 0.6; }
 }
 
-/* =========================================
-   模型模式选择器样式
-   ========================================= */
-
-.model-mode-status {
-  padding: 8px 0;
-  border-bottom: 1px solid rgba(34, 211, 238, 0.2);
-  margin-bottom: 10px;
-}
-
-.mode-label {
-  color: rgba(255, 255, 255, 0.5);
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.mode-value {
-  color: #22d3ee;
-  font-weight: 600;
-  font-size: 13px;
-  margin-left: 6px;
-}
-
-.mode-value.local {
-  color: #10b981;
-}
-
-.mode-value.cloud {
-  color: #a855f7;
-}
-
-.mode-value.smart {
-  color: #22d3ee;
-}
-
-.model-mode-buttons {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.mode-btn {
-  flex: 1;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  padding: 10px 8px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-}
-
-.mode-btn:hover {
-  background: rgba(34, 211, 238, 0.1);
-  border-color: rgba(34, 211, 238, 0.3);
-  transform: translateY(-2px);
-}
-
-.mode-btn.active {
-  background: rgba(34, 211, 238, 0.15);
-  border-color: #22d3ee;
-  box-shadow: 0 0 15px rgba(34, 211, 238, 0.3);
-}
-
-.mode-btn.active[data-mode="local_only"] {
-  background: rgba(16, 185, 129, 0.15);
-  border-color: #10b981;
-  box-shadow: 0 0 15px rgba(16, 185, 129, 0.3);
-}
-
-.mode-btn.active[data-mode="cloud_only"] {
-  background: rgba(168, 85, 247, 0.15);
-  border-color: #a855f7;
-  box-shadow: 0 0 15px rgba(168, 85, 247, 0.3);
-}
-
-.mode-icon {
-  font-size: 20px;
-}
-
-.mode-name {
-  color: #fff;
-  font-weight: 600;
-  font-size: 12px;
-}
-
-.mode-desc {
-  color: rgba(255, 255, 255, 0.5);
-  font-size: 10px;
-}
-
-.model-info {
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 6px;
-  padding: 8px 10px;
-}
-
-.info-row {
-  display: flex;
-  justify-content: space-between;
-  padding: 4px 0;
-  font-size: 11px;
-}
-
-.info-label {
-  color: rgba(255, 255, 255, 0.5);
-}
-
-.info-value {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
-}
-
-.info-value.online {
-  color: #10b981;
-}
-
-.info-value.offline {
-  color: #ef4444;
-}
-
-.info-value.checking {
-  color: #f59e0b;
-}
-
-/* =========================================
-   模型模式面板样式
-   ========================================= */
-
-.mode-status {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 12px;
-  margin-bottom: 12px;
-  background: rgba(0, 0, 0, 0.3);
-  border-radius: 6px;
-  border: 1px solid rgba(34, 211, 238, 0.2);
-}
-
-.mode-label {
-  font-size: 11px;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.mode-value {
-  font-size: 13px;
-  font-weight: 600;
-  padding: 3px 10px;
-  border-radius: 4px;
-  transition: all 0.3s ease;
-}
-
-.mode-value.local {
-  background: rgba(34, 197, 94, 0.2);
-  color: #22c55e;
-  border: 1px solid rgba(34, 197, 94, 0.4);
-}
-
-.mode-value.cloud {
-  background: rgba(59, 130, 246, 0.2);
-  color: #3b82f6;
-  border: 1px solid rgba(59, 130, 246, 0.4);
-}
-
-.mode-value.smart {
-  background: rgba(168, 85, 247, 0.2);
-  color: #a855f7;
-  border: 1px solid rgba(168, 85, 247, 0.4);
-}
-
-.mode-buttons {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.mode-btn {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 10px 8px;
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  font-family: inherit;
-}
-
-.mode-btn:hover {
-  background: rgba(34, 211, 238, 0.1);
-  border-color: rgba(34, 211, 238, 0.3);
-  transform: translateY(-2px);
-}
-
-.mode-btn.active {
-  background: rgba(34, 211, 238, 0.15);
-  border-color: rgba(34, 211, 238, 0.5);
-  box-shadow: 0 0 10px rgba(34, 211, 238, 0.3);
-}
-
-.mode-icon {
-  font-size: 20px;
-}
-
-.mode-name {
-  font-size: 11px;
-  color: var(--text-primary);
-  font-weight: 500;
-}
-
-.service-status {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.service-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 4px;
-}
-
-.service-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #666;
-  transition: all 0.3s ease;
-}
-
-.service-dot.online {
-  background: #22c55e;
-  box-shadow: 0 0 8px rgba(34, 197, 94, 0.6);
-  animation: pulse 2s infinite;
-}
-
-.service-dot.offline {
-  background: #ef4444;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
-
-.service-label {
-  font-size: 11px;
-  color: var(--text-secondary);
-  flex: 1;
-}
-
-.service-value {
-  font-size: 11px;
-  font-weight: 500;
-  padding: 2px 8px;
-  border-radius: 3px;
-  transition: all 0.3s ease;
-}
-
-.service-value.online {
-  color: #22c55e;
-  background: rgba(34, 197, 94, 0.1);
-}
-
-.service-value.offline {
-  color: #ef4444;
-  background: rgba(239, 68, 68, 0.1);
-}
-
-.service-value.checking {
-  color: #f59e0b;
-  background: rgba(245, 158, 11, 0.1);
-}
-
-/* Token 状态指示器 */
-.token-status {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
-  background: rgba(0, 0, 0, 0.3);
-  border-radius: 6px;
-  margin-top: 8px;
-  font-size: 12px;
-  transition: all 0.3s ease;
-}
-
-.token-label {
-  color: #64748b;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.token-bar {
-  flex: 1;
-  height: 4px;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 2px;
-  overflow: hidden;
-  min-width: 60px;
-}
-
-.token-fill {
-  height: 100%;
-  background: linear-gradient(90deg, #22d3ee, #a855f7);
-  border-radius: 2px;
-  transition: width 0.5s ease;
-}
-
-.token-value {
-  color: #22d3ee;
-  font-weight: 600;
-  font-family: 'JetBrains Mono', monospace;
-  min-width: 36px;
-  text-align: right;
-}
-
-/* 状态变化 */
-.token-status.warning .token-fill {
-  background: linear-gradient(90deg, #f59e0b, #ef4444);
-}
-
-.token-status.warning .token-value {
-  color: #f59e0b;
-}
-
-.token-status.danger .token-fill {
-  background: #ef4444;
-}
-
-.token-status.danger .token-value {
-  color: #ef4444;
-  animation: pulse 1s ease-in-out infinite;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
