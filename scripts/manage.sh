@@ -245,18 +245,37 @@ cmd_recent_logs() {
     done
 }
 
+# ---------- 日志轮转命令 ----------
+cmd_logs_rotate() {
+    echo "🔄 轮转日志文件..."
+    python3 "$OMNIA_HOME/scripts/log_rotator.py" --force
+}
+
+cmd_logs_clean() {
+    echo "🧹 清理过期日志..."
+    python3 "$OMNIA_HOME/scripts/log_rotator.py" --clean
+}
+
+cmd_logs_status() {
+    python3 "$OMNIA_HOME/scripts/log_rotator.py" --status
+}
+
 cmd_help() {
     print_banner
     echo "用法: $(basename "$0") [命令]"
     echo ""
     echo "📌  常用命令"
-    echo "  status        查看所有服务状态（默认）"
-    echo "  start         启动所有服务"
-    echo "  stop          停止所有服务"
-    echo "  restart       重启所有服务"
-    echo "  logs [服务]   实时查看日志 (web|daemon|watchdog)"
-    echo "  logs-recent   查看最近日志摘要"
-    echo "  help          显示此帮助"
+    echo "  status          查看所有服务状态（默认）"
+    echo "  start           启动所有服务"
+    echo "  stop            停止所有服务"
+    echo "  restart         重启所有服务"
+    echo "  logs [服务]     实时查看日志 (web|daemon|watchdog)"
+    echo "  logs-recent     查看最近日志摘要"
+    echo ""
+    echo "📌  日志管理"
+    echo "  logs-status     查看日志文件状态和大小"
+    echo "  logs-rotate     手动轮转日志文件"
+    echo "  logs-clean      清理过期日志文件"
     echo ""
     echo "📌  平台命令对照"
     if [ "$OS_TYPE" = "linux" ]; then
@@ -271,13 +290,16 @@ cmd_help() {
 
 # ---------- 入口 ----------
 case "${1:-status}" in
-    status|s)       cmd_status ;;
-    start|up)       cmd_start ;;
-    stop|down)      cmd_stop ;;
-    restart|reload) cmd_restart ;;
-    logs|l)         cmd_logs "$@" ;;
-    logs-recent|lr) cmd_recent_logs ;;
-    help|--help|-h) cmd_help ;;
+    status|s)         cmd_status ;;
+    start|up)         cmd_start ;;
+    stop|down)        cmd_stop ;;
+    restart|reload)   cmd_restart ;;
+    logs|l)           cmd_logs "$@" ;;
+    logs-recent|lr)   cmd_recent_logs ;;
+    logs-status)      cmd_logs_status ;;
+    logs-rotate)      cmd_logs_rotate ;;
+    logs-clean)       cmd_logs_clean ;;
+    help|--help|-h)   cmd_help ;;
     *)
         echo -e "${RED}❌ 未知命令: $1${NC}"
         cmd_help
