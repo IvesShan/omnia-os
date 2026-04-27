@@ -60,8 +60,8 @@ TRIGGER_RULES = [
          ("项目文件结构", "ls -la --color=never " + str(PROJECT_ROOT) + " 2>/dev/null | head -20 || echo 'ls失败'"),
      ]),
 
-    # 7. 通用"检查"动词（兜底）
-    (r"(检查|确认|验证|核实|查一下|看看|检查一下|检测|测试|试一下|跑一下)",
+    # 7. 通用"检查/分析"动词（兜底）
+    (r"(检查|确认|验证|核实|查一下|看看|检查一下|检测|测试|试一下|跑一下|分析|重新分析|完整分析|全面分析)",
      [
          ("通用检查 - Git状态", "git -C " + str(PROJECT_ROOT) + " status --short 2>/dev/null | head -20 || echo '不是git仓库'"),
          ("通用检查 - 最近提交", "git -C " + str(PROJECT_ROOT) + " log --oneline -5 2>/dev/null || echo '不是git仓库'"),
