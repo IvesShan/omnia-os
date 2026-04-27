@@ -37,8 +37,14 @@ yarn-error.log*
 .DS_Store
 Thumbs.db
 
-# Omnia specific
-.omnia/
+# Omnia specific — ignore runtime data, keep code
+.omnia/*.pid
+.omnia/*.log
+.omnia/backups/
+.omnia/logs/
+.omnia/*.bak
+!.omnia/_daemon_runner.py
+
 *.log
 *.pid
 *.db-journal
