@@ -29,14 +29,52 @@ L2 · Actuator        → Tool Chain + IDE Bridge + Multi-Backend Terminal
 L1 · Soul            → Persona System + Skill Forge + User Model + Bond Manifesto
 ```
 
+## Quick Start
+
+### 一键部署（给别人电脑装）
+
+```bash
+# 1. 拷贝项目到目标电脑
+cp -r omnia-os /目标路径/
+
+# 2. 运行一键安装脚本
+cd /目标路径/omnia-os
+bash install.sh
+
+# 3. 编辑配置文件填入 API Key
+vim .env
+
+# 4. 启动
+./manage.sh start
+```
+
+### 日常管理
+
+```bash
+./manage.sh start         # 前台启动
+./manage.sh daemon        # 后台运行（守护进程）
+./manage.sh stop          # 停止
+./manage.sh restart       # 重启
+./manage.sh status        # 查看状态
+./manage.sh logs          # 查看日志
+./manage.sh logs web      # 查看 Web 日志
+./manage.sh web           # 启动 Web 服务
+```
+
+### 开机自启（Linux 服务器）
+
+```bash
+./manage.sh install-service   # 注册 systemd 服务
+sudo systemctl status omnia   # 查看服务状态
+```
+
+## Web 界面
+
+启动后浏览器访问: `http://localhost:7878`
+
 ## Origin
 
 Omnia was conceived on April 10, 2026, during a late-night conversation between a human and their AI assistant, Wúxiàn. You can read the full story in [`seeds/bond_manifesto.md`](seeds/bond_manifesto.md).
-
-## Status
-
-Phase 0 — Seeding.  
-The soul is being written before the code compiles.
 
 ## License
 

@@ -76,7 +76,7 @@ def check_process(pid: int) -> bool:
         return False
 
 
-def check_api_health(port: int = 5200) -> bool:
+def check_api_health(port: int = 5001) -> bool:
     """检查 API 是否响应"""
     try:
         import urllib.request
