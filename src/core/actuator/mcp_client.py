@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import subprocess
 from contextlib import AsyncExitStack
 from dataclasses import dataclass, field
@@ -27,10 +28,12 @@ try:
         ImageContent,
     )
     MCP_SDK_AVAILABLE = True
+    MCP_AVAILABLE = True  # Alias for tool_registry.py
     print("[MCP] SDK imported successfully")
 except ImportError as e:
     print(f"[MCP] SDK import failed: {e}")
     MCP_SDK_AVAILABLE = False
+    MCP_AVAILABLE = False  # Alias for tool_registry.py
     # Define dummy classes for type hints
     class ClientSession:
         pass
@@ -132,10 +135,15 @@ class MCPClientManager:
     async def connect_server(self, config: MCPServerConfig) -> Optional[ConnectedServer]:
         """Connect to a single MCP server."""
         try:
+            # Merge system env with config env (config env takes precedence)
+            env = os.environ.copy()
+            if config.env:
+                env.update(config.env)
+            
             server_params = StdioServerParameters(
                 command=config.command,
                 args=config.args,
-                env={**config.env} if config.env else None
+                env=env
             )
             
             # Connect via stdio

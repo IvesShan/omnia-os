@@ -160,7 +160,7 @@ class VectorStore:
     def search(
         self,
         query: str,
-        top_k: int = 5,
+        top_k: int = 3,  # Reduced for better precision
         metadata_filter: Optional[Dict[str, Any]] = None,
     ) -> List[SearchResult]:
         """
@@ -193,12 +193,14 @@ class VectorStore:
                     # Convert distance to similarity score (cosine distance = 1 - cosine similarity)
                     score = 1 - distance
                     
-                    search_results.append(SearchResult(
-                        memory_id=memory_id,
-                        text=results['documents'][0][i] if results.get('documents') else "",
-                        score=score,
-                        metadata=results['metadatas'][0][i] if results.get('metadatas') else {},
-                    ))
+                    # Only include results above minimum score threshold
+                    if score >= 0.3:  # Minimum similarity threshold
+                        search_results.append(SearchResult(
+                            memory_id=memory_id,
+                            text=results['documents'][0][i] if results.get('documents') else "",
+                            score=score,
+                            metadata=results['metadatas'][0][i] if results.get('metadatas') else {},
+                        ))
             
             return search_results
             
@@ -303,7 +305,7 @@ def get_vector_store() -> VectorStore:
     return _vector_store
 
 
-def semantic_search(query: str, top_k: int = 5) -> List[SearchResult]:
+def semantic_search(query: str, top_k: int = 3) -> List[SearchResult]:  # Reduced for better precision
     """
     Quick semantic search across all memories.
     

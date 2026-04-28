@@ -1372,12 +1372,13 @@ function handlePanelClick(action) {
           if (!GraphViz.scene) {
             console.log('[App] GraphViz 未初始化，调用 init()');
             GraphViz.init();
+            appendOmnia('[系统] 神经图谱已激活，正在加载实体关系网络...');
           } else {
             console.log('[App] GraphViz 已初始化，刷新数据');
             GraphViz.loadGraph();
             GraphViz.loadStats();
+            // 刷新数据时不重复显示激活消息
           }
-          appendOmnia('[系统] 神经图谱已激活，正在加载实体关系网络...');
         } else {
           console.log('[App] GraphViz 尚未加载，等待 three-loaded 事件...');
           // 等待 graph-viz.js 加载完成

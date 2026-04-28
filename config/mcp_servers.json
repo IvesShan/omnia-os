@@ -19,5 +19,17 @@
     "command": "/home/shan/.local/bin/uvx",
     "args": ["mcp-server-fetch"],
     "enabled": true
+  },
+  {
+    "name": "puppeteer",
+    "command": "/bin/bash",
+    "args": [
+      "-c",
+      "exec node /home/shan/.nvm/versions/node/v24.15.0/lib/node_modules/@modelcontextprotocol/server-puppeteer/dist/index.js"
+    ],
+    "env": {
+      "PATH": "/home/shan/.nvm/versions/node/v24.15.0/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+    },
+    "enabled": true
   }
 ]

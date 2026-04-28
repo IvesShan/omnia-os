@@ -453,6 +453,7 @@ def _chat_openai_compatible_requests(api_key: str, provider: str, system_prompt:
 
 
 def _chat_anthropic(api_key: str, system_prompt: str, message: str) -> None:
+    """Chat with Anthropic API with Prompt Caching support."""
     try:
         import anthropic
     except ImportError:
@@ -462,13 +463,35 @@ def _chat_anthropic(api_key: str, system_prompt: str, message: str) -> None:
     client = anthropic.Anthropic(api_key=api_key)
     model = os.environ.get("ANTHROPIC_MODEL", "claude-3-5-sonnet-20241022")
 
+    # Enable Prompt Caching for system prompt
+    # This reduces token cost by caching the system prompt across conversations
+    system_with_cache = [
+        {
+            "type": "text",
+            "text": system_prompt,
+            "cache_control": {"type": "ephemeral"}
+        }
+    ]
+
     with client.messages.stream(
         model=model,
         max_tokens=4096,
-        system=system_prompt,
+        system=system_with_cache,
         messages=[{"role": "user", "content": message}],
     ) as stream:
         print("[Omnia] ", end="", flush=True)
         for text in stream.text_stream:
             print(text, end="", flush=True)
+        
+        # Print cache usage info for transparency
+        final_message = stream.get_final_message()
+        if hasattr(final_message, 'usage'):
+            usage = final_message.usage
+            cache_read = getattr(usage, 'cache_read_input_tokens', 0)
+            cache_created = getattr(usage, 'cache_creation_input_tokens', 0)
+            if cache_read > 0:
+                print(f"\n[Cache] Saved {cache_read} tokens (read from cache)")
+            if cache_created > 0:
+                print(f"[Cache] Cached {cache_created} tokens (first time)")
+    
     print("\n")

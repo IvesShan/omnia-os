@@ -34,8 +34,8 @@ class NeuralGraphContextEnhancer:
     def enhance(
         self,
         message: str,
-        max_entities: int = 10,
-        max_relations: int = 15,
+        max_entities: int = 5,      # Reduced from 10 for better precision
+        max_relations: int = 8,     # Reduced from 15 for better precision
         max_depth: int = 2
     ) -> GraphContext:
         """增强消息上下文
