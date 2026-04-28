@@ -13,7 +13,6 @@ from __future__ import annotations
 import json
 import os
 import signal
-import sys
 import threading
 import time
 from dataclasses import dataclass, field
@@ -97,7 +96,7 @@ class PersonaDaemon:
             pid_path.parent.mkdir(parents=True, exist_ok=True)
             pid_path.write_text(str(os.getpid()))
             self._log("PID", f"Wrote PID {os.getpid()} to {pid_path}")
-        except Exception as e:
+        except (FileNotFoundError, IOError, PermissionError) as e:
             self._log("ERROR", f"Failed to write PID file: {e}")
 
     def _cleanup_pid(self) -> None:
@@ -107,7 +106,7 @@ class PersonaDaemon:
             if pid_path.exists():
                 pid_path.unlink()
                 self._log("PID", f"Removed PID file {pid_path}")
-        except Exception as e:
+        except (FileNotFoundError, IOError, PermissionError) as e:
             self._log("ERROR", f"Failed to cleanup PID file: {e}")
 
     # ------------------------------------------------------------------
@@ -193,13 +192,19 @@ class PersonaDaemon:
             return
 
         try:
-            from .evolution_scheduler import EvolutionScheduler
+            from core.skill_forge.evolution_scheduler import EvolutionScheduler
 
             def on_evolution_complete(result):
                 self._log("EVOLUTION", f"Cycle complete: {result.patterns_found} patterns, {result.skills_generated} skills")
 
+            # EvolutionScheduler 需要 memory_dir 和 skills_dir
+            memory_dir = self.workspace / "memory"
+            skills_dir = self.workspace / ".omnia" / "skills"
+            skills_dir.mkdir(parents=True, exist_ok=True)
+            
             self._evolution_scheduler = EvolutionScheduler(
-                workspace_root=self.workspace,
+                memory_dir=memory_dir,
+                skills_dir=skills_dir,
                 interval_hours=self.config.evolution_interval_hours,
                 on_evolution_complete=on_evolution_complete,
             )
@@ -265,7 +270,7 @@ class PersonaDaemon:
                 text = p.read_text(encoding="utf-8", errors="ignore")
                 if "error" in text.lower() or "fail" in text.lower():
                     alerts.append(f"Potential failure in {p.name}")
-            except Exception:
+            except (FileNotFoundError, IOError, PermissionError) as e:
                 pass
         return alerts
 
@@ -313,7 +318,7 @@ class PersonaDaemon:
         try:
             with open(self.log_path, "a", encoding="utf-8") as f:
                 f.write(line)
-        except Exception:
+        except (FileNotFoundError, IOError, PermissionError) as e:
             pass  # Avoid crashing on log failures
 
     # ------------------------------------------------------------------

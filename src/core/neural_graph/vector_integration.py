@@ -1,5 +1,9 @@
 """Vector Integration - 将真正的向量嵌入集成到神经图谱
 
+from core.logging_config import get_logger
+
+logger = get_logger(__name__)
+
 这个模块将 VectorStore 与 NeuralGraph 连接起来：
 1. 为每个节点生成真正的语义向量
 2. 支持语义相似度搜索
@@ -21,8 +25,8 @@ Usage:
 
 from __future__ import annotations
 
+import json
 import sqlite3
-import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -79,21 +83,18 @@ class VectorIntegration:
     
     def update_node_embedding(self, node_id: str, embedding: np.ndarray) -> bool:
         """更新节点的向量"""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        
         try:
-            cursor.execute(
-                "UPDATE neural_nodes SET embedding = ? WHERE id = ?",
-                (embedding.tobytes(), node_id)
-            )
-            conn.commit()
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "UPDATE neural_nodes SET embedding = ? WHERE id = ?",
+                    (embedding.tobytes(), node_id)
+                )
+                conn.commit()
             return True
-        except Exception as e:
+        except (sqlite3.Error) as e:
             print(f"[VectorIntegration] Error updating embedding: {e}")
             return False
-        finally:
-            conn.close()
     
     def embed_all_nodes(self, batch_size: int = 100, force: bool = False) -> Dict:
         """
@@ -106,27 +107,26 @@ class VectorIntegration:
         Returns:
             统计信息
         """
-        print(f"[VectorIntegration] 开始为节点生成向量...")
+        logger.info(f"[VectorIntegration] 开始为节点生成向量...")
         
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
         
         # 查询需要处理的节点
-        if force:
-            cursor.execute("""
-                SELECT id, entity_type, entity_name, properties
-                FROM neural_nodes
-            """)
-        else:
-            cursor.execute("""
-                SELECT id, entity_type, entity_name, properties
-                FROM neural_nodes
-                WHERE embedding IS NULL
-            """)
+            if force:
+                cursor.execute("""
+                    SELECT id, entity_type, entity_name, properties
+                    FROM neural_nodes
+                """)
+            else:
+                cursor.execute("""
+                    SELECT id, entity_type, entity_name, properties
+                    FROM neural_nodes
+                    WHERE embedding IS NULL
+                """)
         
-        nodes = cursor.fetchall()
-        conn.close()
+            nodes = cursor.fetchall()
         
         total = len(nodes)
         print(f"[VectorIntegration] 需要处理 {total} 个节点")
@@ -143,8 +143,8 @@ class VectorIntegration:
                 properties = None
                 if node["properties"]:
                     try:
-                        properties = eval(node["properties"]) if isinstance(node["properties"], str) else node["properties"]
-                    except:
+                        properties = json.loads(node["properties"]) if isinstance(node["properties"], str) else node["properties"]
+                    except (json.JSONDecodeError) as e:
                         properties = None
                 
                 # 生成向量
@@ -162,7 +162,7 @@ class VectorIntegration:
                 if (i + 1) % 10 == 0 or (i + 1) == total:
                     print(f"  进度: {i + 1}/{total}")
                 
-            except Exception as e:
+            except (ValueError) as e:
                 print(f"  [Error] Node {node['id']}: {e}")
                 errors += 1
         
@@ -191,28 +191,27 @@ class VectorIntegration:
         # 生成查询向量
         query_embedding = self.embed_text(query)
         
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
         
         # 查询所有有向量的节点
-        if entity_types:
-            placeholders = ",".join("?" * len(entity_types))
-            cursor.execute(f"""
-                SELECT id, entity_type, entity_name, canonical_name, embedding
-                FROM neural_nodes
-                WHERE embedding IS NOT NULL
-                AND entity_type IN ({placeholders})
-            """, entity_types)
-        else:
-            cursor.execute("""
-                SELECT id, entity_type, entity_name, canonical_name, embedding
-                FROM neural_nodes
-                WHERE embedding IS NOT NULL
-            """)
+            if entity_types:
+                placeholders = ",".join("?" * len(entity_types))
+                cursor.execute(f"""
+                    SELECT id, entity_type, entity_name, canonical_name, embedding
+                    FROM neural_nodes
+                    WHERE embedding IS NOT NULL
+                    AND entity_type IN ({placeholders})
+                """, entity_types)
+            else:
+                cursor.execute("""
+                    SELECT id, entity_type, entity_name, canonical_name, embedding
+                    FROM neural_nodes
+                    WHERE embedding IS NOT NULL
+                """)
         
-        nodes = cursor.fetchall()
-        conn.close()
+            nodes = cursor.fetchall()
         
         # 计算相似度
         results = []
@@ -234,7 +233,7 @@ class VectorIntegration:
                         "canonical_name": node["canonical_name"],
                         "similarity": float(similarity)
                     })
-            except Exception as e:
+            except (ValueError) as e:
                 continue
         
         # 排序并返回 top_k
@@ -252,19 +251,18 @@ class VectorIntegration:
         Returns:
             [{"id", "type", "name", "similarity"}, ...]
         """
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
         
         # 获取目标节点的向量
-        cursor.execute(
-            "SELECT embedding FROM neural_nodes WHERE id = ?",
-            (node_id,)
-        )
-        result = cursor.fetchone()
+            cursor.execute(
+                "SELECT embedding FROM neural_nodes WHERE id = ?",
+                (node_id,)
+            )
+            result = cursor.fetchone()
         
-        if not result or not result[0]:
-            conn.close()
-            return []
+            if not result or not result[0]:
+                return []
         
         target_embedding = np.frombuffer(result[0], dtype=np.float32)
         
@@ -296,7 +294,7 @@ class VectorIntegration:
                     "canonical_name": node["canonical_name"],
                     "similarity": float(similarity)
                 })
-            except:
+            except (ValueError) as e:
                 continue
         
         # 排序并返回

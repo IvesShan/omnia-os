@@ -227,7 +227,7 @@ class Scheduler:
         while self._running:
             try:
                 self._check_and_run_tasks()
-            except Exception as e:
+            except (FileNotFoundError, IOError, PermissionError) as e:
                 logger.error(f"Scheduler error: {e}", exc_info=True)
             
             time.sleep(self.check_interval)

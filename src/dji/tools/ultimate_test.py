@@ -59,7 +59,7 @@ class DJIUltimateTest:
                     if self.device.is_kernel_driver_active(intf.bInterfaceNumber):
                         self.device.detach_kernel_driver(intf.bInterfaceNumber)
                         logger.info(f"  ✅ 接口 {intf.bInterfaceNumber}")
-                except:
+                except Exception:
                     pass
     
     def test_control_endpoint(self):

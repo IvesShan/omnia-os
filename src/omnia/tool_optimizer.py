@@ -6,7 +6,6 @@ Omnia 工具循环调用优化模块
 from __future__ import annotations
 
 import json
-import asyncio
 from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -419,7 +418,7 @@ class ToolExecutionOptimizer:
                 tool_name = fn.get("name", "unknown")
                 try:
                     arguments = json.loads(fn.get("arguments", "{}"))
-                except:
+                except Exception:
                     arguments = {}
                 
                 future = executor.submit(self.execute_tool, tool_name, arguments)

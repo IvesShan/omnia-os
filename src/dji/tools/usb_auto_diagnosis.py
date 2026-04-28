@@ -17,7 +17,6 @@ DJI 无人机 USB 自动诊断工具
 
 import sys
 import os
-import time
 import json
 from datetime import datetime
 
@@ -130,7 +129,7 @@ class USBAutoDiagnosis:
                         'connected': True,
                         'product_string': product_string
                     }
-        except:
+        except Exception:
             pass
         
         # 回退到 Product ID 映射

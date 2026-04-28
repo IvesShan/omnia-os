@@ -10,13 +10,15 @@ Omnia Watchdog - 监控守护进程和 Web Server 健康状态
 """
 
 import json
+import logging
 import os
 import signal
 import subprocess
 import sys
 import time
-from pathlib import Path
 from datetime import datetime
+from logging.handlers import RotatingFileHandler
+from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
@@ -34,16 +36,39 @@ MAX_FAILURES = 3
 # API 健康检查超时
 API_TIMEOUT = 5
 
+# 日志轮转配置
+MAX_LOG_SIZE = 10 * 1024 * 1024  # 10 MB
+BACKUP_COUNT = 5
+
+
+def setup_logger():
+    """Setup rotating logger for watchdog"""
+    OMNIA_HOME.mkdir(parents=True, exist_ok=True)
+    
+    handler = RotatingFileHandler(
+        HEALTH_LOG,
+        maxBytes=MAX_LOG_SIZE,
+        backupCount=BACKUP_COUNT,
+        encoding='utf-8'
+    )
+    handler.setLevel(logging.DEBUG)
+    handler.setFormatter(logging.Formatter('%(asctime)s %(message)s', datefmt='%Y-%m-%d %H:%M:%S'))
+    
+    logger = logging.getLogger('watchdog')
+    logger.setLevel(logging.DEBUG)
+    logger.addHandler(handler)
+    
+    return logger
+
+
+# 初始化 logger
+logger = setup_logger()
+
 
 def log(msg: str):
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    line = f"[{timestamp}] {msg}"
-    print(line)
-    try:
-        with open(HEALTH_LOG, "a", encoding="utf-8") as f:
-            f.write(line + "\n")
-    except Exception:
-        pass
+    """Log message to both console and rotating file"""
+    print(msg)
+    logger.info(msg)
 
 
 def load_state() -> dict:
@@ -138,13 +163,25 @@ def restart_web_server():
                 pass
             WEB_PID_FILE.unlink(missing_ok=True)
         
+        # 打开 Web Server 日志文件
+        web_log = OMNIA_HOME / "web_server.log"
+        web_log_fd = open(web_log, 'a', encoding='utf-8')
+        
         # 启动新进程
-        subprocess.Popen(
+        proc = subprocess.Popen(
             [sys.executable, str(PROJECT_ROOT / "src" / "omnia" / "web_server.py")],
-            stdout=open(OMNIA_HOME / "web_server.log", "a"),
+            stdout=web_log_fd,
             stderr=subprocess.STDOUT,
             start_new_session=True,
         )
+        
+        # Close file descriptor in parent process
+        # Child process has inherited a copy, so this won't affect it
+        web_log_fd.close()
+        
+        # Save PID
+        WEB_PID_FILE.write_text(str(proc.pid))
+        
         time.sleep(3)
         log("✅ Web Server 重启成功")
         return True
@@ -160,6 +197,7 @@ def main():
     log("=" * 60)
     log("🐕 Omnia Watchdog 启动")
     log(f"检查间隔: {CHECK_INTERVAL}s, 最大失败次数: {MAX_FAILURES}")
+    log(f"日志轮转: {MAX_LOG_SIZE // 1024 // 1024} MB max, {BACKUP_COUNT} backups")
     log("=" * 60)
     
     state = load_state()

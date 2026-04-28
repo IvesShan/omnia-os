@@ -1,4 +1,8 @@
 """
+from core.logging_config import get_logger
+
+logger = get_logger(__name__)
+
 Smart Model Router - 智能模型路由器
 
 支持三种模式：
@@ -19,7 +23,6 @@ Smart Model Router - 智能模型路由器
 """
 
 import os
-import asyncio
 from typing import Optional, Literal
 from dataclasses import dataclass
 from enum import Enum
@@ -86,7 +89,7 @@ class SmartModelRouter:
         else:
             # 云端模式下不初始化本地客户端，避免连接 localhost:8080
             self.local_client = None
-            print(f"[SmartRouter] Cloud mode: local client disabled")
+            logger.info(f"[SmartRouter] Cloud mode: local client disabled")
         
         self._local_available: Optional[bool] = None
         self._last_check: float = 0
@@ -301,7 +304,7 @@ async def check_local_health() -> bool:
                     data = await resp.json()
                     return data.get("status") == "ok"
                 return False
-    except Exception:
+    except (TimeoutError, ConnectionError) as e:
         return False
 
 

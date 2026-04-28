@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 from core.config import OMNIA_HOME
-import os
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -135,7 +134,7 @@ def _call_model_for_discussion(
             # 尝试直接解析
             try:
                 result = json.loads(reply)
-            except:
+            except Exception:
                 # 如果不是 JSON，构造一个默认结构
                 result = {
                     "opinion": reply,
@@ -350,7 +349,7 @@ def handle_list_discussions() -> dict:
                 "status": data.get("status"),
                 "created_at": data.get("created_at"),
             })
-        except:
+        except Exception:
             pass
     
     return {"sessions": sessions, "total": len(sessions)}

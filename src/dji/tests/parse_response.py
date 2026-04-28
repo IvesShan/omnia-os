@@ -4,7 +4,6 @@ DJI 设备信息解析器
 解析从设备收到的响应数据
 """
 
-import struct
 
 def parse_dji_response(data):
     """解析DJI响应数据包"""
@@ -100,7 +99,7 @@ def analyze_response(hex_data):
             # 查找可打印字符
             printable = ''.join(chr(b) if 32 <= b < 127 else '.' for b in parsed['payload'])
             print(f"  可打印: {printable}")
-        except:
+        except Exception:
             pass
     
     return parsed

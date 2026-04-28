@@ -69,7 +69,7 @@ class DJIDiagnosticTool:
             if self.dev.is_kernel_driver_active(WORKING_INTERFACE):
                 self.dev.detach_kernel_driver(WORKING_INTERFACE)
                 print(f"   Detach内核驱动: 接口 {WORKING_INTERFACE}")
-        except:
+        except Exception:
             pass
         
         # 获取端点

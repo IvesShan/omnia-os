@@ -9,7 +9,6 @@ import json
 import os
 import subprocess
 import sys
-import uuid
 from datetime import datetime
 from pathlib import Path
 
@@ -56,13 +55,8 @@ def _cleanup_mcp():
 
 atexit.register(_cleanup_mcp)
 
-# API Provider selection
-_current_provider = None  # Will be set based on env or user selection
-
-# Safety: reset to deepseek if it was local (prevent localhost:8080 errors)
-if _current_provider == "local":
-    print("[web_server] WARNING: _current_provider was local, resetting to deepseek")
-    _current_provider = "deepseek"
+# API Provider selection — initialized to None, set dynamically by env or user choice
+_current_provider = None
 
 
 def _load_pending() -> dict[str, dict]:
@@ -125,17 +119,15 @@ def _memory_counts() -> dict:
     counts = {}
     if db_file.exists():
         import sqlite3
-        conn = sqlite3.connect(str(db_file))
-        cursor = conn.cursor()
-        for table in ["facts", "relations", "habits", "timeline", "conversation_logs"]:
-            try:
-                cursor.execute(f"SELECT COUNT(*) FROM {table}")
-                counts[table] = cursor.fetchone()[0]
-            except sqlite3.OperationalError:
-                counts[table] = 0
-        conn.close()
+        with sqlite3.connect(str(db_file)) as conn:
+            cursor = conn.cursor()
+            for table in ["facts", "relations", "habits", "timeline", "conversation_logs"]:
+                try:
+                    cursor.execute(f"SELECT COUNT(*) FROM {table}")
+                    counts[table] = cursor.fetchone()[0]
+                except sqlite3.OperationalError:
+                    counts[table] = 0
     return counts
-
 
 def _ide_context() -> dict | None:
     ide_file = OMNIA_HOME / "ide_context.json"
@@ -150,20 +142,20 @@ def _ide_context() -> dict | None:
 def _git_snapshot() -> dict:
     result = {"uncommitted_count": 0, "recent_commits_24h": 0, "branch": None}
     try:
-        branch_res = subprocess.run(
-            ["git", "-C", str(WORKSPACE), "rev-parse", "--abbrev-ref", "HEAD"],
-            capture_output=True, text=True, timeout=10,
-        )
-        if branch_res.returncode == 0:
-            result["branch"] = branch_res.stdout.strip()
+            branch_res = subprocess.run(
+                ["git", "-C", str(WORKSPACE), "rev-parse", "--abbrev-ref", "HEAD"],
+                capture_output=True, text=True, timeout=10,
+            )
+            if branch_res.returncode == 0:
+                result["branch"] = branch_res.stdout.strip()
     except Exception:
-        pass
+            pass
 
     try:
         status_res = subprocess.run(
             ["git", "-C", str(WORKSPACE), "status", "--short"],
-            capture_output=True, text=True, timeout=10,
-        )
+        capture_output=True, text=True, timeout=10,
+    )
         if status_res.returncode == 0:
             lines = [l for l in status_res.stdout.splitlines() if l.strip()]
             result["uncommitted_count"] = len(lines)
@@ -258,7 +250,7 @@ def _env_snapshot() -> dict:
     provider_models = {
         "deepseek": ("DEEPSEEK_MODEL", "deepseek-v4-flash"),
         "qianfan": ("QIANFAN_MODEL", "qianfan-code-latest"),
-        "kimi": ("KIMI_MODEL", "K2.6-code-preview"),
+        "kimi": ("MOONSHOT_MODEL", "K2.6-code-preview"),
         "openai": ("OPENAI_MODEL", "gpt-4o"),
         "anthropic": ("ANTHROPIC_MODEL", "claude-3-5-sonnet-20241022"),
     }
@@ -278,15 +270,25 @@ def _env_snapshot() -> dict:
         if env_file.exists():
             env_content = env_file.read_text(encoding="utf-8")
         
+        # Provider → API key env var mapping (handles kimi's MOONSHOT_API_KEY)
+        api_key_env_map = {
+            "deepseek": ("DEEPSEEK_API_KEY", "DEEPSEEK_ACCESS_KEY"),
+            "qianfan": ("QIANFAN_API_KEY", "QIANFAN_ACCESS_KEY"),
+            "kimi": ("MOONSHOT_API_KEY", "MOONSHOT_API_KEY"),
+            "openai": ("OPENAI_API_KEY", "OPENAI_API_KEY"),
+            "anthropic": ("ANTHROPIC_API_KEY", "ANTHROPIC_API_KEY"),
+        }
+        
         # 按优先级检测
         for pid, (env_key, default) in provider_models.items():
+            key1, key2 = api_key_env_map[pid]
             # 检查环境变量
-            if os.environ.get(f"{pid.upper()}_API_KEY") or os.environ.get(f"{pid.upper()}_ACCESS_KEY"):
+            if os.environ.get(key1) or os.environ.get(key2):
                 provider = pid
                 model = os.environ.get(env_key, default)
                 break
             # 检查 .env 文件
-            if f"{pid.upper()}_API_KEY=" in env_content or f"{pid.upper()}_ACCESS_KEY=" in env_content:
+            if f"{key1}=" in env_content or f"{key2}=" in env_content:
                 provider = pid
                 # 从 .env 读取模型
                 for line in env_content.splitlines():
@@ -320,7 +322,7 @@ def _cron_schedule() -> list:
                 schedule = " ".join(parts[:5])
                 cmd = " ".join(parts[5:])
                 # 提取简洁名称
-                name = cmd.split("/")[-1].split()[0] if "/" in cmd else cmd.split()[0]
+                name = (cmd.split("/")[-1].split()[0] if "/" in cmd else (cmd.split()[0] if cmd.split() else "unknown"))
                 if name.endswith(".py"):
                     name = name[:-3]
                 jobs.append({"name": name, "schedule": schedule})
@@ -510,25 +512,7 @@ def create_app() -> Flask:
 
     # === Neural Graph API ===
     
-    # 兼容旧路由 /api/graph/*
-    @app.route("/api/graph/stats", methods=["GET"])
-    def graph_stats_compat():
-        """兼容路由: /api/graph/stats"""
-        return neural_graph_stats()
-    
-    @app.route("/api/graph", methods=["GET"])
-    def graph_export_compat():
-        """兼容路由: /api/graph"""
-        min_weight = request.args.get("min_weight", 0.0, type=float)
-        limit = request.args.get("limit", 100, type=int)
-        
-        try:
-            graph = NeuralGraph()
-            data = graph.export_to_json(limit=limit)
-            return jsonify(data)
-        except Exception as e:
-            return jsonify({"error": str(e)}), 500
-    
+
     @app.route("/api/neural-graph/stats", methods=["GET"])
     def neural_graph_stats():
         """获取神经图谱统计信息"""
@@ -1114,15 +1098,28 @@ def create_app() -> Flask:
 
             if name == "backup-workspace":
                 backup_dir = WORKSPACE.parent / f"openclaw-backup-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
-                cmd = f"rsync -a --exclude='.git' --exclude='node_modules' --exclude='.venv' {WORKSPACE}/ {backup_dir}/"
-                subprocess.Popen(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                cmd = [
+                    "rsync", "-a",
+                    "--exclude=.git",
+                    "--exclude=node_modules",
+                    "--exclude=.venv",
+                    str(WORKSPACE) + "/",
+                    str(backup_dir) + "/"
+                ]
+                subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 return jsonify({"ok": True, "message": f"Backup started to {backup_dir}"})
 
             if name == "seo-deploy":
                 seo_script = WORKSPACE / "drone-repair-website" / "scripts" / "run_seo_pipeline.py"
                 if seo_script.exists():
-                    cmd = f"cd {WORKSPACE / 'drone-repair-website'} && nohup python3 {seo_script} > /tmp/omnia_workflow_seo.log 2>&1 &"
-                    subprocess.Popen(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    cmd = ["nohup", "python3", str(seo_script)]
+                    with open("/tmp/omnia_workflow_seo.log", "w") as log_file:
+                        subprocess.Popen(
+                            cmd,
+                            stdout=log_file,
+                            stderr=subprocess.STDOUT,
+                            cwd=str(WORKSPACE / "drone-repair-website")
+                        )
                     return jsonify({"ok": True, "message": "SEO pipeline started in background"})
                 return jsonify({"ok": False, "error": "SEO script not found"}), 404
 
@@ -1156,7 +1153,7 @@ def create_app() -> Flask:
             # 提取文本
             try:
                 text = json.loads(content).get("text", "")
-            except:
+            except Exception:
                 text = content
             
             # 记录消息
@@ -1226,9 +1223,11 @@ def create_app() -> Flask:
             from omnia.chat_handler import handle_chat
             from core.actuator.tool_registry import get_all_tools_schema
             
-            # Provider 检测（先检测，再加载对应 key）
+            # Provider 检测：请求级 provider > 全局设置 > 自动检测
             global _current_provider
-            if _current_provider:
+            if provider:
+                pass  # 使用用户请求指定的 provider
+            elif _current_provider:
                 provider = _current_provider
             else:
                 # 自动检测：从 .env 或环境变量找第一个可用的
@@ -1258,7 +1257,6 @@ def create_app() -> Flask:
                 
                 # ========== 前置工具检查钩子（方案A）==========
                 # 在消息发给 LLM 之前，强制检查是否需要工具验证
-                import os as _os
                 _tool_result = check_and_run(message)
                 if _tool_result:
                     print(f"[tool_preroll] 命中关键词，注入工具检查结果")
@@ -1619,14 +1617,13 @@ def _start_feishu_adapter(app):
 
 
 def handle_feishu_message(app, event):
-    """处理飞书消息"""
-    from omnia.stream_chat import stream_chat
-    
-    print(f"[Feishu] 收到消息: {event.content[:50]}...")
-    
-    # TODO: 实现消息处理和回复
-    # 这里需要调用模型生成回复，然后发送回飞书
-    pass
+    """处理飞书消息（占位实现）"""
+    try:
+        content = getattr(event, 'content', str(event))[:100]
+        print(f"[Feishu] 收到消息: {content}...")
+        print(f"[Feishu] ⚠ 消息处理尚未实现，消息已记录到日志")
+    except Exception as e:
+        print(f"[Feishu] 处理消息时出错: {e}")
 
 
 

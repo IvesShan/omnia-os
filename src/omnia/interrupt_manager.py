@@ -3,7 +3,6 @@
 支持通过 "/" 快捷指令终止正在进行的任务
 """
 
-import os
 import json
 import time
 from pathlib import Path
@@ -46,7 +45,7 @@ def check_interrupt() -> bool:
         with open(INTERRUPT_FILE, 'r') as f:
             data = json.load(f)
             return data.get("interrupted", False)
-    except:
+    except Exception:
         return False
 
 
@@ -58,7 +57,7 @@ def get_interrupt_info() -> Optional[dict]:
     try:
         with open(INTERRUPT_FILE, 'r') as f:
             return json.load(f)
-    except:
+    except Exception:
         return None
 
 

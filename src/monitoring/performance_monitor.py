@@ -64,37 +64,36 @@ class PerformanceMonitor:
     
     def _init_db(self):
         """初始化性能数据库"""
-        conn = sqlite3.connect(self.db_path)
-        conn.execute('''
-            CREATE TABLE IF NOT EXISTS performance_metrics (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                response_time_ms REAL,
-                memory_usage_mb REAL,
-                cpu_usage_percent REAL,
-                db_query_time_ms REAL,
-                vector_search_time_ms REAL,
-                active_sessions INTEGER
-            )
-        ''')
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute('''
+                CREATE TABLE IF NOT EXISTS performance_metrics (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    response_time_ms REAL,
+                    memory_usage_mb REAL,
+                    cpu_usage_percent REAL,
+                    db_query_time_ms REAL,
+                    vector_search_time_ms REAL,
+                    active_sessions INTEGER
+                )
+            ''')
         
-        conn.execute('''
-            CREATE TABLE IF NOT EXISTS slow_queries (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                query_type TEXT NOT NULL,
-                duration_ms REAL NOT NULL,
-                details TEXT
-            )
-        ''')
+            conn.execute('''
+                CREATE TABLE IF NOT EXISTS slow_queries (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    query_type TEXT NOT NULL,
+                    duration_ms REAL NOT NULL,
+                    details TEXT
+                )
+            ''')
         
-        conn.execute('''
-            CREATE INDEX IF NOT EXISTS idx_timestamp
-            ON performance_metrics(timestamp)
-        ''')
+            conn.execute('''
+                CREATE INDEX IF NOT EXISTS idx_timestamp
+                ON performance_metrics(timestamp)
+            ''')
         
-        conn.commit()
-        conn.close()
+            conn.commit()
     
     def record_response_time(self, response_time_ms: float):
         """记录响应时间"""
@@ -123,13 +122,12 @@ class PerformanceMonitor:
     
     def _record_slow_query(self, query_type: str, duration_ms: float, details: str = ""):
         """记录慢查询"""
-        conn = sqlite3.connect(self.db_path)
-        conn.execute('''
-            INSERT INTO slow_queries (query_type, duration_ms, details)
-            VALUES (?, ?, ?)
-        ''', (query_type, duration_ms, details))
-        conn.commit()
-        conn.close()
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute('''
+                INSERT INTO slow_queries (query_type, duration_ms, details)
+                VALUES (?, ?, ?)
+            ''', (query_type, duration_ms, details))
+            conn.commit()
     
     def get_current_metrics(self) -> PerformanceMetrics:
         """获取当前性能指标"""
@@ -199,16 +197,15 @@ class PerformanceMonitor:
     
     def get_slow_queries(self, limit: int = 10) -> List[Dict]:
         """获取慢查询列表"""
-        conn = sqlite3.connect(self.db_path)
+        with sqlite3.connect(self.db_path) as conn:
         
-        rows = conn.execute('''
-            SELECT timestamp, query_type, duration_ms, details
-            FROM slow_queries
-            ORDER BY duration_ms DESC
-            LIMIT ?
-        ''', (limit,)).fetchall()
+            rows = conn.execute('''
+                SELECT timestamp, query_type, duration_ms, details
+                FROM slow_queries
+                ORDER BY duration_ms DESC
+                LIMIT ?
+            ''', (limit,)).fetchall()
         
-        conn.close()
         
         return [
             {
@@ -224,39 +221,37 @@ class PerformanceMonitor:
         """保存性能指标快照"""
         metrics = self.get_current_metrics()
         
-        conn = sqlite3.connect(self.db_path)
-        conn.execute('''
-            INSERT INTO performance_metrics 
-            (timestamp, response_time_ms, memory_usage_mb, cpu_usage_percent,
-             db_query_time_ms, vector_search_time_ms, active_sessions)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        ''', (
-            metrics.timestamp.isoformat(),
-            metrics.response_time_ms,
-            metrics.memory_usage_mb,
-            metrics.cpu_usage_percent,
-            metrics.db_query_time_ms,
-            metrics.vector_search_time_ms,
-            metrics.active_sessions
-        ))
-        conn.commit()
-        conn.close()
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute('''
+                INSERT INTO performance_metrics 
+                (timestamp, response_time_ms, memory_usage_mb, cpu_usage_percent,
+                 db_query_time_ms, vector_search_time_ms, active_sessions)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                metrics.timestamp.isoformat(),
+                metrics.response_time_ms,
+                metrics.memory_usage_mb,
+                metrics.cpu_usage_percent,
+                metrics.db_query_time_ms,
+                metrics.vector_search_time_ms,
+                metrics.active_sessions
+            ))
+            conn.commit()
     
     def get_performance_trend(self, hours: int = 24) -> List[Dict]:
         """获取性能趋势"""
-        conn = sqlite3.connect(self.db_path)
+        with sqlite3.connect(self.db_path) as conn:
         
-        cutoff = datetime.now() - timedelta(hours=hours)
+            cutoff = datetime.now() - timedelta(hours=hours)
         
-        rows = conn.execute('''
-            SELECT timestamp, response_time_ms, memory_usage_mb, cpu_usage_percent
-            FROM performance_metrics
-            WHERE timestamp >= ?
-            ORDER BY timestamp DESC
-            LIMIT 100
-        ''', (cutoff.isoformat(),)).fetchall()
+            rows = conn.execute('''
+                SELECT timestamp, response_time_ms, memory_usage_mb, cpu_usage_percent
+                FROM performance_metrics
+                WHERE timestamp >= ?
+                ORDER BY timestamp DESC
+                LIMIT 100
+            ''', (cutoff.isoformat(),)).fetchall()
         
-        conn.close()
         
         return [
             {

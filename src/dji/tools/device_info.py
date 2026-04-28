@@ -40,7 +40,7 @@ class DJIDeviceInfo:
             if self.dev.is_kernel_driver_active(WORKING_INTERFACE):
                 self.dev.detach_kernel_driver(WORKING_INTERFACE)
                 print(f"   Detach内核驱动: 接口 {WORKING_INTERFACE}")
-        except:
+        except Exception:
             pass
         
         # 获取端点
@@ -114,7 +114,7 @@ class DJIDeviceInfo:
                     # 查找可打印字符
                     printable = ''.join(chr(b) if 32 <= b < 127 else '.' for b in payload)
                     info['printable'] = printable
-                except:
+                except Exception:
                     pass
         
         return info
@@ -132,7 +132,7 @@ class DJIDeviceInfo:
                 if data:
                     packet_count += 1
                     print(f"   [{packet_count}] {len(data)} 字节: {bytes(data[:20]).hex()}...")
-            except:
+            except Exception:
                 pass
         
         print(f"   共收到 {packet_count} 个数据包")

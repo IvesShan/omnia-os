@@ -228,6 +228,42 @@ def assemble_wake_prompt(
 
 违规后果：如果未调用工具就直接声称"已完成""已修改"，一律视为错误。
 
+### ✅ 正确示例
+
+**用户**: "检查一下 wake.py 的内容"
+**你的行为**: 
+1. 调用 read_file(path="/home/shan/omnia-os/src/omnia/wake.py")
+2. 等待工具返回结果
+3. 基于结果回答
+
+**用户**: "看看 Git 状态"
+**你的行为**:
+1. 调用 execute_shell(command="git status")
+2. 等待工具返回结果
+3. 基于结果回答
+
+### ❌ 错误示例
+
+**用户**: "检查一下 wake.py 的内容"
+**错误行为**: 直接回答"wake.py 是一个 Python 文件..."（未调用工具）
+
+**用户**: "看看 Git 状态"
+**错误行为**: 直接回答"Git 状态是..."（未调用工具）
+
+### 🔧 判断标准
+
+**必须调用工具的场景**：
+1. 需要读取文件内容 → read_file
+2. 需要执行命令 → execute_shell
+3. 需要查看目录 → list_directory
+4. 需要搜索记忆 → query_memory
+5. 需要搜索网络 → web_search
+
+**不需要调用工具的场景**：
+1. 纯粹的闲聊（"你好"、"再见"）
+2. 知识问答（"什么是 Python"）
+3. 创意生成（"写一首诗"）
+
 ## 项目路径
 - Omnia: /home/shan/omnia-os
 - 守护进程: scripts/start_daemon.py

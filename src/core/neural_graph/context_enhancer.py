@@ -138,20 +138,19 @@ class NeuralGraphContextEnhancer:
     def _search_nodes(self, query: str, limit: int = 5) -> List[Dict]:
         """搜索节点"""
         try:
-            conn = sqlite3.connect(self.db_path)
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
+            with sqlite3.connect(self.db_path) as conn:
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
             
-            cursor.execute("""
-                SELECT id, entity_type, entity_name, canonical_name, access_count
-                FROM neural_nodes
-                WHERE entity_name LIKE ? OR canonical_name LIKE ?
-                ORDER BY access_count DESC
-                LIMIT ?
-            """, (f"%{query}%", f"%{query}%", limit))
+                cursor.execute("""
+                    SELECT id, entity_type, entity_name, canonical_name, access_count
+                    FROM neural_nodes
+                    WHERE entity_name LIKE ? OR canonical_name LIKE ?
+                    ORDER BY access_count DESC
+                    LIMIT ?
+                """, (f"%{query}%", f"%{query}%", limit))
             
-            rows = cursor.fetchall()
-            conn.close()
+                rows = cursor.fetchall()
             
             return [dict(r) for r in rows]
         except Exception:
@@ -160,20 +159,19 @@ class NeuralGraphContextEnhancer:
     def _get_relations_for_entity(self, entity_name: str, limit: int = 5) -> List[Dict]:
         """获取实体的相关关系"""
         try:
-            conn = sqlite3.connect(self.db_path)
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
+            with sqlite3.connect(self.db_path) as conn:
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
             
-            cursor.execute("""
-                SELECT id, source_name, target_name, relation_type, weight
-                FROM neural_edges
-                WHERE source_name LIKE ? OR target_name LIKE ?
-                ORDER BY weight DESC
-                LIMIT ?
-            """, (f"%{entity_name}%", f"%{entity_name}%", limit))
+                cursor.execute("""
+                    SELECT id, source_name, target_name, relation_type, weight
+                    FROM neural_edges
+                    WHERE source_name LIKE ? OR target_name LIKE ?
+                    ORDER BY weight DESC
+                    LIMIT ?
+                """, (f"%{entity_name}%", f"%{entity_name}%", limit))
             
-            rows = cursor.fetchall()
-            conn.close()
+                rows = cursor.fetchall()
             
             return [dict(r) for r in rows]
         except Exception:
@@ -212,19 +210,18 @@ class NeuralGraphContextEnhancer:
     def get_hot_entities(self, limit: int = 10) -> List[Dict]:
         """获取热点实体（访问次数最高）"""
         try:
-            conn = sqlite3.connect(self.db_path)
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
+            with sqlite3.connect(self.db_path) as conn:
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
             
-            cursor.execute("""
-                SELECT entity_type, entity_name, access_count
-                FROM neural_nodes
-                ORDER BY access_count DESC
-                LIMIT ?
-            """, (limit,))
+                cursor.execute("""
+                    SELECT entity_type, entity_name, access_count
+                    FROM neural_nodes
+                    ORDER BY access_count DESC
+                    LIMIT ?
+                """, (limit,))
             
-            rows = cursor.fetchall()
-            conn.close()
+                rows = cursor.fetchall()
             
             return [dict(r) for r in rows]
         except Exception:

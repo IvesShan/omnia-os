@@ -1,5 +1,9 @@
 """Session Manager - 智能会话管理
 
+from core.logging_config import get_logger
+
+logger = get_logger(__name__)
+
 解决对话连续性问题：
 1. 自动加载最近的对话历史
 2. 智能会话窗口管理
@@ -60,7 +64,7 @@ class SessionManager:
                     self.current_session = session
                     print(f"[SessionManager] Resumed session: {session.session_id}")
                 else:
-                    print(f"[SessionManager] Previous session expired")
+                    logger.info(f"[SessionManager] Previous session expired")
             except Exception as e:
                 print(f"[SessionManager] Failed to load session: {e}")
     
@@ -176,7 +180,7 @@ def load_recent_conversations(
                     if history:
                         print(f"[SessionManager] Loaded {len(history)} semantically similar messages")
                         return history
-            except Exception as e:
+            except (ValueError) as e:
                 print(f"[SessionManager] Semantic search failed: {e}, falling back to recent")
         
         # 策略 2: 加载最近的对话
@@ -188,7 +192,7 @@ def load_recent_conversations(
         ''', (limit * 2,)).fetchall()  # user + assistant
         
         if not rows:
-            print("[SessionManager] No conversation history found")
+            logger.info("[SessionManager] No conversation history found")
             return []
         
         # 转换为 OpenAI 格式（按时间正序）
@@ -202,7 +206,7 @@ def load_recent_conversations(
         print(f"[SessionManager] Loaded {len(history)} recent messages")
         return history
         
-    except Exception as e:
+    except (ValueError) as e:
         print(f"[SessionManager] Failed to load conversations: {e}")
         return []
 

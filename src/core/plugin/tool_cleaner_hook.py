@@ -1,5 +1,9 @@
 """Tool Pattern Cleaner Hook - 专门处理工具格式清理
 
+from core.logging_config import get_logger
+
+logger = get_logger(__name__)
+
 这是 FreeCode 风格的 Hook 实现，用于在检测到工具格式时自动清理。
 """
 
@@ -33,13 +37,13 @@ def clean_tool_pattern(context: HookContext) -> str:
     for line in lines:
         # 检查是否包含工具格式
         if any(f'<{tool}' in line for tool in all_tools):
-            print(f"[Hook:clean_tool_pattern] Stopping at tool XML tag")
+            logger.info(f"[Hook:clean_tool_pattern] Stopping at tool XML tag")
             break
         if re.match(r'^\s*(read_file|write_file|execute_shell|list_directory|web_search|query_memory)\s*[\(\{]', line):
-            print(f"[Hook:clean_tool_pattern] Stopping at function call")
+            logger.info(f"[Hook:clean_tool_pattern] Stopping at function call")
             break
         if re.match(r'^\s*\{\s*["\']?(path|command|query|content)["\']?\s*:', line):
-            print(f"[Hook:clean_tool_pattern] Stopping at JSON argument")
+            logger.info(f"[Hook:clean_tool_pattern] Stopping at JSON argument")
             break
         clean_lines.append(line)
     
@@ -50,7 +54,7 @@ def clean_tool_pattern(context: HookContext) -> str:
         return extracted
     
     # 策略2: 如果没有有效内容，返回 None 让主流程处理
-    print(f"[Hook:clean_tool_pattern] No valid content extracted, returning None")
+    logger.info(f"[Hook:clean_tool_pattern] No valid content extracted, returning None")
     return None
 
 

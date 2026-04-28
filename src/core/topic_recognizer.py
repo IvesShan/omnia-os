@@ -9,7 +9,6 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass, asdict
-import re
 
 
 @dataclass
@@ -81,52 +80,51 @@ class TopicRecognizer:
     
     def _init_db(self):
         """初始化主题数据库"""
-        conn = sqlite3.connect(self.db_path)
-        conn.execute('''
-            CREATE TABLE IF NOT EXISTS topics (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                topic_id TEXT UNIQUE NOT NULL,
-                name TEXT NOT NULL,
-                category TEXT,
-                keywords TEXT,
-                confidence REAL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                message_count INTEGER DEFAULT 0
-            )
-        ''')
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute('''
+                CREATE TABLE IF NOT EXISTS topics (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    topic_id TEXT UNIQUE NOT NULL,
+                    name TEXT NOT NULL,
+                    category TEXT,
+                    keywords TEXT,
+                    confidence REAL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    message_count INTEGER DEFAULT 0
+                )
+            ''')
         
-        conn.execute('''
-            CREATE TABLE IF NOT EXISTS topic_shifts (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                from_topic TEXT,
-                to_topic TEXT NOT NULL,
-                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                session_id TEXT,
-                trigger_message TEXT,
-                shift_type TEXT
-            )
-        ''')
+            conn.execute('''
+                CREATE TABLE IF NOT EXISTS topic_shifts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    from_topic TEXT,
+                    to_topic TEXT NOT NULL,
+                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    session_id TEXT,
+                    trigger_message TEXT,
+                    shift_type TEXT
+                )
+            ''')
         
-        conn.execute('''
-            CREATE TABLE IF NOT EXISTS message_topics (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                message_id TEXT,
-                topic_id TEXT,
-                confidence REAL,
-                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
+            conn.execute('''
+                CREATE TABLE IF NOT EXISTS message_topics (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    message_id TEXT,
+                    topic_id TEXT,
+                    confidence REAL,
+                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
         
-        conn.execute('''
-            CREATE INDEX IF NOT EXISTS idx_topic_id ON topics(topic_id)
-        ''')
+            conn.execute('''
+                CREATE INDEX IF NOT EXISTS idx_topic_id ON topics(topic_id)
+            ''')
         
-        conn.execute('''
-            CREATE INDEX IF NOT EXISTS idx_session_id ON topic_shifts(session_id)
-        ''')
+            conn.execute('''
+                CREATE INDEX IF NOT EXISTS idx_session_id ON topic_shifts(session_id)
+            ''')
         
-        conn.commit()
-        conn.close()
+            conn.commit()
     
     def recognize_topic(self, message: str) -> Tuple[str, float]:
         """识别单条消息的主题"""
@@ -173,8 +171,15 @@ class TopicRecognizer:
         
         # 统计最常见主题
         from collections import Counter
-        recent_common = Counter(recent_topics).most_common(1)[0][0]
-        previous_common = Counter(previous_topics).most_common(1)[0][0]
+        recent_counter = Counter(recent_topics).most_common(1)
+        previous_counter = Counter(previous_topics).most_common(1)
+        
+        # 边界检查：如果列表为空，返回 None
+        if not recent_counter or not previous_counter:
+            return None
+        
+        recent_common = recent_counter[0][0]
+        previous_common = previous_counter[0][0]
         
         # 检测切换
         if recent_common != previous_common:
@@ -209,16 +214,15 @@ class TopicRecognizer:
     
     def get_topic_chain(self, session_id: str) -> List[Dict]:
         """获取会话的主题链"""
-        conn = sqlite3.connect(self.db_path)
+        with sqlite3.connect(self.db_path) as conn:
         
-        rows = conn.execute('''
-            SELECT from_topic, to_topic, timestamp, trigger_message, shift_type
-            FROM topic_shifts
-            WHERE session_id = ?
-            ORDER BY timestamp ASC
-        ''', (session_id,)).fetchall()
+            rows = conn.execute('''
+                SELECT from_topic, to_topic, timestamp, trigger_message, shift_type
+                FROM topic_shifts
+                WHERE session_id = ?
+                ORDER BY timestamp ASC
+            ''', (session_id,)).fetchall()
         
-        conn.close()
         
         chain = []
         for row in rows:
@@ -234,49 +238,47 @@ class TopicRecognizer:
     
     def save_topic_shift(self, shift: TopicShift):
         """保存主题切换记录"""
-        conn = sqlite3.connect(self.db_path)
-        conn.execute('''
-            INSERT INTO topic_shifts 
-            (from_topic, to_topic, timestamp, session_id, trigger_message, shift_type)
-            VALUES (?, ?, ?, ?, ?, ?)
-        ''', (
-            shift.from_topic,
-            shift.to_topic,
-            shift.timestamp.isoformat(),
-            shift.session_id,
-            shift.trigger_message,
-            shift.shift_type
-        ))
-        conn.commit()
-        conn.close()
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute('''
+                INSERT INTO topic_shifts 
+                (from_topic, to_topic, timestamp, session_id, trigger_message, shift_type)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (
+                shift.from_topic,
+                shift.to_topic,
+                shift.timestamp.isoformat(),
+                shift.session_id,
+                shift.trigger_message,
+                shift.shift_type
+            ))
+            conn.commit()
     
     def get_topic_stats(self, days: int = 7) -> Dict:
         """获取主题统计"""
-        conn = sqlite3.connect(self.db_path)
+        with sqlite3.connect(self.db_path) as conn:
         
-        cutoff = datetime.now() - timedelta(days=days)
+            cutoff = datetime.now() - timedelta(days=days)
         
         # 主题分布
-        topic_dist = conn.execute('''
-            SELECT to_topic, COUNT(*) as count
-            FROM topic_shifts
-            WHERE timestamp >= ?
-            GROUP BY to_topic
-            ORDER BY count DESC
-        ''', (cutoff.isoformat(),)).fetchall()
+            topic_dist = conn.execute('''
+                SELECT to_topic, COUNT(*) as count
+                FROM topic_shifts
+                WHERE timestamp >= ?
+                GROUP BY to_topic
+                ORDER BY count DESC
+            ''', (cutoff.isoformat(),)).fetchall()
         
         # 切换类型分布
-        shift_types = conn.execute('''
-            SELECT shift_type, COUNT(*) as count
-            FROM topic_shifts
-            WHERE timestamp >= ?
-            GROUP BY shift_type
-        ''', (cutoff.isoformat(),)).fetchall()
+            shift_types = conn.execute('''
+                SELECT shift_type, COUNT(*) as count
+                FROM topic_shifts
+                WHERE timestamp >= ?
+                GROUP BY shift_type
+            ''', (cutoff.isoformat(),)).fetchall()
         
         # 平均主题持续时间
         # TODO: 需要更复杂的计算
         
-        conn.close()
         
         return {
             'topic_distribution': {row[0]: row[1] for row in topic_dist},
@@ -286,17 +288,16 @@ class TopicRecognizer:
     
     def get_hot_topics(self, limit: int = 10) -> List[Dict]:
         """获取热门主题"""
-        conn = sqlite3.connect(self.db_path)
+        with sqlite3.connect(self.db_path) as conn:
         
-        rows = conn.execute('''
-            SELECT to_topic, COUNT(*) as count
-            FROM topic_shifts
-            GROUP BY to_topic
-            ORDER BY count DESC
-            LIMIT ?
-        ''', (limit,)).fetchall()
+            rows = conn.execute('''
+                SELECT to_topic, COUNT(*) as count
+                FROM topic_shifts
+                GROUP BY to_topic
+                ORDER BY count DESC
+                LIMIT ?
+            ''', (limit,)).fetchall()
         
-        conn.close()
         
         return [
             {

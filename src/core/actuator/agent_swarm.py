@@ -189,7 +189,7 @@ Synthesize a single, natural-language summary for the user. Celebrate wins, ment
                 task = futures[future]
                 try:
                     res = future.result()
-                except Exception as e:
+                except (FileNotFoundError, IOError, PermissionError) as e:
                     res = SubAgentResult(
                         role=task.role,
                         goal=task.goal,

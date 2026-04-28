@@ -1,4 +1,8 @@
 """
+from core.logging_config import get_logger
+
+logger = get_logger(__name__)
+
 Local LLM Client - llama.cpp server 客户端
 
 支持 llama.cpp 的 HTTP API，兼容 OpenAI 格式
@@ -140,7 +144,7 @@ class LocalLLMClient:
                     timeout=aiohttp.ClientTimeout(total=5)
                 ) as resp:
                     return resp.status == 200
-        except:
+        except Exception:
             return False
     
     async def get_model_info(self) -> dict:
@@ -153,7 +157,7 @@ class LocalLLMClient:
                 ) as resp:
                     if resp.status == 200:
                         return await resp.json()
-        except:
+        except Exception:
             pass
         return {}
 
@@ -165,10 +169,10 @@ async def test_local_llm():
     
     # 健康检查
     if not await client.health_check():
-        print("❌ Local LLM 服务不可用")
+        logger.info("❌ Local LLM 服务不可用")
         return False
     
-    print("✅ Local LLM 服务正常")
+    logger.info("✅ Local LLM 服务正常")
     
     # 测试聊天
     response = await client.chat([

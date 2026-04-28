@@ -116,7 +116,7 @@ def _parse_steps_from_text(text: str) -> List[Step]:
             if isinstance(args, str):
                 try:
                     args = json.loads(args)
-                except:
+                except (json.JSONDecodeError) as e:
                     args = {"command": args}
             steps.append(
                 Step(
@@ -147,8 +147,8 @@ Available tools:
 - query_memory(query, layer) - Query your memory palace for past conversations, facts, and user preferences
 
 Project paths:
-- Omnia: /home/shan//home/shan/omnia-os/omnia-os
-- Workspace: /home/shan//home/shan/omnia-os
+- Omnia: /home/shan/omnia-os
+- Workspace: /home/shan/omnia-os
 - Daemon: scripts/start_daemon.py
 
 Your memory system:
@@ -214,7 +214,7 @@ Use tools when needed to accomplish the goal.
                 tool_name = fn.get("name", "execute_shell")
                 try:
                     args = json.loads(fn.get("arguments", "{}"))
-                except:
+                except (ValueError, json.JSONDecodeError) as e:
                     args = {}
                 print(f"[PlanExecutor.plan] Tool: {tool_name}, Args: {args}")
                 steps.append(Step(

@@ -8,7 +8,6 @@ import usb.util
 from typing import Optional, List
 import logging
 import threading
-import time
 from dataclasses import dataclass
 
 try:
@@ -44,10 +43,10 @@ def list_dji_devices() -> List[str]:
             try:
                 serial = dev.serial_number
                 result.append(f"DJI-{serial}")
-            except:
+            except Exception:
                 result.append(f"DJI-Device-{dev.idProduct:04x}")
         return result
-    except:
+    except Exception:
         return []
 
 
@@ -94,7 +93,7 @@ class USBTransport:
             try:
                 logger.info(f"设备: {self.device.manufacturer} {self.device.product}")
                 logger.info(f"序列号: {self.device.serial_number}")
-            except:
+            except Exception:
                 logger.info("设备信息不可用")
             
             # 尝试自动探测端点
@@ -181,7 +180,7 @@ class USBTransport:
                 if self._kernel_driver_detached:
                     try:
                         self.device.attach_kernel_driver(self.config.interface_v1)
-                    except:
+                    except Exception:
                         pass
                 
                 usb.util.dispose_resources(self.device)

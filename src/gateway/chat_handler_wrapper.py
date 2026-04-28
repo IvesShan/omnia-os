@@ -3,13 +3,12 @@
 这个模块将现有的 chat_handler 包装成 Gateway 可以调用的格式。
 """
 
-from core.config import MEMORY_PALACE_DB
 from __future__ import annotations
 
-import json
 import uuid
 from typing import Any, Dict, List, Optional
 
+from core.config import MEMORY_PALACE_DB
 from core.cognition.prompt_builder import PromptContext, get_prompt_builder
 from core.neural_graph.context_enhancer import get_graph_enhancer
 from core.memory_palace.memory_palace_with_graph import MemoryPalace

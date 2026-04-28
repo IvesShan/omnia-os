@@ -1,4 +1,8 @@
 """
+from core.logging_config import get_logger
+
+logger = get_logger(__name__)
+
 Qianfan LLM Client - 百度千帆 API 客户端
 
 支持千帆 Coding Plan API
@@ -140,23 +144,23 @@ class QianfanClient:
 
 # 测试代码
 if __name__ == "__main__":
-    print("=" * 60)
-    print("Qianfan Client Test")
-    print("=" * 60)
+    logger.info("=" * 60)
+    logger.info("Qianfan Client Test")
+    logger.info("=" * 60)
     
     try:
         client = QianfanClient()
-        print(f"✅ Client initialized")
+        logger.info(f"✅ Client initialized")
         print(f"   Model: {client.model}")
         print(f"   API Key: {client.api_key[:20]}...")
         
         # 测试简单调用
-        print("\n📝 Testing simple call...")
+        logger.info("\n📝 Testing simple call...")
         response = client.simple_call("你好，请简单介绍一下你自己。")
         print(f"✅ Response: {response[:200]}...")
         
         # 测试聊天接口
-        print("\n📝 Testing chat interface...")
+        logger.info("\n📝 Testing chat interface...")
         messages = [
             {"role": "system", "content": "你是一个友好的助手。"},
             {"role": "user", "content": "今天天气怎么样？"}
@@ -165,5 +169,5 @@ if __name__ == "__main__":
         print(f"✅ Content: {result['content'][:200]}...")
         print(f"   Usage: {result['usage']}")
         
-    except Exception as e:
+    except (ValueError) as e:
         print(f"❌ Error: {e}")

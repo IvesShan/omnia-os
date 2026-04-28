@@ -38,8 +38,8 @@ class VectorRetrieverEnhanced:
     """增强向量检索器"""
     
     def __init__(self, db_path: str = None):
-        self.db_path = db_path or "/home/shan/omnia-os/data/conversations.db"
-        self.cache_db = "/home/shan/omnia-os/data/vector_cache.db"
+        self.db_path = db_path or str(Path.home() / ".omnia" / "conversations.db")
+        self.cache_db = str(Path.home() / ".omnia" / "vector_cache.db")
         Path(self.cache_db).parent.mkdir(parents=True, exist_ok=True)
         self._init_cache_db()
         
@@ -140,7 +140,7 @@ class VectorRetrieverEnhanced:
                             channel=channel or 'unknown',
                             metadata=json.loads(metadata) if metadata else {}
                         ))
-                    except:
+                    except (ValueError, json.JSONDecodeError) as e:
                         continue
             
             # 按相似度排序

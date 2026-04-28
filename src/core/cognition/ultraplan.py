@@ -185,6 +185,11 @@ class UltraPlan:
             scores.append((profile.intent_id, normalized))
 
         scores.sort(key=lambda x: x[1], reverse=True)
+        
+        # 边界检查：如果 scores 为空，返回默认值
+        if not scores:
+            return "general_task", 0.2
+        
         best_intent, best_score = scores[0]
 
         # Softmax-like confidence clamping
@@ -262,7 +267,6 @@ class UltraPlan:
 
 
 if __name__ == "__main__":
-    import sys
 
     up = UltraPlan()
     samples = [

@@ -1,5 +1,9 @@
 """Collaboration Manager — 无限 ↔ Omnia 协作管理器
 
+from core.logging_config import get_logger
+
+logger = get_logger(__name__)
+
 实现：
 - HTTP API 端点
 - 任务路由
@@ -8,7 +12,6 @@
 
 from __future__ import annotations
 
-import json
 import requests
 from dataclasses import dataclass
 from datetime import datetime
@@ -84,7 +87,7 @@ class CollaborationManager:
                 print(f"[Collaboration] ✅ 已连接到 {name}: {url}")
             else:
                 self.peer.status = "offline"
-        except:
+        except (TimeoutError, ConnectionError, ValueError) as e:
             self.peer.status = "offline"
             print(f"[Collaboration] ⚠️ 无法连接到 {name}: {url}")
     
@@ -96,7 +99,7 @@ class CollaborationManager:
         try:
             response = requests.get(f"{self.peer.url}/api/collaboration/status", timeout=3)
             self.peer.status = "online" if response.status_code == 200 else "offline"
-        except:
+        except Exception:
             self.peer.status = "offline"
         
         return self.peer.status
@@ -106,7 +109,7 @@ class CollaborationManager:
     def send_message(self, message: CollaborationMessage) -> Optional[CollaborationMessage]:
         """发送消息到对端"""
         if not self.peer or self.peer.status == "offline":
-            print(f"[Collaboration] ⚠️ 对端离线，无法发送消息")
+            logger.info(f"[Collaboration] ⚠️ 对端离线，无法发送消息")
             return None
         
         try:
@@ -123,7 +126,7 @@ class CollaborationManager:
                 print(f"[Collaboration] ❌ 消息发送失败: {response.status_code}")
                 return None
                 
-        except Exception as e:
+        except (ValueError) as e:
             print(f"[Collaboration] ❌ 发送错误: {e}")
             return None
     

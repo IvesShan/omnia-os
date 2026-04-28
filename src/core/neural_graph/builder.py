@@ -1,6 +1,10 @@
 """Memory Palace to Neural Graph Builder - 从记忆宫殿构建神经图谱"""
-
 from __future__ import annotations
+
+from core.logging_config import get_logger
+
+logger = get_logger(__name__)
+
 
 import json
 import sqlite3
@@ -43,7 +47,7 @@ class MemoryPalaceGraphBuilder:
         Returns:
             构建统计
         """
-        print(f"[GraphBuilder] 开始从 Memory Palace 构建图谱...")
+        logger.info(f"[GraphBuilder] 开始从 Memory Palace 构建图谱...")
         
         # 处理各层
         self._process_facts(batch_size, use_llm)
@@ -51,7 +55,7 @@ class MemoryPalaceGraphBuilder:
         self._process_timeline(batch_size, use_llm)
         self._process_habits(batch_size, use_llm)
         
-        print(f"[GraphBuilder] 完成！")
+        logger.info(f"[GraphBuilder] 完成！")
         print(f"  - 处理记忆: {self.stats['processed']} 条")
         print(f"  - 添加节点: {self.stats['nodes_added']} 个")
         print(f"  - 添加边: {self.stats['edges_added']} 条")
@@ -60,22 +64,21 @@ class MemoryPalaceGraphBuilder:
     
     def _process_facts(self, batch_size: int, use_llm: bool):
         """处理 facts 表"""
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        
-        cursor.execute("SELECT COUNT(*) FROM facts")
-        total = cursor.fetchone()[0]
-        
-        print(f"[GraphBuilder] 处理 facts: {total} 条")
-        
-        cursor.execute("""
-            SELECT id, key, value, category
-            FROM facts
-        """)
-        
-        rows = cursor.fetchall()
-        conn.close()
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            
+            cursor.execute("SELECT COUNT(*) FROM facts")
+            total = cursor.fetchone()[0]
+            
+            print(f"[GraphBuilder] 处理 facts: {total} 条")
+            
+            cursor.execute("""
+                SELECT id, key, value, category
+                FROM facts
+            """)
+            
+            rows = cursor.fetchall()
         
         for i, row in enumerate(rows):
             if i % 50 == 0:
@@ -90,23 +93,22 @@ class MemoryPalaceGraphBuilder:
     
     def _process_relations(self, batch_size: int):
         """处理 relations 表（已有关系，直接添加）"""
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        
-        cursor.execute("SELECT COUNT(*) FROM relations")
-        total = cursor.fetchone()[0]
-        
-        print(f"[GraphBuilder] 处理 relations: {total} 条")
-        
-        cursor.execute("""
-            SELECT id, subject, predicate, object, context, created_at
-            FROM relations
-            ORDER BY created_at DESC
-        """)
-        
-        rows = cursor.fetchall()
-        conn.close()
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            
+            cursor.execute("SELECT COUNT(*) FROM relations")
+            total = cursor.fetchone()[0]
+            
+            print(f"[GraphBuilder] 处理 relations: {total} 条")
+            
+            cursor.execute("""
+                SELECT id, subject, predicate, object, context, created_at
+                FROM relations
+                ORDER BY created_at DESC
+            """)
+            
+            rows = cursor.fetchall()
         
         for row in rows:
             # 提取实体
@@ -133,23 +135,22 @@ class MemoryPalaceGraphBuilder:
     
     def _process_timeline(self, batch_size: int, use_llm: bool):
         """处理 timeline 表"""
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        
-        cursor.execute("SELECT COUNT(*) FROM timeline")
-        total = cursor.fetchone()[0]
-        
-        print(f"[GraphBuilder] 处理 timeline: {total} 条")
-        
-        cursor.execute("""
-            SELECT id, event_date, event_type, title, description, tags
-            FROM timeline
-            ORDER BY event_date DESC
-        """)
-        
-        rows = cursor.fetchall()
-        conn.close()
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            
+            cursor.execute("SELECT COUNT(*) FROM timeline")
+            total = cursor.fetchone()[0]
+            
+            print(f"[GraphBuilder] 处理 timeline: {total} 条")
+            
+            cursor.execute("""
+                SELECT id, event_date, event_type, title, description, tags
+                FROM timeline
+                ORDER BY event_date DESC
+            """)
+            
+            rows = cursor.fetchall()
         
         for i, row in enumerate(rows):
             if i % 50 == 0:
@@ -165,20 +166,19 @@ class MemoryPalaceGraphBuilder:
     
     def _process_habits(self, batch_size: int, use_llm: bool):
         """处理 habits 表"""
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        
-        cursor.execute("SELECT COUNT(*) FROM habits")
-        total = cursor.fetchone()[0]
-        
-        print(f"[GraphBuilder] 处理 habits: {total} 条")
-        
-        # 使用 SELECT * 并动态获取列
-        cursor.execute("SELECT * FROM habits")
-        
-        rows = cursor.fetchall()
-        conn.close()
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            
+            cursor.execute("SELECT COUNT(*) FROM habits")
+            total = cursor.fetchone()[0]
+            
+            print(f"[GraphBuilder] 处理 habits: {total} 条")
+            
+            # 使用 SELECT * 并动态获取列
+            cursor.execute("SELECT * FROM habits")
+            
+            rows = cursor.fetchall()
         
         for i, row in enumerate(rows):
             if i % 50 == 0:
@@ -221,7 +221,7 @@ class MemoryPalaceGraphBuilder:
             
             self.stats['processed'] += 1
             
-        except Exception as e:
+        except (json.JSONDecodeError) as e:
             self.stats['errors'] += 1
             if self.stats['errors'] <= 5:
                 print(f"  [Error] {e}")
@@ -244,13 +244,12 @@ class MemoryPalaceGraphBuilder:
         """增量构建（只处理新记忆）"""
         if since is None:
             # 获取最后处理时间
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            cursor.execute("""
-                SELECT MAX(created_at) FROM neural_edges
-            """)
-            result = cursor.fetchone()
-            conn.close()
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT MAX(created_at) FROM neural_edges
+                """)
+                result = cursor.fetchone()
             
             if result and result[0]:
                 since = result[0]
@@ -297,7 +296,7 @@ class IdleGraphProcessor:
             cpu = psutil.cpu_percent(interval=1) / 100
             if cpu > self.CPU_THRESHOLD:
                 return False
-        except:
+        except Exception:
             pass
         
         # 检查是否有未处理的记忆
@@ -307,7 +306,7 @@ class IdleGraphProcessor:
     
     def process_batch(self):
         """处理一批记忆"""
-        print(f"[IdleProcessor] 开始空闲处理...")
+        logger.info(f"[IdleProcessor] 开始空闲处理...")
         
         try:
             stats = self.builder.build_all(
@@ -320,7 +319,7 @@ class IdleGraphProcessor:
             print(f"[IdleProcessor] 处理完成: {stats}")
             return stats
             
-        except Exception as e:
+        except (ValueError) as e:
             print(f"[IdleProcessor] 错误: {e}")
             return None
     

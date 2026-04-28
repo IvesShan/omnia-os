@@ -34,8 +34,6 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 import sqlite3
-import json
-import hashlib
 
 # 统一使用 config.py 中的路径配置
 from core.config import MEMORY_PALACE_DB
@@ -326,31 +324,31 @@ class MemoryPalace:
             try:
                 cursor = conn.execute("SELECT COUNT(*) FROM facts")
                 stats['facts'] = cursor.fetchone()[0]
-            except:
+            except Exception:
                 stats['facts'] = 0
             
             try:
                 cursor = conn.execute("SELECT COUNT(*) FROM relations")
                 stats['relations'] = cursor.fetchone()[0]
-            except:
+            except Exception:
                 stats['relations'] = 0
             
             try:
                 cursor = conn.execute("SELECT COUNT(*) FROM habits")
                 stats['habits'] = cursor.fetchone()[0]
-            except:
+            except Exception:
                 stats['habits'] = 0
             
             try:
                 cursor = conn.execute("SELECT COUNT(*) FROM timeline")
                 stats['timeline'] = cursor.fetchone()[0]
-            except:
+            except Exception:
                 stats['timeline'] = 0
             
             try:
                 cursor = conn.execute("SELECT COUNT(*) FROM conversation_logs")
                 stats['conversations'] = cursor.fetchone()[0]
-            except:
+            except Exception:
                 stats['conversations'] = 0
             
             return stats

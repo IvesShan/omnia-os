@@ -97,7 +97,7 @@ def get_url_domain(url: str) -> str:
     try:
         parsed = urllib.parse.urlparse(url)
         return parsed.netloc
-    except:
+    except Exception:
         return url
 
 

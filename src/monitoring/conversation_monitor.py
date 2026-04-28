@@ -52,50 +52,49 @@ class ConversationMonitor:
     
     def _init_db(self):
         """初始化监控数据库"""
-        conn = sqlite3.connect(self.db_path)
-        conn.execute('''
-            CREATE TABLE IF NOT EXISTS conversation_metrics (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                session_id TEXT NOT NULL,
-                turn_count INTEGER DEFAULT 0,
-                duration_seconds REAL DEFAULT 0,
-                context_hit_rate REAL DEFAULT 0,
-                topic_shifts INTEGER DEFAULT 0,
-                avg_response_time REAL DEFAULT 0,
-                user_satisfaction_score REAL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                metadata TEXT
-            )
-        ''')
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute('''
+                CREATE TABLE IF NOT EXISTS conversation_metrics (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    session_id TEXT NOT NULL,
+                    turn_count INTEGER DEFAULT 0,
+                    duration_seconds REAL DEFAULT 0,
+                    context_hit_rate REAL DEFAULT 0,
+                    topic_shifts INTEGER DEFAULT 0,
+                    avg_response_time REAL DEFAULT 0,
+                    user_satisfaction_score REAL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    metadata TEXT
+                )
+            ''')
         
-        conn.execute('''
-            CREATE TABLE IF NOT EXISTS response_times (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                session_id TEXT NOT NULL,
-                message_id TEXT,
-                response_time REAL NOT NULL,
-                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
+            conn.execute('''
+                CREATE TABLE IF NOT EXISTS response_times (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    session_id TEXT NOT NULL,
+                    message_id TEXT,
+                    response_time REAL NOT NULL,
+                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
         
-        conn.execute('''
-            CREATE TABLE IF NOT EXISTS context_hits (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                session_id TEXT NOT NULL,
-                hit_type TEXT NOT NULL,
-                hit_count INTEGER DEFAULT 0,
-                miss_count INTEGER DEFAULT 0,
-                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
+            conn.execute('''
+                CREATE TABLE IF NOT EXISTS context_hits (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    session_id TEXT NOT NULL,
+                    hit_type TEXT NOT NULL,
+                    hit_count INTEGER DEFAULT 0,
+                    miss_count INTEGER DEFAULT 0,
+                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
         
-        conn.execute('''
-            CREATE INDEX IF NOT EXISTS idx_session_id 
-            ON conversation_metrics(session_id)
-        ''')
+            conn.execute('''
+                CREATE INDEX IF NOT EXISTS idx_session_id 
+                ON conversation_metrics(session_id)
+            ''')
         
-        conn.commit()
-        conn.close()
+            conn.commit()
     
     def start_session(self, session_id: str):
         """开始新会话"""
@@ -184,39 +183,37 @@ class ConversationMonitor:
     
     def _save_metrics(self, metrics: ConversationMetrics):
         """保存指标到数据库"""
-        conn = sqlite3.connect(self.db_path)
-        conn.execute('''
-            INSERT INTO conversation_metrics 
-            (session_id, turn_count, duration_seconds, context_hit_rate,
-             topic_shifts, avg_response_time, user_satisfaction_score, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (
-            metrics.session_id,
-            metrics.turn_count,
-            metrics.duration_seconds,
-            metrics.context_hit_rate,
-            metrics.topic_shifts,
-            metrics.avg_response_time,
-            metrics.user_satisfaction_score,
-            metrics.created_at.isoformat()
-        ))
-        conn.commit()
-        conn.close()
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute('''
+                INSERT INTO conversation_metrics 
+                (session_id, turn_count, duration_seconds, context_hit_rate,
+                 topic_shifts, avg_response_time, user_satisfaction_score, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                metrics.session_id,
+                metrics.turn_count,
+                metrics.duration_seconds,
+                metrics.context_hit_rate,
+                metrics.topic_shifts,
+                metrics.avg_response_time,
+                metrics.user_satisfaction_score,
+                metrics.created_at.isoformat()
+            ))
+            conn.commit()
     
     def get_session_stats(self, days: int = 7) -> SessionStats:
         """获取会话统计"""
-        conn = sqlite3.connect(self.db_path)
+        with sqlite3.connect(self.db_path) as conn:
         
-        cutoff = datetime.now() - timedelta(days=days)
+            cutoff = datetime.now() - timedelta(days=days)
         
-        rows = conn.execute('''
-            SELECT session_id, turn_count, duration_seconds, context_hit_rate,
-                   topic_shifts, user_satisfaction_score
-            FROM conversation_metrics
-            WHERE created_at >= ?
-        ''', (cutoff.isoformat(),)).fetchall()
+            rows = conn.execute('''
+                SELECT session_id, turn_count, duration_seconds, context_hit_rate,
+                       topic_shifts, user_satisfaction_score
+                FROM conversation_metrics
+                WHERE created_at >= ?
+            ''', (cutoff.isoformat(),)).fetchall()
         
-        conn.close()
         
         if not rows:
             return SessionStats(
@@ -245,24 +242,23 @@ class ConversationMonitor:
     
     def get_quality_trend(self, days: int = 30) -> List[Dict]:
         """获取质量趋势"""
-        conn = sqlite3.connect(self.db_path)
+        with sqlite3.connect(self.db_path) as conn:
         
-        cutoff = datetime.now() - timedelta(days=days)
+            cutoff = datetime.now() - timedelta(days=days)
         
-        rows = conn.execute('''
-            SELECT 
-                DATE(created_at) as date,
-                COUNT(*) as session_count,
-                AVG(turn_count) as avg_turns,
-                AVG(context_hit_rate) as avg_hit_rate,
-                AVG(avg_response_time) as avg_response_time
-            FROM conversation_metrics
-            WHERE created_at >= ?
-            GROUP BY DATE(created_at)
-            ORDER BY date DESC
-        ''', (cutoff.isoformat(),)).fetchall()
+            rows = conn.execute('''
+                SELECT 
+                    DATE(created_at) as date,
+                    COUNT(*) as session_count,
+                    AVG(turn_count) as avg_turns,
+                    AVG(context_hit_rate) as avg_hit_rate,
+                    AVG(avg_response_time) as avg_response_time
+                FROM conversation_metrics
+                WHERE created_at >= ?
+                GROUP BY DATE(created_at)
+                ORDER BY date DESC
+            ''', (cutoff.isoformat(),)).fetchall()
         
-        conn.close()
         
         return [
             {
@@ -277,18 +273,17 @@ class ConversationMonitor:
     
     def get_top_topics(self, limit: int = 10) -> List[Dict]:
         """获取热门主题"""
-        conn = sqlite3.connect(self.db_path)
+        with sqlite3.connect(self.db_path) as conn:
         
         # 从 metadata 中提取主题
-        rows = conn.execute('''
-            SELECT metadata
-            FROM conversation_metrics
-            WHERE metadata IS NOT NULL
-            ORDER BY created_at DESC
-            LIMIT 100
-        ''').fetchall()
+            rows = conn.execute('''
+                SELECT metadata
+                FROM conversation_metrics
+                WHERE metadata IS NOT NULL
+                ORDER BY created_at DESC
+                LIMIT 100
+            ''').fetchall()
         
-        conn.close()
         
         # TODO: 实现主题提取和统计
         return []

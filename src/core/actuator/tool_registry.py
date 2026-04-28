@@ -1,14 +1,16 @@
 """Tool Registry — Define and dispatch Omnia's hands and feet.
 
 
+from core.logging_config import get_logger
+
+logger = get_logger(__name__)
+
 All tools are JSON-schema compatible for OpenAI function-calling.
 Supports both native tools and external MCP servers.
 """
 
 from __future__ import annotations
 
-import json
-import os
 from core.config import MEMORY_PALACE_DB
 import subprocess
 from pathlib import Path
@@ -170,7 +172,7 @@ def tool_read_file(path: str) -> Dict[str, Any]:
         if len(text) > 50_000:
             text = text[:50_000] + "\n\n[...truncated at 50KB...]"
         return {"path": str(p), "content": text}
-    except Exception as e:
+    except (FileNotFoundError, IOError, PermissionError) as e:
         return {"error": str(e)}
 
 
@@ -188,7 +190,7 @@ def tool_write_file(path: str, content: str) -> Dict[str, Any]:
             backup.write_bytes(p.read_bytes())
         p.write_text(content, encoding="utf-8")
         return {"path": str(p), "bytes_written": len(content.encode("utf-8"))}
-    except Exception as e:
+    except (FileNotFoundError, IOError, PermissionError) as e:
         return {"error": str(e)}
 
 
@@ -237,7 +239,7 @@ def tool_list_directory(path: str) -> Dict[str, Any]:
             marker = "[D]" if child.is_dir() else "[F]"
             items.append(f"{marker} {child.name}")
         return {"path": str(p), "items": items}
-    except Exception as e:
+    except (FileNotFoundError, IOError, PermissionError) as e:
         return {"error": str(e)}
 
 
@@ -307,62 +309,61 @@ def tool_query_memory(query: str, layer: str = "all") -> Dict[str, Any]:
         if not db_path.exists():
             return {"error": "Memory Palace database not found", "db_path": str(db_path)}
         
-        conn = sqlite3.connect(str(db_path))
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
+        with sqlite3.connect(str(db_path)) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
         
-        results = []
-        search_pattern = f"%{query}%"
+            results = []
+            search_pattern = f"%{query}%"
         
         # Search in facts table
-        if layer in ("all", "facts"):
-            cursor.execute(
-                "SELECT id, category, key, value, created_at FROM facts WHERE (value LIKE ? OR key LIKE ?) AND status = 'active' ORDER BY id DESC LIMIT 10",
-                (search_pattern, search_pattern)
-            )
-            for row in cursor.fetchall():
-                results.append({
-                    "layer": "facts",
-                    "id": row["id"],
-                    "category": row["category"],
-                    "key": row["key"],
-                    "value": row["value"][:500],
-                    "created_at": row["created_at"]
-                })
+            if layer in ("all", "facts"):
+                cursor.execute(
+                    "SELECT id, category, key, value, created_at FROM facts WHERE (value LIKE ? OR key LIKE ?) AND status = 'active' ORDER BY id DESC LIMIT 10",
+                    (search_pattern, search_pattern)
+                )
+                for row in cursor.fetchall():
+                    results.append({
+                        "layer": "facts",
+                        "id": row["id"],
+                        "category": row["category"],
+                        "key": row["key"],
+                        "value": row["value"][:500],
+                        "created_at": row["created_at"]
+                    })
         
         # Search in timeline table
-        if layer in ("all", "timeline"):
-            cursor.execute(
-                "SELECT id, event_date, event_type, title, description FROM timeline WHERE (title LIKE ? OR description LIKE ?) AND status = 'active' ORDER BY id DESC LIMIT 10",
-                (search_pattern, search_pattern)
-            )
-            for row in cursor.fetchall():
-                results.append({
-                    "layer": "timeline",
-                    "id": row["id"],
-                    "event_date": row["event_date"],
-                    "event_type": row["event_type"],
-                    "title": row["title"][:200],
-                    "description": row["description"][:500] if row["description"] else None,
-                })
+            if layer in ("all", "timeline"):
+                cursor.execute(
+                    "SELECT id, event_date, event_type, title, description FROM timeline WHERE (title LIKE ? OR description LIKE ?) AND status = 'active' ORDER BY id DESC LIMIT 10",
+                    (search_pattern, search_pattern)
+                )
+                for row in cursor.fetchall():
+                    results.append({
+                        "layer": "timeline",
+                        "id": row["id"],
+                        "event_date": row["event_date"],
+                        "event_type": row["event_type"],
+                        "title": row["title"][:200],
+                        "description": row["description"][:500] if row["description"] else None,
+                    })
         
         # Search in relations table
-        if layer in ("all", "relations"):
-            cursor.execute(
-                "SELECT id, subject, predicate, object, context FROM relations WHERE (subject LIKE ? OR object LIKE ? OR context LIKE ?) AND status = 'active' ORDER BY id DESC LIMIT 10",
-                (search_pattern, search_pattern, search_pattern)
-            )
-            for row in cursor.fetchall():
-                results.append({
-                    "layer": "relations",
-                    "id": row["id"],
-                    "subject": row["subject"],
-                    "predicate": row["predicate"],
-                    "object": row["object"],
-                    "context": row["context"][:200] if row["context"] else None,
-                })
+            if layer in ("all", "relations"):
+                cursor.execute(
+                    "SELECT id, subject, predicate, object, context FROM relations WHERE (subject LIKE ? OR object LIKE ? OR context LIKE ?) AND status = 'active' ORDER BY id DESC LIMIT 10",
+                    (search_pattern, search_pattern, search_pattern)
+                )
+                for row in cursor.fetchall():
+                    results.append({
+                        "layer": "relations",
+                        "id": row["id"],
+                        "subject": row["subject"],
+                        "predicate": row["predicate"],
+                        "object": row["object"],
+                        "context": row["context"][:200] if row["context"] else None,
+                    })
         
-        conn.close()
         
         if not results:
             return {"query": query, "result": "No matching memories found"}
@@ -455,12 +456,12 @@ def dispatch_tool(name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
         print(f"[dispatch_tool] Found native tool: {name}")
         try:
             result = fn(**arguments)
-            print(f"[dispatch_tool] Tool executed successfully")
+            logger.info(f"[dispatch_tool] Tool executed successfully")
             return result
         except TypeError as e:
             print(f"[dispatch_tool] TypeError: {e}")
             return {"error": f"Tool call failed: {e}. Arguments received: {arguments}"}
-        except Exception as e:
+        except (ValueError, TypeError) as e:
             print(f"[dispatch_tool] Error: {e}")
             return {"error": str(e)}
     
@@ -469,7 +470,7 @@ def dispatch_tool(name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
         print(f"[dispatch_tool] Trying MCP tool: {name}")
         try:
             return _mcp_registry.call(name, **arguments)
-        except Exception as e:
+        except (ValueError) as e:
             print(f"[dispatch_tool] MCP error: {e}")
             return {"error": f"MCP tool error: {e}"}
     

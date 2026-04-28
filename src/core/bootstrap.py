@@ -1,4 +1,8 @@
 """
+from core.logging_config import get_logger
+
+logger = get_logger(__name__)
+
 Omnia Bootstrap - 启动时自动初始化核心功能
 
 在 daemon 启动或首次对话时调用，确保所有核心功能自动启用。
@@ -124,9 +128,9 @@ def get_feature_status() -> dict:
 def print_status():
     """打印启动状态"""
     status = get_bootstrap_status()
-    print("=" * 50)
-    print("Omnia Bootstrap Status")
-    print("=" * 50)
+    logger.info("=" * 50)
+    logger.info("Omnia Bootstrap Status")
+    logger.info("=" * 50)
     for key, value in status.items():
         print(f"  {key}: {value}")
-    print("=" * 50)
+    logger.info("=" * 50)

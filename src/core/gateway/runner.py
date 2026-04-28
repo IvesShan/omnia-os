@@ -119,7 +119,7 @@ class SessionStore:
             from pathlib import Path
             if Path(self.db_path).exists():
                 self._sessions = json.loads(Path(self.db_path).read_text())
-        except:
+        except Exception:
             self._sessions = {}
     
     def _save(self):
@@ -282,7 +282,7 @@ class GatewayRunner:
             
             try:
                 await adapter.send(msg.target, msg.content, **msg.metadata)
-            except Exception as e:
+            except (ValueError) as e:
                 print(f"[Gateway] Delivery failed: {e}")
     
     async def broadcast(self, content: str, channels: list[ChannelType] | None = None):

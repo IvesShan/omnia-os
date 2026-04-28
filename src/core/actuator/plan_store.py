@@ -94,100 +94,97 @@ class PlanStore:
     
     def _init_db(self):
         """初始化数据库表"""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
         
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS plans (
-                id TEXT PRIMARY KEY,
-                session_id TEXT,
-                goal TEXT,
-                context TEXT,
-                current_step_index INTEGER,
-                status TEXT DEFAULT 'running',
-                created_at TEXT,
-                updated_at TEXT
-            )
-        """)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS plans (
+                    id TEXT PRIMARY KEY,
+                    session_id TEXT,
+                    goal TEXT,
+                    context TEXT,
+                    current_step_index INTEGER,
+                    status TEXT DEFAULT 'running',
+                    created_at TEXT,
+                    updated_at TEXT
+                )
+            """)
         
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS steps (
-                id TEXT PRIMARY KEY,
-                plan_id TEXT,
-                description TEXT,
-                tool_name TEXT,
-                tool_args TEXT,
-                status TEXT,
-                result TEXT,
-                observation TEXT,
-                dependencies TEXT,
-                step_index INTEGER,
-                FOREIGN KEY (plan_id) REFERENCES plans(id)
-            )
-        """)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS steps (
+                    id TEXT PRIMARY KEY,
+                    plan_id TEXT,
+                    description TEXT,
+                    tool_name TEXT,
+                    tool_args TEXT,
+                    status TEXT,
+                    result TEXT,
+                    observation TEXT,
+                    dependencies TEXT,
+                    step_index INTEGER,
+                    FOREIGN KEY (plan_id) REFERENCES plans(id)
+                )
+            """)
         
-        conn.commit()
-        conn.close()
+            conn.commit()
     
     def save_plan(self, plan: Plan, session_id: str = None) -> None:
         """保存 Plan 到数据库"""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
         
         # 更新时间
-        plan.updated_at = datetime.now().isoformat()
+            plan.updated_at = datetime.now().isoformat()
         
         # 保存 plan
-        cursor.execute("""
-            INSERT OR REPLACE INTO plans 
-            (id, session_id, goal, context, current_step_index, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, (
-            plan.id,
-            session_id,
-            plan.goal,
-            json.dumps(plan.context),
-            plan.current_step_index,
-            plan.created_at,
-            plan.updated_at,
-        ))
-        
-        # 保存 steps
-        for idx, step in enumerate(plan.steps):
             cursor.execute("""
-                INSERT OR REPLACE INTO steps
-                (id, plan_id, description, tool_name, tool_args, status, result, observation, dependencies, step_index)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT OR REPLACE INTO plans 
+                (id, session_id, goal, context, current_step_index, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
             """, (
-                step.id,
                 plan.id,
-                step.description,
-                step.tool_name,
-                json.dumps(step.tool_args),
-                step.status,
-                json.dumps(step.result) if step.result else None,
-                step.observation,
-                json.dumps(step.dependencies),
-                idx,
+                session_id,
+                plan.goal,
+                json.dumps(plan.context),
+                plan.current_step_index,
+                plan.created_at,
+                plan.updated_at,
             ))
         
-        conn.commit()
-        conn.close()
+        # 保存 steps
+            for idx, step in enumerate(plan.steps):
+                cursor.execute("""
+                    INSERT OR REPLACE INTO steps
+                    (id, plan_id, description, tool_name, tool_args, status, result, observation, dependencies, step_index)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    step.id,
+                    plan.id,
+                    step.description,
+                    step.tool_name,
+                    json.dumps(step.tool_args),
+                    step.status,
+                    json.dumps(step.result) if step.result else None,
+                    step.observation,
+                    json.dumps(step.dependencies),
+                    idx,
+                ))
+        
+            conn.commit()
     
     def load_plan(self, plan_id: str = None, session_id: str = None) -> Optional[Plan]:
         """从数据库加载 Plan"""
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
         
         # 查找 plan
-        if plan_id:
-            cursor.execute("SELECT * FROM plans WHERE id = ?", (plan_id,))
-        elif session_id:
-            cursor.execute("SELECT * FROM plans WHERE session_id = ? ORDER BY updated_at DESC LIMIT 1", (session_id,))
-        else:
-            conn.close()
-            return None
+            if plan_id:
+                cursor.execute("SELECT * FROM plans WHERE id = ?", (plan_id,))
+            elif session_id:
+                cursor.execute("SELECT * FROM plans WHERE session_id = ? ORDER BY updated_at DESC LIMIT 1", (session_id,))
+            else:
+                return None
         
         row = cursor.fetchone()
         if not row:
@@ -227,67 +224,64 @@ class PlanStore:
     
     def update_step(self, plan_id: str, step_id: str, status: str = None, result: Dict = None, observation: str = None):
         """更新单个步骤状态"""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
         
-        updates = []
-        params = []
+            updates = []
+            params = []
         
-        if status:
-            updates.append("status = ?")
-            params.append(status)
-        if result is not None:
-            updates.append("result = ?")
-            params.append(json.dumps(result))
-        if observation is not None:
-            updates.append("observation = ?")
-            params.append(observation)
+            if status:
+                updates.append("status = ?")
+                params.append(status)
+            if result is not None:
+                updates.append("result = ?")
+                params.append(json.dumps(result))
+            if observation is not None:
+                updates.append("observation = ?")
+                params.append(observation)
         
-        if updates:
-            params.extend([step_id, plan_id])
-            cursor.execute(f"""
-                UPDATE steps SET {', '.join(updates)}
-                WHERE id = ? AND plan_id = ?
-            """, params)
+            if updates:
+                params.extend([step_id, plan_id])
+                cursor.execute(f"""
+                    UPDATE steps SET {', '.join(updates)}
+                    WHERE id = ? AND plan_id = ?
+                """, params)
             
             # 更新 plan 的 updated_at
-            cursor.execute("""
-                UPDATE plans SET updated_at = ? WHERE id = ?
-            """, (datetime.now().isoformat(), plan_id))
+                cursor.execute("""
+                    UPDATE plans SET updated_at = ? WHERE id = ?
+                """, (datetime.now().isoformat(), plan_id))
             
-            conn.commit()
+                conn.commit()
         
-        conn.close()
     
     def list_active_plans(self, limit: int = 10) -> List[Dict]:
         """列出所有活跃的 Plan"""
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
         
-        cursor.execute("""
-            SELECT id, goal, status, created_at, updated_at
-            FROM plans 
-            WHERE status = 'running'
-            ORDER BY updated_at DESC
-            LIMIT ?
-        """, (limit,))
+            cursor.execute("""
+                SELECT id, goal, status, created_at, updated_at
+                FROM plans 
+                WHERE status = 'running'
+                ORDER BY updated_at DESC
+                LIMIT ?
+            """, (limit,))
         
-        results = [dict(row) for row in cursor.fetchall()]
-        conn.close()
+            results = [dict(row) for row in cursor.fetchall()]
         return results
     
     def mark_plan_completed(self, plan_id: str, status: str = "completed"):
         """标记 Plan 完成"""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
         
-        cursor.execute("""
-            UPDATE plans SET status = ?, updated_at = ? WHERE id = ?
-        """, (status, datetime.now().isoformat(), plan_id))
+            cursor.execute("""
+                UPDATE plans SET status = ?, updated_at = ? WHERE id = ?
+            """, (status, datetime.now().isoformat(), plan_id))
         
-        conn.commit()
-        conn.close()
+            conn.commit()
 
 
 # 全局实例

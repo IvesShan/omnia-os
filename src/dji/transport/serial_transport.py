@@ -127,7 +127,7 @@ class SerialTransport:
         if self.serial and self.serial.is_open:
             try:
                 self.serial.close()
-            except:
+            except Exception:
                 pass
             self.serial = None
         

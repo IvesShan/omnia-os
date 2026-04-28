@@ -9,7 +9,6 @@ DJI 无人机智能诊断工具
 
 import sys
 import os
-import time
 import json
 import logging
 from typing import Optional, Dict, Any, List
@@ -127,7 +126,7 @@ class SmartDroneDiagnosis:
                 choice = input("     输入 y 继续，其他键退出: ").strip().lower()
                 if choice == 'y':
                     return self.run_simulated_diagnosis(result)
-            except:
+            except Exception:
                 pass
             
             result['errors'].append('未发现设备')

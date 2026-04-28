@@ -9,15 +9,19 @@ from typing import List, Dict, Any, Optional
 from collections import defaultdict, deque
 import random
 import time
+from pathlib import Path
 
-DB_PATH = "/home/shan/.omnia/memory_palace.db"
+# 使用统一配置
+from core.config import MEMORY_PALACE_DB
+
+DB_PATH = str(MEMORY_PALACE_DB)
 
 
 class NeuralGraphAlgorithms:
     """神经图谱图算法引擎"""
     
-    def __init__(self, db_path: str = DB_PATH):
-        self.db_path = db_path
+    def __init__(self, db_path: str = None):
+        self.db_path = db_path or DB_PATH
         self._graph_cache = None
         self._cache_time = 0
     

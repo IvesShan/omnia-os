@@ -23,7 +23,7 @@ def find_model_code(data):
         for code, info in MODEL_CODES.items():
             if code in data_str:
                 return code, info
-    except:
+    except Exception:
         pass
     return None, None
 
@@ -115,7 +115,7 @@ def main():
     try:
         usb.util.dispose_resources(dev)
         dev.attach_kernel_driver(intf.bInterfaceNumber)
-    except:
+    except Exception:
         pass
     
     print("\n" + "=" * 70)

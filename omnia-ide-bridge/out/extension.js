@@ -38,7 +38,7 @@ function pushContext(ctx) {
         debug('push skipped: disabled');
         return;
     }
-    const endpoint = cfg.get('endpoint', 'http://127.0.0.1:6789/ide-context');
+    const endpoint = cfg.get('endpoint', 'http://127.0.0.1:5001/ide-context');
     const url = new URL(endpoint);
     const payload = JSON.stringify(ctx);
     const options = {

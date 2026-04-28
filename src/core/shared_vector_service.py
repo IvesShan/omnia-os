@@ -1,5 +1,9 @@
 """Shared Vector Service for Omnia.
 
+from core.logging_config import get_logger
+
+logger = get_logger(__name__)
+
 A singleton service that provides vector embeddings for:
 - Memory Palace (facts, habits, timeline)
 - Neural Graph (nodes)
@@ -32,10 +36,10 @@ if 'HF_ENDPOINT' not in os.environ:
         socket.setdefaulttimeout(3)
         socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect(('huggingface.co', 443))
         # Connection OK, use default
-    except:
+    except (sqlite3.Error) as e:
         # Connection failed, use mirror
         os.environ['HF_ENDPOINT'] = 'https://hf-mirror.com'
-        print("[SharedVectorService] Using HuggingFace mirror: hf-mirror.com")
+        logger.info("[SharedVectorService] Using HuggingFace mirror: hf-mirror.com")
 
 
 class SharedVectorService:
@@ -72,7 +76,7 @@ class SharedVectorService:
             # Start background loading
             self._start_background_load()
         else:
-            print(f"[SharedVectorService] Initialized (lazy mode, will load model on demand)")
+            logger.info(f"[SharedVectorService] Initialized (lazy mode, will load model on demand)")
     
     def _start_background_load(self):
         """Start loading model in background thread."""
@@ -153,12 +157,12 @@ class SharedVectorService:
         except ImportError as e:
             self._load_error = str(e)
             print(f"[SharedVectorService] ⚠ PyTorch/sentence-transformers not available: {e}")
-            print(f"[SharedVectorService] Using hash-based vectors (fallback mode)")
+            logger.info(f"[SharedVectorService] Using hash-based vectors (fallback mode)")
             return False
-        except Exception as e:
+        except (ValueError) as e:
             self._load_error = str(e)
             print(f"[SharedVectorService] ⚠ Failed to load semantic model: {e}")
-            print(f"[SharedVectorService] Using hash-based vectors (fallback mode)")
+            logger.info(f"[SharedVectorService] Using hash-based vectors (fallback mode)")
             return False
     
     def _hash_vector(self, text: str) -> np.ndarray:

@@ -1,4 +1,8 @@
 """
+from core.logging_config import get_logger
+
+logger = get_logger(__name__)
+
 Verified Execution - Omnia 2.0 创新功能
 
 目的：生成可验证的执行证明，让用户确认 Agent 真正完成了任务
@@ -17,7 +21,7 @@ Usage:
     proof = await executor.execute_with_proof("删除 test.txt", ["execute_shell"])
     
     if executor.verify(proof):
-        print("执行已验证通过")
+        logger.info("执行已验证通过")
 """
 
 from __future__ import annotations
@@ -105,7 +109,7 @@ class VerifiedExecution:
                     content = file_path.read_bytes()
                     file_hash = hashlib.md5(content).hexdigest()
                     files[str(file_path.relative_to(self.workspace))] = file_hash
-                except:
+                except (FileNotFoundError, IOError, PermissionError) as e:
                     continue
         
         # 捕获进程（简化）
@@ -114,7 +118,7 @@ class VerifiedExecution:
             import subprocess
             result = subprocess.run(['ps', 'aux'], capture_output=True, text=True)
             processes = result.stdout.split('\n')[:20]
-        except:
+        except Exception:
             pass
         
         # 捕获环境变量
@@ -186,7 +190,7 @@ class VerifiedExecution:
         )
         
         if proof.signature != expected_sig:
-            print("[Verification] Signature mismatch")
+            logger.info("[Verification] Signature mismatch")
             return False
         
         # 2. 验证状态变更
@@ -196,13 +200,13 @@ class VerifiedExecution:
         )
         
         if not file_changes:
-            print("[Verification] No state change detected")
+            logger.info("[Verification] No state change detected")
             # 可能是只读操作，仍然有效
         
         # 3. 验证时间戳
         time_diff = (proof.after_snapshot.timestamp - proof.before_snapshot.timestamp).total_seconds()
         if time_diff < 0:
-            print("[Verification] Invalid timestamp")
+            logger.info("[Verification] Invalid timestamp")
             return False
         
         proof.verified = True
@@ -237,14 +241,6 @@ class VerifiedExecution:
 # ============================================================================
 # Progressive Capability System
 # ============================================================================
-
-class CapabilityLevel(Enum):
-    """能力等级"""
-    BASIC = "basic"
-    INTERMEDIATE = "intermediate"
-    ADVANCED = "advanced"
-    EXPERT = "expert"
-
 
 @dataclass
 class UserCapability:
@@ -373,7 +369,7 @@ class PersonaContinuity:
             if self.db_path.exists():
                 data = json.loads(self.db_path.read_text())
                 # TODO: 反序列化
-        except:
+        except Exception:
             self._states = {}
     
     def _save(self):

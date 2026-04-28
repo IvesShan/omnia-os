@@ -1,5 +1,9 @@
 """Skill Forge — Skill Generator
 
+from core.logging_config import get_logger
+
+logger = get_logger(__name__)
+
 Converts a DetectedPattern into a structured SKILL.md draft.
 V0.1 uses built-in templates per bucket; falls back to a generic template.
 """
@@ -242,7 +246,6 @@ class SkillGenerator:
 
 
 if __name__ == "__main__":
-    import sys
 
     from .detector import PatternDetector
 
@@ -253,6 +256,6 @@ if __name__ == "__main__":
     print(f"Detected {len(patterns)} pattern(s).\n")
     for p in patterns:
         md = sg.generate(p)
-        print("=" * 60)
-        print(md)
-        print("=" * 60)
+        logger.info("=" * 60)
+        logger.info(md)
+        logger.info("=" * 60)

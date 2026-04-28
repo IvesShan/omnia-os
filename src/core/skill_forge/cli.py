@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 """Skill Forge CLI — Detect recurring patterns and auto-generate skills."""
+from core.logging_config import get_logger
+
+logger = get_logger(__name__)
+
 import sys
 import argparse
 from pathlib import Path
@@ -41,7 +45,7 @@ def main():
 
 
 def cmd_detect(args):
-    print("=== Skill Forge Pattern Detection ===\n")
+    logger.info("=== Skill Forge Pattern Detection ===\n")
     pd = PatternDetector(
         memory_dir=str(PROJECT_ROOT.parent / "memory"),
         lookback_days=args.days,
@@ -59,7 +63,7 @@ def cmd_detect(args):
         print(f"  置信度: {p.confidence:.2f}")
         print(f"  建议技能: {p.suggested_skill_name}")
         print()
-    print("✅ 检测完成!")
+    logger.info("✅ 检测完成!")
 
 
 def cmd_generate(args):
@@ -69,7 +73,7 @@ def cmd_generate(args):
 
 
 def cmd_run(args):
-    print("=== Skill Forge Full Pipeline ===\n")
+    logger.info("=== Skill Forge Full Pipeline ===\n")
     pd = PatternDetector(
         memory_dir=str(PROJECT_ROOT.parent / "memory"),
         lookback_days=args.days,
@@ -80,7 +84,7 @@ def cmd_run(args):
     for p in patterns:
         if p.confidence >= 0.7:
             print(f"🛠️  生成技能: {p.suggested_skill_name}")
-    print("\n✅ 流水线完成!")
+    logger.info("\n✅ 流水线完成!")
 
 
 if __name__ == "__main__":

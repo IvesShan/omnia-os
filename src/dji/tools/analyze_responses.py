@@ -73,7 +73,7 @@ def main():
             try:
                 if dev.is_kernel_driver_active(intf.bInterfaceNumber):
                     dev.detach_kernel_driver(intf.bInterfaceNumber)
-            except:
+            except Exception:
                 pass
     
     dev.reset()

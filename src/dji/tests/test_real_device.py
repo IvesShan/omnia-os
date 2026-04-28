@@ -5,7 +5,6 @@ DJI 实际设备测试脚本
 """
 
 import sys
-import time
 import usb.core
 import usb.util
 
@@ -179,7 +178,7 @@ def main():
                         response = ep_in.read(512, timeout=500)
                         print(f"     ✅ 收到响应: {len(response)} 字节")
                         print(f"        数据: {bytes(response[:32]).hex()}...")
-                    except:
+                    except Exception:
                         print(f"     ⚠️  无响应")
                         
                 except Exception as e:

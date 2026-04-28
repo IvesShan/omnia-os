@@ -358,7 +358,7 @@ class AutoSkillLearner:
             try:
                 data = json.loads(meta_file.read_text(encoding="utf-8"))
                 skills.append(data)
-            except:
+            except Exception:
                 continue
         return skills
     
@@ -377,7 +377,7 @@ class AutoSkillLearner:
                 procedure=data["procedure"],
                 metadata=data.get("metadata", {})
             )
-        except:
+        except Exception:
             return None
 
 
@@ -412,7 +412,7 @@ class SkillMatcher:
                     procedure=data["procedure"],
                     metadata=data.get("metadata", {})
                 ))
-            except:
+            except Exception:
                 continue
         
         self._skills = skills

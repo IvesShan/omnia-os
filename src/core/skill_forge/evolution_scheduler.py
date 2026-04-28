@@ -89,7 +89,7 @@ class EvolutionScheduler:
                 # Run evolution
                 result = self.run_now()
                 print(f"[EvolutionScheduler] Cycle complete: {len(result.skills_approved)} skills approved")
-            except Exception as e:
+            except (ValueError) as e:
                 print(f"[EvolutionScheduler] Error: {e}")
                 
             # Sleep for interval

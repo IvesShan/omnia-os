@@ -1,4 +1,8 @@
 """
+from core.logging_config import get_logger
+
+logger = get_logger(__name__)
+
 Omnia Chat Engine with Recurrent Reasoning
 
 集成循环推理引擎的聊天系统
@@ -141,16 +145,16 @@ class OmniaChatEngine:
 
 # 测试代码
 if __name__ == "__main__":
-    print("=" * 60)
-    print("Omnia Chat Engine Test")
-    print("=" * 60)
+    logger.info("=" * 60)
+    logger.info("Omnia Chat Engine Test")
+    logger.info("=" * 60)
     
     try:
         engine = OmniaChatEngine()
-        print("✅ Engine initialized")
+        logger.info("✅ Engine initialized")
         
         # 测试简单任务
-        print("\n📝 Test 1: Simple task")
+        logger.info("\n📝 Test 1: Simple task")
         response = engine.chat("你好")
         print(f"   Complexity: {response.complexity}")
         print(f"   Reasoning depth: {response.reasoning_depth}")
@@ -159,7 +163,7 @@ if __name__ == "__main__":
         print(f"   Time: {response.time_elapsed:.3f}s")
         
         # 测试中等任务
-        print("\n📝 Test 2: Medium task")
+        logger.info("\n📝 Test 2: Medium task")
         response = engine.chat("帮我写一个 Python 脚本来计算斐波那契数列")
         print(f"   Complexity: {response.complexity}")
         print(f"   Reasoning depth: {response.reasoning_depth}")
@@ -168,7 +172,7 @@ if __name__ == "__main__":
         print(f"   Time: {response.time_elapsed:.3f}s")
         
         # 测试复杂任务
-        print("\n📝 Test 3: Complex task")
+        logger.info("\n📝 Test 3: Complex task")
         response = engine.chat("分析一下量子计算的基本原理，以及它在密码学领域的应用前景")
         print(f"   Complexity: {response.complexity}")
         print(f"   Reasoning depth: {response.reasoning_depth}")
@@ -176,9 +180,9 @@ if __name__ == "__main__":
         print(f"   Response: {response.content[:150]}...")
         print(f"   Time: {response.time_elapsed:.3f}s")
         
-        print("\n✅ All tests passed!")
+        logger.info("\n✅ All tests passed!")
         
-    except Exception as e:
+    except (ValueError) as e:
         print(f"❌ Error: {e}")
         import traceback
         traceback.print_exc()

@@ -142,7 +142,7 @@ class USBTransport:
         if self.device:
             try:
                 usb.util.dispose_resources(self.device)
-            except:
+            except Exception:
                 pass
             self.device = None
         
@@ -305,7 +305,7 @@ def list_dji_devices() -> List[dict]:
                 'product': dev.product,
                 'serial_number': dev.serial_number,
             })
-        except:
+        except Exception:
             result.append({
                 'vendor_id': hex(dev.idVendor),
                 'product_id': hex(dev.idProduct),

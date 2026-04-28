@@ -56,33 +56,32 @@ class AnomalyDetector:
     
     def _init_db(self):
         """初始化异常数据库"""
-        conn = sqlite3.connect(self.db_path)
-        conn.execute('''
-            CREATE TABLE IF NOT EXISTS anomalies (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                anomaly_type TEXT NOT NULL,
-                severity TEXT NOT NULL,
-                description TEXT,
-                session_id TEXT,
-                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                context TEXT,
-                resolved BOOLEAN DEFAULT 0,
-                resolved_at TIMESTAMP
-            )
-        ''')
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute('''
+                CREATE TABLE IF NOT EXISTS anomalies (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    anomaly_type TEXT NOT NULL,
+                    severity TEXT NOT NULL,
+                    description TEXT,
+                    session_id TEXT,
+                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    context TEXT,
+                    resolved BOOLEAN DEFAULT 0,
+                    resolved_at TIMESTAMP
+                )
+            ''')
         
-        conn.execute('''
-            CREATE INDEX IF NOT EXISTS idx_anomaly_type
-            ON anomalies(anomaly_type)
-        ''')
+            conn.execute('''
+                CREATE INDEX IF NOT EXISTS idx_anomaly_type
+                ON anomalies(anomaly_type)
+            ''')
         
-        conn.execute('''
-            CREATE INDEX IF NOT EXISTS idx_timestamp
-            ON anomalies(timestamp)
-        ''')
+            conn.execute('''
+                CREATE INDEX IF NOT EXISTS idx_timestamp
+                ON anomalies(timestamp)
+            ''')
         
-        conn.commit()
-        conn.close()
+            conn.commit()
     
     def detect_conversation_interrupt(self, session_id: str, last_activity: datetime) -> Optional[Anomaly]:
         """检测对话中断"""
@@ -164,50 +163,47 @@ class AnomalyDetector:
     
     def save_anomaly(self, anomaly: Anomaly):
         """保存异常记录"""
-        conn = sqlite3.connect(self.db_path)
-        conn.execute('''
-            INSERT INTO anomalies 
-            (anomaly_type, severity, description, session_id, timestamp, context, resolved)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        ''', (
-            anomaly.anomaly_type.value,
-            anomaly.severity,
-            anomaly.description,
-            anomaly.session_id,
-            anomaly.timestamp.isoformat(),
-            json.dumps(anomaly.context),
-            anomaly.resolved
-        ))
-        conn.commit()
-        conn.close()
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute('''
+                INSERT INTO anomalies 
+                (anomaly_type, severity, description, session_id, timestamp, context, resolved)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                anomaly.anomaly_type.value,
+                anomaly.severity,
+                anomaly.description,
+                anomaly.session_id,
+                anomaly.timestamp.isoformat(),
+                json.dumps(anomaly.context),
+                anomaly.resolved
+            ))
+            conn.commit()
     
     def resolve_anomaly(self, anomaly_id: int):
         """解决异常"""
-        conn = sqlite3.connect(self.db_path)
-        conn.execute('''
-            UPDATE anomalies
-            SET resolved = 1, resolved_at = ?
-            WHERE id = ?
-        ''', (datetime.now().isoformat(), anomaly_id))
-        conn.commit()
-        conn.close()
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute('''
+                UPDATE anomalies
+                SET resolved = 1, resolved_at = ?
+                WHERE id = ?
+            ''', (datetime.now().isoformat(), anomaly_id))
+            conn.commit()
     
     def get_recent_anomalies(self, hours: int = 24, limit: int = 100) -> List[Anomaly]:
         """获取最近的异常"""
-        conn = sqlite3.connect(self.db_path)
+        with sqlite3.connect(self.db_path) as conn:
         
-        cutoff = datetime.now() - timedelta(hours=hours)
+            cutoff = datetime.now() - timedelta(hours=hours)
         
-        rows = conn.execute('''
-            SELECT id, anomaly_type, severity, description, session_id, 
-                   timestamp, context, resolved, resolved_at
-            FROM anomalies
-            WHERE timestamp >= ?
-            ORDER BY timestamp DESC
-            LIMIT ?
-        ''', (cutoff.isoformat(), limit)).fetchall()
+            rows = conn.execute('''
+                SELECT id, anomaly_type, severity, description, session_id, 
+                       timestamp, context, resolved, resolved_at
+                FROM anomalies
+                WHERE timestamp >= ?
+                ORDER BY timestamp DESC
+                LIMIT ?
+            ''', (cutoff.isoformat(), limit)).fetchall()
         
-        conn.close()
         
         return [
             Anomaly(
@@ -225,17 +221,16 @@ class AnomalyDetector:
     
     def get_unresolved_anomalies(self) -> List[Anomaly]:
         """获取未解决的异常"""
-        conn = sqlite3.connect(self.db_path)
+        with sqlite3.connect(self.db_path) as conn:
         
-        rows = conn.execute('''
-            SELECT id, anomaly_type, severity, description, session_id, 
-                   timestamp, context, resolved, resolved_at
-            FROM anomalies
-            WHERE resolved = 0
-            ORDER BY severity DESC, timestamp DESC
-        ''').fetchall()
+            rows = conn.execute('''
+                SELECT id, anomaly_type, severity, description, session_id, 
+                       timestamp, context, resolved, resolved_at
+                FROM anomalies
+                WHERE resolved = 0
+                ORDER BY severity DESC, timestamp DESC
+            ''').fetchall()
         
-        conn.close()
         
         return [
             Anomaly(
@@ -253,33 +248,32 @@ class AnomalyDetector:
     
     def get_anomaly_stats(self, hours: int = 24) -> Dict:
         """获取异常统计"""
-        conn = sqlite3.connect(self.db_path)
+        with sqlite3.connect(self.db_path) as conn:
         
-        cutoff = datetime.now() - timedelta(hours=hours)
+            cutoff = datetime.now() - timedelta(hours=hours)
         
         # 按类型统计
-        type_stats = conn.execute('''
-            SELECT anomaly_type, COUNT(*) as count
-            FROM anomalies
-            WHERE timestamp >= ?
-            GROUP BY anomaly_type
-        ''', (cutoff.isoformat(),)).fetchall()
+            type_stats = conn.execute('''
+                SELECT anomaly_type, COUNT(*) as count
+                FROM anomalies
+                WHERE timestamp >= ?
+                GROUP BY anomaly_type
+            ''', (cutoff.isoformat(),)).fetchall()
         
         # 按严重程度统计
-        severity_stats = conn.execute('''
-            SELECT severity, COUNT(*) as count
-            FROM anomalies
-            WHERE timestamp >= ?
-            GROUP BY severity
-        ''', (cutoff.isoformat(),)).fetchall()
+            severity_stats = conn.execute('''
+                SELECT severity, COUNT(*) as count
+                FROM anomalies
+                WHERE timestamp >= ?
+                GROUP BY severity
+            ''', (cutoff.isoformat(),)).fetchall()
         
         # 未解决数量
-        unresolved = conn.execute('''
-            SELECT COUNT(*) FROM anomalies
-            WHERE resolved = 0 AND timestamp >= ?
-        ''', (cutoff.isoformat(),)).fetchone()[0]
+            unresolved = conn.execute('''
+                SELECT COUNT(*) FROM anomalies
+                WHERE resolved = 0 AND timestamp >= ?
+            ''', (cutoff.isoformat(),)).fetchone()[0]
         
-        conn.close()
         
         return {
             'by_type': {row[0]: row[1] for row in type_stats},

@@ -20,7 +20,7 @@ def load_working_memory(project_root: Path) -> Optional[str]:
         if len(content) > 1000:
             content = content[:1000] + "\n... (truncated)"
         return content
-    except Exception:
+    except (FileNotFoundError, IOError, PermissionError) as e:
         return None
 
 
@@ -39,7 +39,7 @@ def load_current_task(project_root: Path) -> Optional[str]:
         if "**任务 ID**: -" in content or "**任务 ID**:-" in content:
             return None  # No active task
         return content
-    except Exception:
+    except (FileNotFoundError, IOError, PermissionError) as e:
         return None
 
 
@@ -91,7 +91,7 @@ def update_essential_context(
                 lines[i] = f"*最后更新: {now}*"
         
         essential_path.write_text("\n".join(lines), encoding="utf-8")
-    except Exception:
+    except (FileNotFoundError, IOError, PermissionError) as e:
         pass
 
 

@@ -230,7 +230,7 @@ class SmartPauser:
                     metadata=data.get("metadata", {}),
                     timestamp=data.get("timestamp", ""),
                 )
-            except:
+            except Exception:
                 pass
         return None
     

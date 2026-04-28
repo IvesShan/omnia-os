@@ -6,7 +6,6 @@ DJI 设备管理器
 from typing import Optional, List, Dict, Any, Union
 from dataclasses import dataclass
 import logging
-import time
 
 from ..protocols.v1_protocol import DeviceType, CommandID, get_device_name
 from ..transport.usb_transport import USBTransport, USBConfig, list_dji_devices

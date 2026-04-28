@@ -13,7 +13,6 @@ import usb.core
 import usb.util
 import logging
 import struct
-import time
 
 logging.basicConfig(
     level=logging.INFO,

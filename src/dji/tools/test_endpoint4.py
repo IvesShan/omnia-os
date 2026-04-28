@@ -46,7 +46,7 @@ class DJIEndpoint4Test:
                 try:
                     if self.device.is_kernel_driver_active(intf.bInterfaceNumber):
                         self.device.detach_kernel_driver(intf.bInterfaceNumber)
-                except:
+                except Exception:
                     pass
         
         # 重置
@@ -54,7 +54,7 @@ class DJIEndpoint4Test:
             self.device.reset()
             logger.info("设备已重置")
             time.sleep(1)
-        except:
+        except Exception:
             pass
     
     def calculate_crc(self, data):

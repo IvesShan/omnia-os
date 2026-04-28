@@ -71,35 +71,34 @@ class ReminderEngine:
     
     def _init_db(self):
         """初始化提醒数据库"""
-        conn = sqlite3.connect(self.db_path)
-        conn.execute('''
-            CREATE TABLE IF NOT EXISTS reminders (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                reminder_id TEXT UNIQUE NOT NULL,
-                reminder_type TEXT NOT NULL,
-                content TEXT NOT NULL,
-                trigger_time TIMESTAMP NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                session_id TEXT,
-                context TEXT,
-                priority INTEGER DEFAULT 3,
-                status TEXT DEFAULT 'pending',
-                triggered_at TIMESTAMP
-            )
-        ''')
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute('''
+                CREATE TABLE IF NOT EXISTS reminders (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    reminder_id TEXT UNIQUE NOT NULL,
+                    reminder_type TEXT NOT NULL,
+                    content TEXT NOT NULL,
+                    trigger_time TIMESTAMP NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    session_id TEXT,
+                    context TEXT,
+                    priority INTEGER DEFAULT 3,
+                    status TEXT DEFAULT 'pending',
+                    triggered_at TIMESTAMP
+                )
+            ''')
         
-        conn.execute('''
-            CREATE INDEX IF NOT EXISTS idx_trigger_time
-            ON reminders(trigger_time)
-        ''')
+            conn.execute('''
+                CREATE INDEX IF NOT EXISTS idx_trigger_time
+                ON reminders(trigger_time)
+            ''')
         
-        conn.execute('''
-            CREATE INDEX IF NOT EXISTS idx_status
-            ON reminders(status)
-        ''')
+            conn.execute('''
+                CREATE INDEX IF NOT EXISTS idx_status
+                ON reminders(status)
+            ''')
         
-        conn.commit()
-        conn.close()
+            conn.commit()
     
     def analyze_context(self, context: Dict) -> List[Reminder]:
         """分析上下文，识别提醒点"""
@@ -205,41 +204,39 @@ class ReminderEngine:
     
     def _save_reminder(self, reminder: Reminder):
         """保存提醒"""
-        conn = sqlite3.connect(self.db_path)
-        conn.execute('''
-            INSERT INTO reminders 
-            (reminder_id, reminder_type, content, trigger_time, created_at,
-             session_id, context, priority, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (
-            reminder.reminder_id,
-            reminder.reminder_type.value,
-            reminder.content,
-            reminder.trigger_time.isoformat(),
-            reminder.created_at.isoformat(),
-            reminder.session_id,
-            json.dumps(reminder.context),
-            reminder.priority,
-            reminder.status
-        ))
-        conn.commit()
-        conn.close()
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute('''
+                INSERT INTO reminders 
+                (reminder_id, reminder_type, content, trigger_time, created_at,
+                 session_id, context, priority, status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                reminder.reminder_id,
+                reminder.reminder_type.value,
+                reminder.content,
+                reminder.trigger_time.isoformat(),
+                reminder.created_at.isoformat(),
+                reminder.session_id,
+                json.dumps(reminder.context),
+                reminder.priority,
+                reminder.status
+            ))
+            conn.commit()
     
     def check_reminders(self) -> List[Reminder]:
         """检查到期提醒"""
-        conn = sqlite3.connect(self.db_path)
+        with sqlite3.connect(self.db_path) as conn:
         
-        now = datetime.now()
+            now = datetime.now()
         
-        rows = conn.execute('''
-            SELECT reminder_id, reminder_type, content, trigger_time,
-                   created_at, session_id, context, priority, status, triggered_at
-            FROM reminders
-            WHERE status = 'pending' AND trigger_time <= ?
-            ORDER BY priority DESC, trigger_time ASC
-        ''', (now.isoformat(),)).fetchall()
+            rows = conn.execute('''
+                SELECT reminder_id, reminder_type, content, trigger_time,
+                       created_at, session_id, context, priority, status, triggered_at
+                FROM reminders
+                WHERE status = 'pending' AND trigger_time <= ?
+                ORDER BY priority DESC, trigger_time ASC
+            ''', (now.isoformat(),)).fetchall()
         
-        conn.close()
         
         reminders = []
         for row in rows:
@@ -261,40 +258,37 @@ class ReminderEngine:
     
     def trigger_reminder(self, reminder_id: str):
         """触发提醒"""
-        conn = sqlite3.connect(self.db_path)
-        conn.execute('''
-            UPDATE reminders
-            SET status = 'triggered', triggered_at = ?
-            WHERE reminder_id = ?
-        ''', (datetime.now().isoformat(), reminder_id))
-        conn.commit()
-        conn.close()
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute('''
+                UPDATE reminders
+                SET status = 'triggered', triggered_at = ?
+                WHERE reminder_id = ?
+            ''', (datetime.now().isoformat(), reminder_id))
+            conn.commit()
     
     def dismiss_reminder(self, reminder_id: str):
         """关闭提醒"""
-        conn = sqlite3.connect(self.db_path)
-        conn.execute('''
-            UPDATE reminders
-            SET status = 'dismissed'
-            WHERE reminder_id = ?
-        ''', (reminder_id,))
-        conn.commit()
-        conn.close()
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute('''
+                UPDATE reminders
+                SET status = 'dismissed'
+                WHERE reminder_id = ?
+            ''', (reminder_id,))
+            conn.commit()
     
     def get_pending_reminders(self, limit: int = 20) -> List[Reminder]:
         """获取待处理提醒"""
-        conn = sqlite3.connect(self.db_path)
+        with sqlite3.connect(self.db_path) as conn:
         
-        rows = conn.execute('''
-            SELECT reminder_id, reminder_type, content, trigger_time,
-                   created_at, session_id, context, priority, status, triggered_at
-            FROM reminders
-            WHERE status = 'pending'
-            ORDER BY trigger_time ASC
-            LIMIT ?
-        ''', (limit,)).fetchall()
+            rows = conn.execute('''
+                SELECT reminder_id, reminder_type, content, trigger_time,
+                       created_at, session_id, context, priority, status, triggered_at
+                FROM reminders
+                WHERE status = 'pending'
+                ORDER BY trigger_time ASC
+                LIMIT ?
+            ''', (limit,)).fetchall()
         
-        conn.close()
         
         reminders = []
         for row in rows:
@@ -316,33 +310,32 @@ class ReminderEngine:
     
     def get_reminder_stats(self, days: int = 7) -> Dict:
         """获取提醒统计"""
-        conn = sqlite3.connect(self.db_path)
+        with sqlite3.connect(self.db_path) as conn:
         
-        cutoff = datetime.now() - timedelta(days=days)
+            cutoff = datetime.now() - timedelta(days=days)
         
         # 按类型统计
-        type_stats = conn.execute('''
-            SELECT reminder_type, COUNT(*) as count
-            FROM reminders
-            WHERE created_at >= ?
-            GROUP BY reminder_type
-        ''', (cutoff.isoformat(),)).fetchall()
+            type_stats = conn.execute('''
+                SELECT reminder_type, COUNT(*) as count
+                FROM reminders
+                WHERE created_at >= ?
+                GROUP BY reminder_type
+            ''', (cutoff.isoformat(),)).fetchall()
         
         # 按状态统计
-        status_stats = conn.execute('''
-            SELECT status, COUNT(*) as count
-            FROM reminders
-            WHERE created_at >= ?
-            GROUP BY status
-        ''', (cutoff.isoformat(),)).fetchall()
+            status_stats = conn.execute('''
+                SELECT status, COUNT(*) as count
+                FROM reminders
+                WHERE created_at >= ?
+                GROUP BY status
+            ''', (cutoff.isoformat(),)).fetchall()
         
         # 待处理数量
-        pending = conn.execute('''
-            SELECT COUNT(*) FROM reminders
-            WHERE status = 'pending'
-        ''').fetchone()[0]
+            pending = conn.execute('''
+                SELECT COUNT(*) FROM reminders
+                WHERE status = 'pending'
+            ''').fetchone()[0]
         
-        conn.close()
         
         return {
             'by_type': {row[0]: row[1] for row in type_stats},

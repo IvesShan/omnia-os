@@ -19,8 +19,11 @@ import re
 from datetime import datetime, date
 from typing import Optional, List, Tuple, Dict, Any
 
+from core.logging_config import get_logger
 from core.plugin.hooks import register_hook, HookType, HookContext
 from core.memory_palace import MemoryPalace
+
+logger = get_logger(__name__)
 
 
 # 全局 Memory Palace 实例
@@ -168,7 +171,7 @@ def auto_store_memory(context: HookContext):
     if not message:
         return
     
-    print(f"[Hook:auto_memory] Processing message: {message[:50]}...")
+    logger.info(f"[Hook:auto_memory] Processing message: {message[:50]}...")
     
     # 从 metadata 获取完整对话
     if context.metadata:
@@ -186,17 +189,17 @@ def auto_store_memory(context: HookContext):
             # 存储事实
             for category, key, value in info["facts"]:
                 palace.remember_fact(category, key, value, source="conversation")
-                print(f"[Hook:auto_memory] Stored fact: {category}.{key} = {value[:30]}...")
+                logger.info(f"[Hook:auto_memory] Stored fact: {category}.{key} = {value[:30]}...")
             
             # 存储关系
             for subject, predicate, obj, ctx in info["relations"]:
                 palace.remember_relation(subject, predicate, obj, context=ctx)
-                print(f"[Hook:auto_memory] Stored relation: {subject} -> {predicate} -> {obj}")
+                logger.info(f"[Hook:auto_memory] Stored relation: {subject} -> {predicate} -> {obj}")
             
             # 存储习惯
             for domain, pattern, certainty in info["habits"]:
                 palace.remember_habit(domain, pattern, certainty=certainty)
-                print(f"[Hook:auto_memory] Stored habit: {domain}")
+                logger.info(f"[Hook:auto_memory] Stored habit: {domain}")
             
             # 存储时间线
             if info["timeline_summary"]:
@@ -205,7 +208,7 @@ def auto_store_memory(context: HookContext):
                     content=info["timeline_summary"],
                     metadata={"user_message": user_msg[:200]}
                 )
-                print(f"[Hook:auto_memory] Stored timeline: {info['timeline_summary'][:50]}...")
+                logger.info(f"[Hook:auto_memory] Stored timeline: {info['timeline_summary'][:50]}...")
     
     return None
 
@@ -231,7 +234,7 @@ def auto_store_after_response(context: HookContext):
     if not user_msg:
         return
     
-    print(f"[Hook:auto_memory] Storing conversation after response...")
+    logger.info("[Hook:auto_memory] Storing conversation after response...")
     
     # 判断是否需要存储
     if not should_store_memory(user_msg, assistant_msg):
@@ -246,17 +249,17 @@ def auto_store_after_response(context: HookContext):
     # 存储事实
     for category, key, value in info["facts"]:
         palace.remember_fact(category, key, value, source="conversation")
-        print(f"[Hook:auto_memory] ✓ Fact: {category}.{key}")
+        logger.info(f"[Hook:auto_memory] ✓ Fact: {category}.{key}")
     
     # 存储关系
     for subject, predicate, obj, ctx in info["relations"]:
         palace.remember_relation(subject, predicate, obj, context=ctx)
-        print(f"[Hook:auto_memory] ✓ Relation: {subject} -> {predicate} -> {obj}")
+        logger.info(f"[Hook:auto_memory] ✓ Relation: {subject} -> {predicate} -> {obj}")
     
     # 存储习惯
     for domain, pattern, certainty in info["habits"]:
         palace.remember_habit(domain, pattern, certainty=certainty)
-        print(f"[Hook:auto_memory] ✓ Habit: {domain}")
+        logger.info(f"[Hook:auto_memory] ✓ Habit: {domain}")
     
     # 存储时间线
     if info["timeline_summary"]:
@@ -265,7 +268,7 @@ def auto_store_after_response(context: HookContext):
             content=info["timeline_summary"],
             metadata={"user_message": user_msg[:200], "assistant_message": assistant_msg[:200]}
         )
-        print(f"[Hook:auto_memory] ✓ Timeline: {info['timeline_summary'][:50]}...")
+        logger.info(f"[Hook:auto_memory] ✓ Timeline: {info['timeline_summary'][:50]}...")
     
     # 总是存储对话到时间线
     palace.remember_timeline(
@@ -291,7 +294,7 @@ def extract_knowledge_from_tool_use(context: HookContext):
     if not tool_name or not tool_result:
         return
     
-    print(f"[Hook:auto_memory] Extracting knowledge from tool: {tool_name}")
+    logger.info(f"[Hook:auto_memory] Extracting knowledge from tool: {tool_name}")
     
     palace = get_memory_palace()
     
@@ -337,6 +340,6 @@ def extract_knowledge_from_tool_use(context: HookContext):
 
 
 # 初始化时打印日志
-print("[AutoMemory] Hook registered: ON_MESSAGE -> auto_store_memory")
-print("[AutoMemory] Hook registered: POST_RESPONSE -> auto_store_after_response")
-print("[AutoMemory] Hook registered: POST_TOOL_USE -> extract_tool_knowledge")
+logger.info("[AutoMemory] Hook registered: ON_MESSAGE -> auto_store_memory")
+logger.info("[AutoMemory] Hook registered: POST_RESPONSE -> auto_store_after_response")
+logger.info("[AutoMemory] Hook registered: POST_TOOL_USE -> extract_tool_knowledge")

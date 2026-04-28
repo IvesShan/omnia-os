@@ -1,5 +1,9 @@
 """Vector IPC Service — Inter-process communication for shared vector embeddings.
 
+from core.logging_config import get_logger
+
+logger = get_logger(__name__)
+
 Architecture:
     ┌─────────────┐         Unix Socket        ┌──────────────┐
     │  Web Server │ ────────────────────────→  │   Daemon     │
@@ -74,14 +78,14 @@ class VectorIPCServer:
         if self._server_socket:
             try:
                 self._server_socket.close()
-            except:
+            except Exception:
                 pass
         if os.path.exists(self.socket_path):
             try:
                 os.unlink(self.socket_path)
-            except:
+            except Exception:
                 pass
-        print("[VectorIPC] Server stopped")
+        logger.info("[VectorIPC] Server stopped")
     
     def _run_server(self):
         """Run the server loop."""
@@ -102,11 +106,11 @@ class VectorIPCServer:
                     ).start()
                 except socket.timeout:
                     continue
-                except Exception as e:
+                except (FileNotFoundError, IOError, PermissionError) as e:
                     if self.running:
                         print(f"[VectorIPC] Accept error: {e}")
         
-        except Exception as e:
+        except (ValueError) as e:
             print(f"[VectorIPC] Server error: {e}")
         finally:
             self.stop()
@@ -135,11 +139,11 @@ class VectorIPCServer:
             response_data = json.dumps(response).encode('utf-8')
             client_socket.sendall(response_data)
         
-        except Exception as e:
+        except (json.JSONDecodeError) as e:
             try:
                 error_response = {"error": str(e)}
                 client_socket.sendall(json.dumps(error_response).encode('utf-8'))
-            except:
+            except (json.JSONDecodeError) as e:
                 pass
         finally:
             client_socket.close()
@@ -223,7 +227,7 @@ class VectorIPCClient:
             sock.close()
             self._available = True
             return True
-        except:
+        except (sqlite3.Error) as e:
             self._available = False
             return False
     
@@ -312,9 +316,9 @@ class HybridVectorService:
         if self._use_ipc is None:
             self._use_ipc = self.ipc_client.is_available()
             if self._use_ipc:
-                print("[HybridVectorService] Using IPC (shared daemon model)")
+                logger.info("[HybridVectorService] Using IPC (shared daemon model)")
             else:
-                print("[HybridVectorService] Using local (fallback mode)")
+                logger.info("[HybridVectorService] Using local (fallback mode)")
         
         if self._use_ipc:
             return self.ipc_client

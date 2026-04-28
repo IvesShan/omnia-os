@@ -66,7 +66,7 @@ def main():
             try:
                 if device.is_kernel_driver_active(intf.bInterfaceNumber):
                     device.detach_kernel_driver(intf.bInterfaceNumber)
-            except:
+            except Exception:
                 pass
     
     device.reset()

@@ -57,7 +57,7 @@ class SessionManagerEnhanced:
     """增强会话管理器"""
     
     def __init__(self, db_path: str = None):
-        self.db_path = db_path or "/home/shan/omnia-os/data/sessions.db"
+        self.db_path = db_path or str(Path.home() / ".omnia" / "sessions.db")
         Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
         self._init_db()
         self.current_session: Optional[Session] = None

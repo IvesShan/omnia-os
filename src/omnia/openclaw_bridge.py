@@ -2,7 +2,6 @@
 # 使用 OpenClaw 的 Gateway 调用 Kimi API
 
 import requests
-import json
 from typing import List, Dict, Any, Optional
 
 def call_via_openclaw(message: str, history: List[Dict] = None, tools: Optional[List[Dict]] = None) -> Dict[str, Any]:

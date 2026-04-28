@@ -162,7 +162,6 @@ class MemoryPalace:
                     fts_index_sql = [line]
         
         # 更稳健的方式：从 schema.sql 中提取 FTS 和索引语句
-        import re
         # 找到 "Full-text search" 之后的所有内容
         fts_part = sql[sql.find('-- ============================================\n-- Full-text search'):]
         conn.executescript(fts_part)
@@ -1013,7 +1012,7 @@ class MemoryPalace:
         cursor = conn.execute(
             """INSERT INTO conversation_logs 
                (session_id, turn_number, role, content, persona, embedding, metadata)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
             (session_id, turn_number, role, content, persona, embedding_blob, metadata_json),
         )
         conn.commit()

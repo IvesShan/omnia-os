@@ -135,7 +135,7 @@ def main():
                 data = device.read(ep_in, 512, timeout=1000)
                 print(f"    ✅ 接收成功: {len(data)} 字节")
                 print(f"    数据: {data.hex()}")
-            except:
+            except Exception:
                 print(f"    ⚠️  无接收")
                 
         except Exception as e:

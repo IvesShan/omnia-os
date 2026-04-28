@@ -1,5 +1,9 @@
 """Self-Evolution Module - Automatic skill creation and learning
 
+from core.logging_config import get_logger
+
+logger = get_logger(__name__)
+
 Implements the self-evolution capability from Omnia 2.0 Architecture.
 This module activates the CORE_SELF_EVOLUTION feature flag.
 
@@ -21,7 +25,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -199,7 +202,7 @@ class SelfEvolutionEngine:
             
             print(f"[SelfEvolution] Cycle {cycle_id} completed: {len(result.skills_approved)} skills approved")
             
-        except Exception as e:
+        except (ValueError) as e:
             result.error = str(e)
             result.finished_at = datetime.now()
             print(f"[SelfEvolution] Cycle {cycle_id} failed: {e}")
@@ -248,7 +251,7 @@ class SelfEvolutionEngine:
             print(f"[SelfEvolution] Skill approved: {skill_name}")
             return True
             
-        except Exception as e:
+        except (ValueError) as e:
             print(f"[SelfEvolution] Failed to approve skill: {e}")
             return False
     
@@ -269,7 +272,7 @@ class SelfEvolutionEngine:
             print(f"[SelfEvolution] Skill rejected: {skill_name}")
             return True
             
-        except Exception as e:
+        except (ValueError) as e:
             print(f"[SelfEvolution] Failed to reject skill: {e}")
             return False
     
@@ -320,8 +323,8 @@ async def run_background_evolution(interval_hours: int = 24):
                 result = await engine.run_evolution_cycle()
                 print(f"[BackgroundEvolution] Cycle completed: {result.to_dict()}")
             else:
-                print("[BackgroundEvolution] Self-evolution is disabled")
-        except Exception as e:
+                logger.info("[BackgroundEvolution] Self-evolution is disabled")
+        except (ValueError) as e:
             print(f"[BackgroundEvolution] Error: {e}")
         
         await asyncio.sleep(interval_hours * 3600)
@@ -359,39 +362,39 @@ def cli_main():
     # Enable feature flag if requested
     if args.enable:
         FF.set("CORE_SELF_EVOLUTION", True)
-        print("✅ Self-evolution enabled")
+        logger.info("✅ Self-evolution enabled")
     
     engine = SelfEvolutionEngine()
     
     if args.command == "run":
         if not engine.is_enabled():
-            print("❌ Self-evolution is disabled. Use --enable to enable.")
+            logger.info("❌ Self-evolution is disabled. Use --enable to enable.")
             return
         
         result = asyncio.run(engine.run_evolution_cycle())
-        print(json.dumps(result.to_dict(), indent=2))
+        logger.info(json.dumps(result.to_dict(), indent=2))
     
     elif args.command == "stats":
         stats = engine.get_stats()
-        print(json.dumps(stats.to_dict(), indent=2))
+        logger.info(json.dumps(stats.to_dict(), indent=2))
     
     elif args.command == "pending":
         pending = engine.get_pending_skills()
-        print(json.dumps(pending, indent=2))
+        logger.info(json.dumps(pending, indent=2))
     
     elif args.command == "approve":
         if not args.skill_name:
-            print("❌ --skill-name is required")
+            logger.info("❌ --skill-name is required")
             return
         success = engine.approve_skill(args.skill_name)
-        print("✅ Approved" if success else "❌ Failed")
+        logger.error("✅ Approved" if success else "❌ Failed")
     
     elif args.command == "reject":
         if not args.skill_name:
-            print("❌ --skill-name is required")
+            logger.info("❌ --skill-name is required")
             return
         success = engine.reject_skill(args.skill_name)
-        print("✅ Rejected" if success else "❌ Failed")
+        logger.error("✅ Rejected" if success else "❌ Failed")
 
 
 if __name__ == "__main__":

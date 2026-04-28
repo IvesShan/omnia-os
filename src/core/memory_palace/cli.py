@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 """Memory Palace CLI — The first command-line gateway into Omnia's memory."""
-
 from __future__ import annotations
 
+from core.logging_config import get_logger
+
+logger = get_logger(__name__)
+
+
 import argparse
-import json
 import sys
 from datetime import date
 from pathlib import Path
@@ -34,7 +37,7 @@ def cmd_fact_list(args):
     mp = _mp()
     results = mp.recall_facts(category=args.category, key=args.key)
     if not results:
-        print("No facts found.")
+        logger.info("No facts found.")
         return
     for r in results:
         print(f"#{r['id']} [{r['category']}] {r['key']} = {r['value']} (strength {r['strength']:.2f})")
@@ -50,7 +53,7 @@ def cmd_relation_list(args):
     mp = _mp()
     results = mp.recall_relations(args.entity)
     if not results:
-        print("No relations found.")
+        logger.info("No relations found.")
         return
     for r in results:
         print(f"#{r['id']} {r['subject']} --[{r['predicate']}]--> {r['object']} | {r['context']}")
@@ -66,7 +69,7 @@ def cmd_habit_list(args):
     mp = _mp()
     results = mp.recall_habits(domain=args.domain)
     if not results:
-        print("No habits found.")
+        logger.info("No habits found.")
         return
     for r in results:
         print(f"#{r['id']} [{r['domain']}] {r['pattern']} (certainty {r['certainty']:.2f}, last {r['last_observed_at']})")
@@ -90,7 +93,7 @@ def cmd_event_search(args):
     mp = _mp()
     results = mp.search_timeline(args.query, limit=args.limit)
     if not results:
-        print("No events found.")
+        logger.info("No events found.")
         return
     for r in results:
         print(f"#{r['id']} [{r['event_date']}] ({r['event_type']}) {r['title']} | tags: {r['tags']}")
@@ -100,7 +103,7 @@ def cmd_search(args):
     mp = _mp()
     results = mp.search(args.query, limit=args.limit)
     if not results:
-        print("No results found across any layer.")
+        logger.info("No results found across any layer.")
         return
     for res in results:
         print(f"[{res.layer.upper():8}] #{res.rowid:3} | {res.snippet}")

@@ -4,7 +4,6 @@ DJI 诊断引擎 - 核心诊断逻辑
 整合知识库，提供智能故障诊断
 """
 
-import json
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -21,7 +20,7 @@ class DiagnosticEngine:
             knowledge_base_path: 知识库路径
         """
         self.knowledge_base_path = knowledge_base_path or Path(
-            "/home/shan//home/shan/omnia-os/omnia-os/knowledge_base/dji"
+            str(Path(__file__).parent.parent.parent / "knowledge_base" / "dji")
         )
         
         # 加载故障代码数据库

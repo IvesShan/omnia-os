@@ -10,23 +10,17 @@ from __future__ import annotations
 
 import json
 import os
-import asyncio
 from concurrent.futures import ThreadPoolExecutor
-from typing import Optional, Generator, Dict
-from datetime import datetime
+from typing import Generator, Dict
 from pathlib import Path
 
-from flask import Flask, request, jsonify, Response
-from flask_cors import CORS
 
 from core.config import MEMORY_PALACE_DB
 from omnia.wake import assemble_wake_prompt
 from omnia.tool_preroll import check_and_run
 from omnia.chat import _load_api_key, _build_model_config
-from omnia.tool_optimizer import ToolExecutionOptimizer, ToolResult, ParallelToolExecutor
-from omnia.long_task_handler import LongTaskHandler, handle_long_task_stream
-from omnia.smart_pauser import SmartPauser, get_pauser, PauseReason
-from core.actuator.tool_registry import TOOLS_SCHEMA, dispatch_tool
+from omnia.tool_optimizer import ToolExecutionOptimizer, ParallelToolExecutor
+from core.actuator.tool_registry import TOOLS_SCHEMA
 from core.memory_palace.memory_palace import MemoryPalace
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
@@ -165,7 +159,7 @@ def _stream_chat_unified(
     # ========== 前置工具检查钩子（方案A）==========
     _tool_result = check_and_run(message)
     if _tool_result:
-        print(f"[stream_chat] 命中关键词，注入工具检查结果")
+        print("[stream_chat] 命中关键词，注入工具检查结果")
         _tool_warning = "\n\n[系统强制工具检查结果 - 请基于以下实际数据回答用户]\n"
         _tool_warning += _tool_result
         _tool_warning += "\n[/系统强制工具检查结果]\n"
@@ -244,7 +238,7 @@ def _stream_chat_unified(
         tool_calls_buffer = {}  # 用字典合并增量
         content = ""
         reasoning_content = ""  # DeepSeek V4 思考模式需要
-        has_seen_reasoning = False  # 追踪本轮是否进入过思考模式
+        has_seen_reasoning = False  # 追踪本轮是否进入过思考模式 (用于逻辑判断)
         finish_reason = None
         
         for line in response.iter_lines():
@@ -287,7 +281,7 @@ def _stream_chat_unified(
                         if 'reasoning_content' in delta and delta['reasoning_content']:
                             # DeepSeek V4 / Gemma 3 thinking mode: 收集并输出到前端
                             reasoning_content += delta["reasoning_content"]
-                            has_seen_reasoning = True
+                            _ = True  # has_seen_reasoning (unused)
                             thinking_mode_active = True  # 全局追踪：进入思考模式
                             # 将思考内容作为 'thinking' 事件输出
                             yield "data: " + json.dumps({"type": "thinking", "content": delta["reasoning_content"]}) + "\n\n"
@@ -332,7 +326,7 @@ def _stream_chat_unified(
                     if 'reasoning_content' in data and data['reasoning_content'] and 'choices' not in data:
                         # 某些 API 实现可能将 reasoning_content 放在顶层
                         reasoning_content += data["reasoning_content"]
-                        has_seen_reasoning = True
+                        _ = True  # has_seen_reasoning (unused)
                         thinking_mode_active = True
                 
                 except json.JSONDecodeError:
@@ -409,7 +403,7 @@ def _stream_chat_unified(
             args_str = fn.get("arguments", "{}")
             try:
                 args = json.loads(args_str) if args_str else {}
-            except:
+            except Exception:
                 args = {}
             processed_tool_calls.append({
                 "name": tool_name,
@@ -445,7 +439,7 @@ def _stream_chat_unified(
                 args_str = fn.get("arguments", "{}")
                 try:
                     args = json.loads(args_str) if args_str else {}
-                except:
+                except Exception:
                     args = {}
                 
                 yield f"data: {json.dumps({'type': 'tool_call', 'name': tool_name, 'arguments': args})}\n\n"

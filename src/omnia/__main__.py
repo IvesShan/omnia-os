@@ -66,13 +66,12 @@ def cmd_status(args):
     # Memory palace
     if db_file.exists():
         import sqlite3
-        conn = sqlite3.connect(str(db_file))
-        cursor = conn.cursor()
-        counts = {}
-        for table in ["facts", "relations", "habits", "timeline"]:
-            cursor.execute(f"SELECT COUNT(*) FROM {table}")
-            counts[table] = cursor.fetchone()[0]
-        conn.close()
+        with sqlite3.connect(str(db_file)) as conn:
+            cursor = conn.cursor()
+            counts = {}
+            for table in ["facts", "relations", "habits", "timeline"]:
+                cursor.execute(f"SELECT COUNT(*) FROM {table}")
+                counts[table] = cursor.fetchone()[0]
         print("\nMemory Palace:")
         for k, v in counts.items():
             print(f"  {k}: {v}")

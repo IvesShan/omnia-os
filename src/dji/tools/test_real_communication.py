@@ -6,7 +6,6 @@ DJI 真实通信测试工具
 
 import sys
 import os
-import time
 import logging
 
 # 添加父目录到路径

@@ -6,7 +6,6 @@ Uses lightweight keyword bucketing instead of heavy NLP.
 
 from __future__ import annotations
 
-import glob
 import json
 import re
 from collections import defaultdict
@@ -181,7 +180,6 @@ class PatternDetector:
 
 
 if __name__ == "__main__":
-    import sys
 
     # Quick smoke test when run directly
     pd = PatternDetector()

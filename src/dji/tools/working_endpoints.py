@@ -54,13 +54,13 @@ class DJIWorkingCommunication:
                 try:
                     if self.device.is_kernel_driver_active(intf.bInterfaceNumber):
                         self.device.detach_kernel_driver(intf.bInterfaceNumber)
-                except:
+                except Exception:
                     pass
         
         # 设置配置
         try:
             self.device.set_configuration()
-        except:
+        except Exception:
             pass
         
         time.sleep(0.1)

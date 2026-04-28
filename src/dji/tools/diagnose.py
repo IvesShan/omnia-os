@@ -70,7 +70,7 @@ def check_usb_device():
                 print(f"      驱动: 已附加")
             else:
                 print(f"      驱动: 未附加")
-        except:
+        except Exception:
             print(f"      驱动: 检查失败")
     
     return device

@@ -1,8 +1,11 @@
 """Conversation Processor - 从对话日志提取实体和关系，构建神经图谱"""
-
 from __future__ import annotations
 
-import json
+from core.logging_config import get_logger
+
+logger = get_logger(__name__)
+
+
 import sqlite3
 from datetime import datetime
 from pathlib import Path
@@ -50,24 +53,23 @@ class ConversationProcessor:
         Returns:
             处理统计
         """
-        print(f"[ConversationProcessor] 开始处理历史对话...")
+        logger.info(f"[ConversationProcessor] 开始处理历史对话...")
         
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
         
         # 获取所有对话，按 session 分组
-        query = """
-            SELECT id, session_id, turn_number, role, content, created_at
-            FROM conversation_logs
-            ORDER BY created_at ASC
-        """
-        if limit:
-            query += f" LIMIT {limit}"
+            query = """
+                SELECT id, session_id, turn_number, role, content, created_at
+                FROM conversation_logs
+                ORDER BY created_at ASC
+            """
+            if limit:
+                query += f" LIMIT {limit}"
         
-        cursor.execute(query)
-        rows = cursor.fetchall()
-        conn.close()
+            cursor.execute(query)
+            rows = cursor.fetchall()
         
         print(f"[ConversationProcessor] 找到 {len(rows)} 条对话记录")
         
@@ -88,7 +90,7 @@ class ConversationProcessor:
             
             self._process_session(session_id, turns, use_llm)
         
-        print(f"\n[ConversationProcessor] 完成！")
+        logger.info(f"\n[ConversationProcessor] 完成！")
         print(f"  - 处理对话: {self.stats['processed']} 条")
         print(f"  - 添加节点: {self.stats['nodes_added']} 个")
         print(f"  - 添加边: {self.stats['edges_added']} 条")
@@ -208,20 +210,19 @@ class ConversationProcessor:
     
     def get_unprocessed_count(self) -> int:
         """获取未处理的对话数量"""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
         
         # 检查是否有处理标记
-        cursor.execute("""
-            SELECT name FROM sqlite_master 
-            WHERE type='table' AND name='conversation_processed'
-        """)
+            cursor.execute("""
+                SELECT name FROM sqlite_master 
+                WHERE type='table' AND name='conversation_processed'
+            """)
         
-        if not cursor.fetchone():
+            if not cursor.fetchone():
             # 没有标记表，所有对话都未处理
-            cursor.execute("SELECT COUNT(*) FROM conversation_logs")
-            count = cursor.fetchone()[0]
-            conn.close()
+                cursor.execute("SELECT COUNT(*) FROM conversation_logs")
+                count = cursor.fetchone()[0]
             return count
         
         # 有标记表，统计未处理的

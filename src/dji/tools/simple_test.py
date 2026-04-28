@@ -13,7 +13,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import usb.core
 import usb.util
 import logging
-import time
 
 logging.basicConfig(
     level=logging.INFO,
@@ -35,7 +34,7 @@ def list_dji_devices():
                     'product_id': dev.idProduct,
                     'device': dev
                 })
-            except:
+            except Exception:
                 result.append({
                     'serial': f'Device-{dev.idProduct:04x}',
                     'product_id': dev.idProduct,
@@ -84,7 +83,7 @@ def test_usb_connection(device_info):
             print(f"     制造商: {device.manufacturer}")
             print(f"     产品: {device.product}")
             print(f"     序列号: {device.serial_number}")
-        except:
+        except Exception:
             print("     (信息不可用)")
         
         # 获取配置

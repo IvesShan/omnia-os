@@ -297,7 +297,7 @@ class ContextCompressor:
         try:
             summary = await self.llm_summarizer(summary_prompt)
             return summary[:500]  # 限制摘要长度
-        except Exception as e:
+        except (json.JSONDecodeError) as e:
             print(f"[Compressor] Summary generation failed: {e}")
             return "（摘要生成失败）"
 

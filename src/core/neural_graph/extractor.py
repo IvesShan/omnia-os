@@ -179,7 +179,7 @@ class EntityExtractor:
                     )
                     for e in data.get("entities", [])
                 ]
-        except Exception as e:
+        except (json.JSONDecodeError) as e:
             print(f"[EntityExtractor] LLM extraction failed: {e}")
         
         return []

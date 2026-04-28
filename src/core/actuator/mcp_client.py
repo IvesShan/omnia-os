@@ -10,11 +10,14 @@ from __future__ import annotations
 import asyncio
 import json
 import os
-import subprocess
 from contextlib import AsyncExitStack
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Callable
+
+from core.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 # MCP SDK
 try:
@@ -29,9 +32,9 @@ try:
     )
     MCP_SDK_AVAILABLE = True
     MCP_AVAILABLE = True  # Alias for tool_registry.py
-    print("[MCP] SDK imported successfully")
+    logger.info("[MCP] SDK imported successfully")
 except ImportError as e:
-    print(f"[MCP] SDK import failed: {e}")
+    logger.warning(f"[MCP] SDK import failed: {e}")
     MCP_SDK_AVAILABLE = False
     MCP_AVAILABLE = False  # Alias for tool_registry.py
     # Define dummy classes for type hints
@@ -128,7 +131,7 @@ class MCPClientManager:
                         enabled=True
                     ))
         except Exception as e:
-            print(f"[MCP] Warning: Failed to load config: {e}")
+            logger.warning(f"[MCP] Failed to load config: {e}")
             
         return configs
     
@@ -176,18 +179,18 @@ class MCPClientManager:
                 self._tool_to_server[full_name] = config.name
                 self._tool_to_server[tool.name] = config.name  # Also register short name
             
-            print(f"[MCP] ✓ Connected to '{config.name}' with {len(tools_result.tools)} tools")
+            logger.info(f"[MCP] ✓ Connected to '{config.name}' with {len(tools_result.tools)} tools")
             return server
             
-        except Exception as e:
-            print(f"[MCP] ✗ Failed to connect '{config.name}': {e}")
+        except (ValueError) as e:
+            logger.error(f"[MCP] ✗ Failed to connect '{config.name}': {e}")
             return None
     
     async def connect_all(self) -> None:
         """Connect to all configured MCP servers."""
         configs = self._load_config()
         
-        print(f"[MCP] Connecting to {len(configs)} servers...")
+        logger.info(f"[MCP] Connecting to {len(configs)} servers...")
         
         for config in configs:
             server = await self.connect_server(config)
@@ -195,7 +198,7 @@ class MCPClientManager:
                 self.servers[config.name] = server
         
         total_tools = sum(len(s.tools) for s in self.servers.values())
-        print(f"[MCP] Connected: {len(self.servers)}/{len(configs)} servers, {total_tools} tools available")
+        logger.info(f"[MCP] Connected: {len(self.servers)}/{len(configs)} servers, {total_tools} tools available")
     
     def get_all_tools_schema(self) -> List[Dict[str, Any]]:
         """

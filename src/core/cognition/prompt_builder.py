@@ -1,11 +1,12 @@
 """Prompt Builder - 参考 Hermes 的动态系统提示
-from core.config import MEMORY_PALACE_DB
 
 根据对话阶段、工具执行状态等动态构建系统提示。
 """
 
 from dataclasses import dataclass
 from typing import Optional
+
+from core.config import MEMORY_PALACE_DB
 
 
 @dataclass
@@ -153,7 +154,7 @@ class PromptBuilder:
             tool_names = [t['function']['name'] for t in TOOLS_SCHEMA]
             tools_info = f"\n**当前可用工具** ({len(tool_names)} 个):\n" + "\n".join(f"- {name}" for name in tool_names)
             parts.append(tools_info)
-        except:
+        except Exception:
             pass
         
         # 🔑 新增：动态注入技能列表
@@ -170,19 +171,18 @@ class PromptBuilder:
             import sqlite3
             db_path = MEMORY_PALACE_DB
             if db_path.exists():
-                conn = sqlite3.connect(str(db_path))
-                cursor = conn.cursor()
-                total = 0
-                for table in ['facts', 'relations', 'habits', 'timeline']:
-                    try:
-                        cursor.execute(f"SELECT COUNT(*) FROM {table}")
-                        total += cursor.fetchone()[0]
-                    except:
-                        pass
-                conn.close()
+                with sqlite3.connect(str(db_path)) as conn:
+                    cursor = conn.cursor()
+                    total = 0
+                    for table in ['facts', 'relations', 'habits', 'timeline']:
+                        try:
+                            cursor.execute(f"SELECT COUNT(*) FROM {table}")
+                            total += cursor.fetchone()[0]
+                        except (sqlite3.Error) as e:
+                            pass
                 if total > 0:
                     parts.append(f"\n**Memory Palace 当前状态**: 已存储 {total} 条记忆")
-        except:
+        except Exception:
             pass
         
         # 根据模式添加不同的提示
@@ -225,7 +225,7 @@ class PromptBuilder:
         # 根据 Provider 特性调整
         if provider in ("qianfan", "baiduqianfancodingplan"):
             # Qianfan 需要更强的禁止指令
-            extra = "\n\n特别提醒：千帆模型，请确保回复中不要包含任何工具调用格式的文本。"
+            extra = "\n\n特别提醒：千帆模型，请确保回复中不要包含任何工具调用格式的文本。 "
             return base_prompt + extra
         
         elif provider == "anthropic":

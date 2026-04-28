@@ -6,7 +6,6 @@ Also extracts entities and relations for neural graph in real-time.
 
 from __future__ import annotations
 
-import time
 import uuid
 from datetime import datetime
 from typing import Any, Dict, Optional
@@ -98,7 +97,7 @@ class AutoLogger:
                 if extraction['nodes_added'] > 0 or extraction['edges_added'] > 0:
                     print(f"[AutoLogger] 🧠 提取: {extraction['nodes_added']} 节点, {extraction['edges_added']} 边")
                     
-            except Exception as e:
+            except (ValueError) as e:
                 # 不影响主流程
                 print(f"[AutoLogger] ⚠️ 神经图谱提取失败: {e}")
         

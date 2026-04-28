@@ -3,7 +3,6 @@
 
 import usb.core
 import usb.util
-import sys
 
 # DJI USB IDs
 DJI_VID = 0x2ca3
@@ -74,7 +73,7 @@ def read_real_device():
         intf_str = f"   接口 {intf.bInterfaceNumber}: "
         try:
             intf_str += usb.util.get_string(dev, intf.iInterface) or "Unknown"
-        except:
+        except Exception:
             intf_str += "Unknown"
         
         intf_str += f" (Class: {intf.bInterfaceClass}, SubClass: {intf.bInterfaceSubClass})"
@@ -92,7 +91,7 @@ def read_real_device():
     # 找到 BULK 接口 (接口 4)
     try:
         intf = cfg[(4, 0)]
-    except:
+    except Exception:
         # 找第一个 Vendor Specific 接口
         for i in cfg:
             if i.bInterfaceClass == 0xFF:
@@ -221,7 +220,7 @@ def read_real_device():
         usb.util.dispose_resources(dev)
         dev.attach_kernel_driver(intf.bInterfaceNumber)
         print(f"\n✅ 已恢复内核驱动")
-    except:
+    except Exception:
         pass
     
     print()

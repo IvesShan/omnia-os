@@ -70,7 +70,7 @@ class DJIRealCommunicationV3:
             # 设置配置
             try:
                 self.device.set_configuration()
-            except:
+            except Exception:
                 pass
             
             # 等待稳定

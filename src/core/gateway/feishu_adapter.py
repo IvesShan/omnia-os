@@ -1,4 +1,8 @@
 """
+from core.logging_config import get_logger
+
+logger = get_logger(__name__)
+
 Feishu Adapter - 飞书/Lark 通道适配器
 
 支持：
@@ -62,7 +66,7 @@ class FeishuAdapter(ChannelAdapter):
             asyncio.create_task(self._ws_loop())
         else:
             # Webhook 模式由外部 HTTP 服务触发
-            print(f"[FeishuAdapter] Started in webhook mode")
+            logger.info(f"[FeishuAdapter] Started in webhook mode")
     
     async def stop(self):
         """停止适配器"""
@@ -128,7 +132,7 @@ class FeishuAdapter(ChannelAdapter):
                     else:
                         print(f"[FeishuAdapter] Send failed: {data}")
                         return False
-        except Exception as e:
+        except (ValueError) as e:
             print(f"[FeishuAdapter] Send error: {e}")
             return False
     
@@ -200,7 +204,7 @@ class FeishuAdapter(ChannelAdapter):
             try:
                 data = json.loads(content)
                 return data.get("text", "")
-            except:
+            except (json.JSONDecodeError) as e:
                 return content
         
         # 其他类型暂不支持
@@ -227,7 +231,6 @@ class FeishuAdapter(ChannelAdapter):
     
     async def _ws_loop(self):
         """WebSocket 长连接循环"""
-        import aiohttp
         
         while self._running:
             try:
@@ -250,7 +253,7 @@ class FeishuAdapter(ChannelAdapter):
         async with aiohttp.ClientSession() as session:
             async with session.ws_connect(url, headers=headers) as ws:
                 self._ws = ws
-                print(f"[FeishuAdapter] WebSocket connected")
+                logger.info(f"[FeishuAdapter] WebSocket connected")
                 
                 async for msg in ws:
                     if msg.type == aiohttp.WSMsgType.TEXT:

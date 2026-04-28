@@ -7,13 +7,11 @@ Uses sentence-transformers for local embedding generation.
 from __future__ import annotations
 
 import json
-import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-import numpy as np
 
 from core.config import VECTOR_STORE_DIR
 
@@ -227,7 +225,7 @@ class VectorStore:
         try:
             self.collection.delete(ids=[memory_id])
             return True
-        except Exception as e:
+        except (ValueError) as e:
             print(f"[VectorStore] Failed to delete memory {memory_id}: {e}")
             return False
     
@@ -260,25 +258,24 @@ class VectorStore:
             print(f"[VectorStore] Memory Palace DB not found: {memory_palace_db}")
             return 0
         
-        conn = sqlite3.connect(str(memory_palace_db))
-        cursor = conn.cursor()
+        with sqlite3.connect(str(memory_palace_db)) as conn:
+            cursor = conn.cursor()
         
         # Get all memories from all layers
-        memories = []
+            memories = []
         
-        for layer in ['facts', 'relations', 'habits', 'timeline']:
-            try:
-                cursor.execute(f"SELECT id, content, metadata FROM {layer}")
-                for row in cursor.fetchall():
-                    memory_id = f"{layer}_{row[0]}"
-                    content = row[1]
-                    metadata = json.loads(row[2]) if row[2] else {}
-                    metadata['layer'] = layer
-                    memories.append((memory_id, content, metadata))
-            except Exception as e:
-                print(f"[VectorStore] Failed to read {layer}: {e}")
+            for layer in ['facts', 'relations', 'habits', 'timeline']:
+                try:
+                    cursor.execute(f"SELECT id, content, metadata FROM {layer}")
+                    for row in cursor.fetchall():
+                        memory_id = f"{layer}_{row[0]}"
+                        content = row[1]
+                        metadata = json.loads(row[2]) if row[2] else {}
+                        metadata['layer'] = layer
+                        memories.append((memory_id, content, metadata))
+                except (json.JSONDecodeError) as e:
+                    print(f"[VectorStore] Failed to read {layer}: {e}")
         
-        conn.close()
         
         # Add to vector store in batches
         batch_size = 100

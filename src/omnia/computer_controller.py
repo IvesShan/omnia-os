@@ -12,7 +12,6 @@ Omnia 电脑控制器
   controller.execute("打开浏览器，搜索今天的新闻")
 """
 
-import os
 import sys
 import json
 import time
@@ -288,10 +287,14 @@ class OmniaController:
     
     def open_app(self, app_name: str) -> bool:
         """打开应用"""
+        # 安全检查：防止命令注入
+        
         if sys.platform == "darwin":
             subprocess.run(["open", "-a", app_name])
         elif sys.platform == "win32":
-            subprocess.run(["start", app_name], shell=True)
+            # Windows: 使用 os.startfile 避免命令注入
+            import os
+            os.startfile(app_name)
         else:  # Linux
             subprocess.run([app_name], detached=True)
         

@@ -4,7 +4,6 @@ DJI v1 通信协议实现
 """
 
 import struct
-import time
 from typing import Optional, Tuple, List, Dict, Any
 from dataclasses import dataclass
 from enum import IntEnum

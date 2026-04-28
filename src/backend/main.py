@@ -10,7 +10,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 import json
-import os
 import asyncio
 from datetime import datetime
 from pathlib import Path
@@ -76,7 +75,7 @@ def load_json_file(path: Path) -> Dict:
     try:
         with open(path, 'r', encoding='utf-8') as f:
             return json.load(f)
-    except:
+    except (json.JSONDecodeError, OSError, IOError) as e:
         return {}
 
 def save_json_file(path: Path, data: Dict) -> bool:
@@ -86,7 +85,7 @@ def save_json_file(path: Path, data: Dict) -> bool:
         with open(path, 'w', encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
         return True
-    except:
+    except (OSError, IOError) as e:
         return False
 
 def get_memory_stats() -> Dict[str, int]:

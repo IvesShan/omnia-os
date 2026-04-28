@@ -27,7 +27,7 @@ def find_model_code(data):
         for code, info in MODEL_CODES.items():
             if code in data_str:
                 return code, info
-    except:
+    except Exception:
         pass
     return None, None
 
@@ -89,7 +89,7 @@ def generate_report():
     # 找到通信接口
     try:
         intf = cfg[(4, 0)]
-    except:
+    except Exception:
         for i in cfg:
             if i.bInterfaceClass == 0xFF:
                 intf = i
@@ -186,7 +186,7 @@ def generate_report():
                     hex_str = ' '.join(f'{b:02x}' for b in chunk)
                     ascii_str = ''.join(chr(b) if 32 <= b < 127 else '.' for b in chunk)
                     report.append(f"   {i:04x}: {hex_str:<48} {ascii_str}")
-            except:
+            except Exception:
                 pass
         
         # 恢复内核驱动
@@ -196,7 +196,7 @@ def generate_report():
                 dev.attach_kernel_driver(intf.bInterfaceNumber)
                 report.append("")
                 report.append("   ✅ 已恢复内核驱动")
-            except:
+            except Exception:
                 pass
     
     report.append("")

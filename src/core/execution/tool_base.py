@@ -331,7 +331,7 @@ class ReadFileTool(Tool[ReadFileInput, str]):
                     f.seek(args.offset)
                 content = f.read(args.limit) if args.limit else f.read()
             return ToolResult(data=content)
-        except Exception as e:
+        except (FileNotFoundError, IOError, PermissionError) as e:
             return ToolResult(data="", error=str(e))
 
 

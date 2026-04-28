@@ -4,20 +4,23 @@
 
 import json
 from core.config import MEMORY_PALACE_DB, OMNIA_HOME
-import uuid
 from typing import Any
-import re
 
-def should_require_tool(user_message: str) -> str | None:
+def should_require_tool(user_message: str, provider: str = "deepseek") -> str | None:
     """
     智能判断是否应该强制调用工具。
     
-    注意：DeepSeek reasoning 模型不支持 tool_choice: "required"，
-    所以统一返回 "auto" 让模型自行决定。
-    硬规矩 + 系统提示中的 Tool Use Capability 已足够引导模型。
+    策略：
+    - kimi/openai/anthropic: 支持 tool_choice: "required"，强制调用
+    - deepseek: 不支持 "required"，返回 "auto" + 依赖系统提示引导
+    
+    Args:
+        user_message: 用户消息
+        provider: 当前使用的 provider
     
     Returns:
-        "auto" - 建议模型考虑调用工具（不强制）
+        "required" - 强制调用工具（仅对支持的 provider）
+        "auto" - 建议模型考虑调用工具
         None - 不传此参数，使用 API 默认行为
     """
     trigger_keywords = [
@@ -32,11 +35,24 @@ def should_require_tool(user_message: str) -> str | None:
     
     user_lower = user_message.lower()
     
+    # 检查是否命中关键词
+    triggered = False
     for kw in trigger_keywords:
         if kw in user_lower:
-            return "auto"
+            triggered = True
+            break
     
-    return None
+    if not triggered:
+        return None
+    
+    # 根据 provider 决定策略
+    providers_support_required = ["kimi", "openai", "anthropic"]
+    
+    if provider.lower() in providers_support_required:
+        return "required"  # 强制调用
+    else:
+        return "auto"  # 依赖系统提示引导
+
 
 
 
@@ -64,9 +80,7 @@ def handle_chat(message: str, history: list, api_key: str, provider: str, system
     from core.context_manager import ContextManager, SessionContext, save_current_context
     from pathlib import Path
     
-    import omnia.web_server as ws
-    _store_confirmation = ws._store_confirmation
-    
+
     hooks = get_hook_registry()
     prompt_builder = get_prompt_builder()
     
@@ -196,21 +210,26 @@ def handle_chat(message: str, history: list, api_key: str, provider: str, system
             # 清空消息列表，只保留系统提示和关键信息
             messages = [{"role": "system", "content": dynamic_prompt}]
             
-            # 策略 2: 添加极简的总结提示
+            # 策略 2: 添加极简的总结提示（改进：允许继续调用工具）
             messages.append({
                 "role": "user",
                 "content": f"""基于之前的工具执行结果，请回答：{original_message}
 
-记住：用自然语言回答，不要输出任何工具调用格式。"""
+注意：
+1. 如果工具结果已足够回答问题，用自然语言回答即可
+2. 如果还需要更多信息（如读取其他文件、执行其他命令），请继续调用工具
+3. 不要编造或臆测，确保回答基于工具返回的实际结果"""
             })
             
             print(f"[Chat] Rebuilt messages: {len(messages)} (no history)")
         
         # 调用模型
-        use_tools = tools_schema if not tool_calls_executed else None
+        # 策略改进：工具执行后仍然可以继续调用工具（不再禁用）
+        # 但通过 MAX_TOOL_ROUNDS 限制总轮数
+        use_tools = tools_schema
         
         # 智能判断 tool_choice（不传 None 即为 API 默认行为）
-        tool_choice = should_require_tool(message) if use_tools else None
+        tool_choice = should_require_tool(message, provider) if use_tools else None
         if tool_choice:
             print(f"[Chat] Tool choice: {tool_choice}")
         
