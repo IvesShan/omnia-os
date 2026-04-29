@@ -1,6 +1,6 @@
 /**
  * Omnia 神经图谱 - Obsidian 风格升级版
- * 添加力导向布局、悬停高亮、节点拖拽、发光效果
+ * 悬停高亮 | 发光效果 | 力导向布局
  */
 
 class NeuralGraphImproved {
@@ -30,19 +30,13 @@ class NeuralGraphImproved {
   }
   
   async init() {
-    // 检查库是否已加载
     if (typeof ForceGraph3D === 'undefined') {
-      this.container.innerHTML = '<p class="text-red-400 text-center p-8">❌ 3D Force Graph 库未加载，请刷新页面</p>';
+      this.container.innerHTML = '<p class="text-red-400 text-center p-8">❌ 3D Force Graph 库未加载</p>';
       return;
     }
     
-    // 创建控制面板
     this.createControlPanel();
-    
-    // 加载数据
     await this.loadData();
-    
-    // 创建图谱
     this.createGraph();
   }
   
@@ -80,8 +74,8 @@ class NeuralGraphImproved {
           </div>
         </div>
       </div>
-      <div class="graph-hint" style="margin-top: 8px; font-size: 11px; color: #6b7280;">
-        💡 悬停高亮 | 拖拽移动 | 点击详情
+      <div class="graph-hint" style="text-align:center; padding:8px; font-size:12px; color:#6b7280;">
+        悬停高亮 | 拖拽移动 | 点击详情
       </div>
     `;
     
@@ -126,7 +120,7 @@ class NeuralGraphImproved {
           id: node.id,
           name: node.label || node.id,
           type: node.type || 'ENTITY',
-          val: Math.max(5, Math.min(30, (connectionCount[node.id] || 1) * 2 + 5)),
+          val: Math.max(5, Math.min(30, (connectionCount[node.id] || 1) * 2)),
           color: this.typeColors[node.type] || '#6b7280',
           connections: connectionCount[node.id] || 0,
           source: node.source || 'unknown'
@@ -136,11 +130,10 @@ class NeuralGraphImproved {
           source: link.source,
           target: link.target,
           relation: link.relation,
-          color: 'rgba(99, 102, 241, 0.25)'
+          color: 'rgba(99, 102, 241, 0.3)'
         }));
         
         this.originalData = JSON.parse(JSON.stringify(this.data));
-        
         console.log('✅ 神经图谱数据加载完成:', this.data.nodes.length, '节点,', this.data.links.length, '边');
       }
     } catch (error) {
@@ -153,15 +146,12 @@ class NeuralGraphImproved {
     this.data = {
       nodes: [
         { id: 'omnia', name: 'Omnia', type: 'SYSTEM', val: 25, color: '#6366f1', connections: 4, source: 'system' },
-        { id: 'user', name: '原点', type: 'PERSON', val: 20, color: '#f43f5e', connections: 2, source: 'system' },
-        { id: 'assistant', name: '无限', type: 'PERSON', val: 18, color: '#8b5cf6', connections: 2, source: 'system' },
-        { id: 'memory', name: 'Memory Palace', type: 'CONCEPT', val: 15, color: '#f59e0b', connections: 1, source: 'system' }
+        { id: 'user', name: '原点', type: 'PERSON', val: 20, color: '#f43f5e', connections: 1, source: 'user' },
+        { id: 'assistant', name: '无限', type: 'PERSON', val: 18, color: '#8b5cf6', connections: 1, source: 'system' }
       ],
       links: [
-        { source: 'omnia', target: 'user', color: 'rgba(244, 63, 94, 0.4)' },
-        { source: 'omnia', target: 'assistant', color: 'rgba(139, 92, 246, 0.4)' },
-        { source: 'omnia', target: 'memory', color: 'rgba(245, 158, 11, 0.4)' },
-        { source: 'user', target: 'assistant', color: 'rgba(99, 102, 241, 0.3)' }
+        { source: 'omnia', target: 'user', color: 'rgba(244, 63, 94, 0.5)' },
+        { source: 'omnia', target: 'assistant', color: 'rgba(139, 92, 246, 0.5)' }
       ]
     };
     this.originalData = JSON.parse(JSON.stringify(this.data));
@@ -194,137 +184,99 @@ class NeuralGraphImproved {
     }
   }
   
-  // 获取节点的所有连接节点
-  getConnectedNodes(node) {
-    const connected = new Set();
-    this.data.links.forEach(link => {
-      const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
-      const targetId = typeof link.target === 'object' ? link.target.id : link.target;
-      
-      if (sourceId === node.id) connected.add(targetId);
-      if (targetId === node.id) connected.add(sourceId);
-    });
-    return connected;
-  }
-  
   createGraph() {
     const panel = this.container.querySelector('.graph-control-panel');
     this.container.innerHTML = '';
     if (panel) this.container.appendChild(panel);
     
-    // 创建图谱 - Obsidian 风格
+    // 获取连接的节点
+    const getConnectedNodes = (nodeId) => {
+      const connected = new Set([nodeId]);
+      this.data.links.forEach(link => {
+        const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+        const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+        if (sourceId === nodeId) connected.add(targetId);
+        if (targetId === nodeId) connected.add(sourceId);
+      });
+      return connected;
+    };
+    
+    // 创建图谱
     this.graph = ForceGraph3D()(this.container)
       .graphData(this.data)
-      // 节点配置 - 发光效果
-      .nodeThreeObject(node => {
-        const isConnected = this.hoveredNode && (
-          this.hoveredNode.id === node.id || 
-          this.getConnectedNodes(this.hoveredNode).has(node.id)
-        );
-        const isHovered = this.hoveredNode && this.hoveredNode.id === node.id;
-        
-        // 创建节点组
-        const nodeGroup = new THREE.Group();
-        
-        // 核心球体
-        const coreGeometry = new THREE.SphereGeometry(node.val * 0.15, 16, 16);
-        const coreMaterial = new THREE.MeshBasicMaterial({
-          color: node.color,
-          transparent: true,
-          opacity: isConnected ? 1 : (this.hoveredNode ? 0.2 : 0.85)
-        });
-        const core = new THREE.Mesh(coreGeometry, coreMaterial);
-        nodeGroup.add(core);
-        
-        // 光晕效果
-        const glowSize = isHovered ? node.val * 0.4 : node.val * 0.25;
-        const glowGeometry = new THREE.SphereGeometry(glowSize, 16, 16);
-        const glowMaterial = new THREE.MeshBasicMaterial({
-          color: node.color,
-          transparent: true,
-          opacity: isHovered ? 0.6 : 0.2,
-          side: THREE.BackSide
-        });
-        const glow = new THREE.Mesh(glowGeometry, glowMaterial);
-        nodeGroup.add(glow);
-        
-        // 悬停时添加外圈
-        if (isHovered) {
-          const ringGeometry = new THREE.RingGeometry(node.val * 0.35, node.val * 0.4, 32);
-          const ringMaterial = new THREE.MeshBasicMaterial({
-            color: node.color,
-            transparent: true,
-            opacity: 0.8,
-            side: THREE.DoubleSide
-          });
-          const ring = new THREE.Mesh(ringGeometry, ringMaterial);
-          ring.rotation.x = Math.PI / 2;
-          nodeGroup.add(ring);
+      .nodeLabel(node => `<b>${node.name}</b><br/>类型: ${node.type}<br/>连接: ${node.connections}`)
+      .nodeColor(node => {
+        if (this.hoveredNode) {
+          const connected = getConnectedNodes(this.hoveredNode.id);
+          if (connected.has(node.id)) {
+            return node.color; // 高亮
+          }
+          return '#1f2937'; // 变暗
         }
-        
-        return nodeGroup;
+        return node.color;
       })
-      .nodeLabel(node => `<div style="padding: 8px; background: rgba(0,0,0,0.8); border-radius: 8px;">
-        <strong>${node.name}</strong><br>
-        <span style="color: #9ca3af;">${node.type}</span>
-      </div>`)
-      // 连接线配置 - 悬停高亮
-      .linkColor(link => {
-        if (!this.hoveredNode) return 'rgba(99, 102, 241, 0.25)';
-        
-        const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
-        const targetId = typeof link.target === 'object' ? link.target.id : link.target;
-        
-        if (sourceId === this.hoveredNode.id || targetId === this.hoveredNode.id) {
-          return 'rgba(99, 102, 241, 0.9)';
+      .nodeVal(node => {
+        if (this.hoveredNode) {
+          const connected = getConnectedNodes(this.hoveredNode.id);
+          if (node.id === this.hoveredNode.id) return node.val * 1.5; // 悬停节点放大
+          if (connected.has(node.id)) return node.val * 1.2;
+          return node.val * 0.5; // 其他节点缩小
         }
-        return 'rgba(99, 102, 241, 0.08)';
+        return node.val;
+      })
+      .nodeOpacity(0.9)
+      .linkColor(link => {
+        if (this.hoveredNode) {
+          const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+          const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+          if (sourceId === this.hoveredNode.id || targetId === this.hoveredNode.id) {
+            return '#6366f1'; // 高亮连接
+          }
+          return 'rgba(31, 41, 55, 0.3)'; // 变暗
+        }
+        return 'rgba(99, 102, 241, 0.3)';
       })
       .linkWidth(link => {
-        if (!this.hoveredNode) return 1;
-        
-        const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
-        const targetId = typeof link.target === 'object' ? link.target.id : link.target;
-        
-        if (sourceId === this.hoveredNode.id || targetId === this.hoveredNode.id) {
-          return 3;
+        if (this.hoveredNode) {
+          const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+          const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+          if (sourceId === this.hoveredNode.id || targetId === this.hoveredNode.id) {
+            return 3;
+          }
+          return 0.5;
         }
-        return 0.5;
+        return 1;
       })
-      .linkOpacity(0.8)
+      .linkOpacity(0.6)
       .backgroundColor('#0a0e27')
       .width(this.container.clientWidth)
       .height(this.container.clientHeight)
       .enableNodeDrag(true)
       .enableNavigationControls(true)
       .enablePointerInteraction(true)
-      // 悬停事件 - Obsidian 风格高亮
+      .onNodeClick(node => this.onNodeClick(node))
       .onNodeHover(node => {
         this.hoveredNode = node;
         this.container.style.cursor = node ? 'pointer' : 'default';
-        
-        // 刷新图谱以更新视觉效果
+        // 刷新图谱以更新高亮
         if (this.graph) {
-          this.graph
-            .nodeColor(this.data.nodes.map(n => n.color))
-            .linkColor(this.data.links.map(l => l.color));
+          this.graph.nodeColor(this.graph.nodeColor())
+                   .nodeVal(this.graph.nodeVal())
+                   .linkColor(this.graph.linkColor())
+                   .linkWidth(this.graph.linkWidth());
         }
-      })
-      // 点击事件 - 显示详情
-      .onNodeClick(node => this.onNodeClick(node));
+      });
     
-    // 设置力导向参数 - Obsidian 风格自然分布
+    // 力导向参数
     this.graph
-      .d3AlphaDecay(0.005)      // 更慢的冷却，更自然的动画
-      .d3VelocityDecay(0.2)      // 更低的阻尼，更流畅的运动
-      .cooldownTicks(300)        // 更长的动画时间
-      .linkDistance(80)          // 连接距离
-      .nodeResolution(16);       // 更平滑的节点
+      .d3AlphaDecay(0.02)
+      .d3VelocityDecay(0.3)
+      .cooldownTicks(100)
+      .linkDistance(50)
+      .nodeResolution(16);
     
-    // 自动旋转（空闲时）
     this.autoRotate();
     
-    // 响应窗口大小变化
     window.addEventListener('resize', () => {
       if (this.graph) {
         this.graph
@@ -335,6 +287,8 @@ class NeuralGraphImproved {
   }
   
   onNodeClick(node) {
+    if (!node) return;
+    
     const detailPanel = this.container.querySelector('#node-detail-panel');
     if (detailPanel) {
       this.container.querySelector('#node-name').textContent = node.name;
@@ -345,13 +299,13 @@ class NeuralGraphImproved {
     }
     
     // 聚焦到节点
-    const distance = 60;
+    const distance = 80;
     const distRatio = 1 + distance / Math.hypot(node.x || 0, node.y || 0, node.z || 0);
     
     this.graph.cameraPosition(
       { x: (node.x || 0) * distRatio, y: (node.y || 0) * distRatio, z: (node.z || 0) * distRatio },
-      node,
-      1500
+      { x: node.x || 0, y: node.y || 0, z: node.z || 0 },
+      2000
     );
   }
   
@@ -359,13 +313,8 @@ class NeuralGraphImproved {
     let angle = 0;
     let lastInteraction = Date.now();
     
-    this.container.addEventListener('mousedown', () => {
-      lastInteraction = Date.now();
-    });
-    
-    this.container.addEventListener('wheel', () => {
-      lastInteraction = Date.now();
-    });
+    this.container.addEventListener('mousedown', () => { lastInteraction = Date.now(); });
+    this.container.addEventListener('wheel', () => { lastInteraction = Date.now(); });
     
     const rotate = () => {
       if (!this.graph) return;
@@ -373,9 +322,9 @@ class NeuralGraphImproved {
       if (Date.now() - lastInteraction > 3000) {
         const camera = this.graph.camera();
         if (camera) {
-          angle += 0.001;
-          camera.position.x = 400 * Math.sin(angle);
-          camera.position.z = 400 * Math.cos(angle);
+          angle += 0.002;
+          camera.position.x = 300 * Math.sin(angle);
+          camera.position.z = 300 * Math.cos(angle);
           camera.lookAt(0, 0, 0);
         }
       }
@@ -394,5 +343,4 @@ class NeuralGraphImproved {
   }
 }
 
-// 导出
 export { NeuralGraphImproved };
