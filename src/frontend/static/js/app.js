@@ -230,10 +230,10 @@ async function loadGraph() {
     
     // 动态加载 neural-graph.js
     try {
-        const module = await import('/static/js/neural-graph.js');  // 使用 3d-force-graph 库
+        const module = await import('/static/js/neural-graph-improved.js');  // 使用 3d-force-graph 库
         
-        if (module.NeuralGraphForce) {
-            neuralBrainInstance = new module.NeuralGraphForce(container);
+        if (module.NeuralGraphImproved) {
+            neuralBrainInstance = new module.NeuralGraphImproved(container);
             console.log('🧠 Neural Graph Brain initialized');
         }
     } catch (error) {

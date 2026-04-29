@@ -136,7 +136,7 @@
         // 加载统计
         async function loadStats() {
             try {
-                const response = await fetch('http://localhost:8765/api/memory/stats');
+                const response = await fetch('/api/neural-graph/stats');
                 const data = await response.json();
                 
                 document.getElementById('node-count').textContent = data.neural_nodes || 0;

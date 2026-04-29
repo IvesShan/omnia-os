@@ -13,6 +13,7 @@ Provider Abstraction - Omnia 2.0
 - Zhipu (GLM)
 - Alibaba (Qwen)
 - DeepSeek
+- Xiaomi (MiMo)
 - Ollama (本地模型)
 - vLLM (本地部署)
 - Custom (自定义端点)
@@ -21,7 +22,7 @@ Usage:
     from core.providers import ProviderResolver, ModelClient
     
     resolver = ProviderResolver()
-    client = resolver.get_client("openai/gpt-4o")
+    client = resolver.get_client("xiaomi/mimo-v2.5-pro")
     response = await client.chat(messages, tools)
 """
 
@@ -45,6 +46,7 @@ class ProviderType(Enum):
     ZHIPU = "zhipu"
     QWEN = "qwen"
     DEEPSEEK = "deepseek"
+    XIAOMI = "xiaomi"
     OLLAMA = "ollama"
     VLLM = "vllm"
     CUSTOM = "custom"
@@ -63,6 +65,8 @@ class ModelConfig:
     supports_streaming: bool = True
     api_format: str = "openai"  # openai, anthropic, codex
     base_url: str | None = None
+    auth_header: str = "Authorization"  # 认证头类型: Authorization, api-key
+    auth_prefix: str = "Bearer "       # 认证头前缀: "Bearer ", "" 等
     default_params: dict = field(default_factory=dict)
 
 
@@ -197,6 +201,67 @@ MODEL_REGISTRY: dict[str, ModelConfig] = {
         base_url="https://api.deepseek.com/v1",
     ),
     
+    # === Xiaomi MiMo (Token Plan + 计费 API) ===
+    "xiaomi/mimo-v2.5-pro": ModelConfig(
+        provider=ProviderType.XIAOMI,
+        model_id="mimo-v2.5-pro",
+        display_name="MiMo V2.5 Pro",
+        context_window=128_000,
+        max_output=131_072,
+        supports_vision=True,
+        supports_tools=True,
+        base_url="https://token-plan-cn.xiaomimimo.com/v1",
+        auth_header="api-key",
+        auth_prefix="",
+    ),
+    "xiaomi/mimo-v2.5": ModelConfig(
+        provider=ProviderType.XIAOMI,
+        model_id="mimo-v2.5",
+        display_name="MiMo V2.5",
+        context_window=128_000,
+        max_output=32_768,
+        supports_vision=True,
+        supports_tools=True,
+        base_url="https://token-plan-cn.xiaomimimo.com/v1",
+        auth_header="api-key",
+        auth_prefix="",
+    ),
+    "xiaomi/mimo-v2-pro": ModelConfig(
+        provider=ProviderType.XIAOMI,
+        model_id="mimo-v2-pro",
+        display_name="MiMo V2 Pro",
+        context_window=128_000,
+        max_output=131_072,
+        supports_vision=True,
+        supports_tools=True,
+        base_url="https://token-plan-cn.xiaomimimo.com/v1",
+        auth_header="api-key",
+        auth_prefix="",
+    ),
+    "xiaomi/mimo-v2-omni": ModelConfig(
+        provider=ProviderType.XIAOMI,
+        model_id="mimo-v2-omni",
+        display_name="MiMo V2 Omni",
+        context_window=128_000,
+        max_output=32_768,
+        supports_vision=True,
+        supports_tools=True,
+        base_url="https://token-plan-cn.xiaomimimo.com/v1",
+        auth_header="api-key",
+        auth_prefix="",
+    ),
+    "xiaomi/mimo-v2-flash": ModelConfig(
+        provider=ProviderType.XIAOMI,
+        model_id="mimo-v2-flash",
+        display_name="MiMo V2 Flash",
+        context_window=128_000,
+        max_output=65_536,
+        supports_tools=True,
+        base_url="https://token-plan-cn.xiaomimimo.com/v1",
+        auth_header="api-key",
+        auth_prefix="",
+    ),
+    
     # === Ollama (Local) ===
     "ollama/llama3": ModelConfig(
         provider=ProviderType.OLLAMA,
@@ -292,6 +357,18 @@ class ModelClient(ABC):
 class OpenAIClient(ModelClient):
     """OpenAI 兼容客户端"""
     
+    def _build_headers(self) -> dict:
+        """构建请求头"""
+        headers = {
+            "Content-Type": "application/json",
+        }
+        
+        if self.api_key:
+            auth_value = f"{self.config.auth_prefix}{self.api_key}"
+            headers[self.config.auth_header] = auth_value
+        
+        return headers
+    
     async def chat(
         self,
         messages: list[dict],
@@ -303,10 +380,7 @@ class OpenAIClient(ModelClient):
         base_url = self.config.base_url or "https://api.openai.com/v1"
         url = f"{base_url}/chat/completions"
         
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {self.api_key}",
-        }
+        headers = self._build_headers()
         
         payload = {
             "model": self.config.model_id,
@@ -456,6 +530,7 @@ class ProviderResolver:
         ProviderType.ZHIPU: "ZHIPU_API_KEY",
         ProviderType.QWEN: "QWEN_API_KEY",
         ProviderType.DEEPSEEK: "DEEPSEEK_API_KEY",
+        ProviderType.XIAOMI: "MIMO_API_KEY",
     }
     
     def __init__(self, api_keys: dict[str, str] | None = None):
@@ -487,7 +562,7 @@ class ProviderResolver:
         获取模型客户端
         
         Args:
-            model_id: 模型 ID (e.g., "openai/gpt-4o")
+            model_id: 模型 ID (e.g., "openai/gpt-4o" or "xiaomi/mimo-v2.5-pro")
             api_key: 可选的 API Key（覆盖默认）
         
         Returns:

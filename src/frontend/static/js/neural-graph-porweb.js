@@ -170,7 +170,7 @@ class NeuralGraphPorweb {
    */
   async createKnowledgeNodes() {
     try {
-      const response = await fetch('http://localhost:8765/api/memory/neural-graph');
+      const response = await fetch('/api/neural-graph/export');
       const data = await response.json();
       
       if (!data.nodes || data.nodes.length === 0) {
