@@ -890,6 +890,13 @@ class MemoryPalace:
         
         rows = conn.execute(sql).fetchall()
         
+        # 如果 MLA 启用了但没有 compressed_embedding 数据，回退到原始空间搜索
+        if not rows and has_mla:
+            has_mla = False
+            where_ = " AND status = 'active'" if active_only and table != 'conversation_logs' else ""
+            sql = f"SELECT * FROM {table} WHERE embedding IS NOT NULL{where_}"
+            rows = conn.execute(sql).fetchall()
+        
         if not rows:
             return []
         
