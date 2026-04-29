@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 from core.logging_config import get_logger
 

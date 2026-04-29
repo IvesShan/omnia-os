@@ -1,3 +1,4 @@
+from __future__ import annotations
 # Omnia Chat Handler - 融合三家最佳实践
 # 核心策略：工具执行后完全重建消息列表
 # 新增：神经图谱上下文增强 + 会话历史自动加载
