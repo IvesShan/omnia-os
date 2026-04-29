@@ -91,6 +91,8 @@ def stream_chat(message: str, history: list = None, provider: str = None) -> Gen
                 provider = "qianfan"
             elif "OPENAI" in key_name.upper():
                 provider = "openai"
+            elif "MIMO" in key_name.upper():
+                provider = "xiaomi"
             else:
                 provider = "kimi"  # 默认 fallback
     
@@ -125,6 +127,21 @@ def _get_dynamic_limit(analysis: Dict) -> int:
         return DYNAMIC_LIMITS["unlimited"]
 
 
+def _build_headers(api_key: str, provider: str) -> dict:
+    """根据 provider 构建正确的请求头
+    
+    Xiaomi MiMo 使用 api-key 头，其他使用 Authorization: Bearer
+    """
+    headers = {
+        "Content-Type": "application/json",
+    }
+    if provider == "xiaomi":
+        headers["api-key"] = api_key
+    else:
+        headers["Authorization"] = f"Bearer {api_key}"
+    return headers
+
+
 def _stream_chat_unified(
     message: str,
     history: list,
@@ -141,7 +158,7 @@ def _stream_chat_unified(
         message: 用户消息
         history: 历史消息列表
         api_key: API密钥
-        provider: 提供商名称 (deepseek/kimi/openai/qianfan/local)
+        provider: 提供商名称 (deepseek/kimi/openai/qianfan/local/xiaomi)
         max_iterations: 最大迭代轮数
         context: 上下文信息
         session_id: 会话ID
@@ -195,11 +212,7 @@ def _stream_chat_unified(
         iteration += 1
         
         # === 构建请求参数 ===
-        # url, model already set above
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {api_key}"
-        }
+        headers = _build_headers(api_key, provider)
         
         payload = {
             "model": model,
@@ -350,8 +363,7 @@ def _stream_chat_unified(
                         mp.log_conversation(session_id, 1, "assistant", full_content)
                     except Exception as e:
                         print(f"[stream_chat] Failed to log assistant reply: {e}")
-                token_info = f"\n\n---\n📊 **Token 使用**: 输入 {total_input_tokens} | 输出 {total_output_tokens} | 总计 {total_input_tokens + total_output_tokens}"
-                yield f"data: {json.dumps({'type': 'done', 'full_content': full_content + token_info})}\n\n"
+                yield f"data: {json.dumps({'type': 'done', 'full_content': full_content})}\n\n"
                 return
             
             # 没有工具调用但也没完成
@@ -365,9 +377,7 @@ def _stream_chat_unified(
                         mp.log_conversation(session_id, 1, "assistant", full_content)
                     except Exception as e:
                         print(f"[stream_chat] Failed to log assistant reply: {e}")
-                # 添加 token 统计到响应
-                token_info = f"\n\n---\n📊 **Token 使用**: 输入 {total_input_tokens} | 输出 {total_output_tokens} | 总计 {total_input_tokens + total_output_tokens}"
-                yield f"data: {json.dumps({'type': 'done', 'full_content': full_content + token_info})}\n\n"
+                yield f"data: {json.dumps({'type': 'done', 'full_content': full_content})}\n\n"
                 return
             
             continue

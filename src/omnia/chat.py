@@ -111,6 +111,7 @@ def _load_api_key(prefer_provider: str | None = None) -> Tuple[Optional[str], Op
       - kimi      -> MOONSHOT_API_KEY / KIMI_API_KEY
       - openai    -> OPENAI_API_KEY
       - anthropic -> ANTHROPIC_API_KEY
+      - xiaomi    -> MIMO_API_KEY
     """
     PROVIDER_KEY_MAP = {
         "deepseek": ["DEEPSEEK_API_KEY"],
@@ -118,6 +119,7 @@ def _load_api_key(prefer_provider: str | None = None) -> Tuple[Optional[str], Op
         "kimi": ["MOONSHOT_API_KEY", "KIMI_API_KEY"],
         "openai": ["OPENAI_API_KEY"],
         "anthropic": ["ANTHROPIC_API_KEY"],
+        "xiaomi": ["MIMO_API_KEY"],
     }
     
     # Priority 1: .env file in project root (user explicit config)
@@ -147,17 +149,19 @@ def _load_api_key(prefer_provider: str | None = None) -> Tuple[Optional[str], Op
     
     # Fallback: return the first configured key (original behavior)
     # Check .env first
-    for key in ["DEEPSEEK_API_KEY", "QIANFAN_API_KEY", "QIANFAN_ACCESS_KEY", "MOONSHOT_API_KEY", "KIMI_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY"]:
+    for key in ["DEEPSEEK_API_KEY", "QIANFAN_API_KEY", "QIANFAN_ACCESS_KEY", "MOONSHOT_API_KEY", "KIMI_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "MIMO_API_KEY"]:
         if key in env_vars:
             return key, env_vars[key]
     
     # Priority 2: Environment variables (fallback)
-    for key in ["DEEPSEEK_API_KEY", "QIANFAN_API_KEY", "QIANFAN_ACCESS_KEY", "MOONSHOT_API_KEY", "KIMI_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY"]:
+    for key in ["DEEPSEEK_API_KEY", "QIANFAN_API_KEY", "QIANFAN_ACCESS_KEY", "MOONSHOT_API_KEY", "KIMI_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "MIMO_API_KEY"]:
         val = os.environ.get(key)
         if val:
             return key, val
     
     return None, None
+
+
 def _try_chat_with_fallback(message: str, system_prompt: str, primary_key: str, primary_name: str) -> str | None:
     """Try to chat with primary provider, fallback to others if fails."""
     # Try primary first
@@ -171,6 +175,8 @@ def _try_chat_with_fallback(message: str, system_prompt: str, primary_key: str, 
                 provider = "qianfan"
             elif key_name == "OPENAI_API_KEY":
                 provider = "openai"
+            elif key_name == "MIMO_API_KEY":
+                provider = "xiaomi"
             
             reply = _chat_openai_compatible_requests(api_key, provider, system_prompt, message)
             return f"[{provider}] {reply}"
@@ -223,7 +229,8 @@ def chat(message: str) -> None:
             "  MOONSHOT_API_KEY=your_key_here     # Moonshot/Kimi\n"
             "  KIMI_API_KEY=your_key_here         # Kimi Legacy\n"
             "  OPENAI_API_KEY=your_key_here       # OpenAI\n"
-            "  ANTHROPIC_API_KEY=your_key_here    # Anthropic Claude"
+            "  ANTHROPIC_API_KEY=your_key_here    # Anthropic Claude\n"
+            "  MIMO_API_KEY=your_key_here          # Xiaomi MiMo (Token Plan)"
         )
         return
 
@@ -242,6 +249,8 @@ def chat(message: str) -> None:
         provider = "openai"
     elif key_name == "ANTHROPIC_API_KEY":
         provider = "anthropic"
+    elif key_name == "MIMO_API_KEY":
+        provider = "xiaomi"
 
     try:
         if provider == "anthropic":
@@ -282,12 +291,16 @@ def _build_model_config(provider: str) -> tuple[str, str]:
         url = "https://api.deepseek.com/v1/chat/completions"
         model = os.environ.get("DEEPSEEK_MODEL", "deepseek-v4-flash")
         print(f"[_build_model_config] Using DeepSeek: url={url}, model={model}")
+    elif provider == "xiaomi":
+        # Xiaomi MiMo Token Plan - 中国集群
+        url = "https://token-plan-cn.xiaomimimo.com/v1/chat/completions"
+        model = os.environ.get("MIMO_MODEL", "mimo-v2.5-pro")
+        print(f"[_build_model_config] Using Xiaomi MiMo: url={url}, model={model}")
     else:
         url = "https://api.openai.com/v1/chat/completions"
         model = os.environ.get("OPENAI_MODEL", "gpt-4o")
         print(f"[_build_model_config] Using OpenAI default: url={url}, model={model}")
     return url, model
-
 
 
 
@@ -380,7 +393,18 @@ def _call_model_messages(api_key: str, provider: str, messages: list, tools: lis
         "Accept": "application/json",
     }
     
-    if provider in ("baiduqianfancodingplan", "qianfan"):
+    if provider == "xiaomi":
+        # Xiaomi MiMo Token Plan - 使用 api-key 头（非 Bearer）
+        headers["api-key"] = api_key
+        
+        payload: dict = {
+            "model": model,
+            "messages": messages,
+            "max_tokens": 8192,
+            "temperature": 0.7,
+        }
+        print(f"[_call_model_messages] Xiaomi MiMo chat with {len(messages)} messages")
+    elif provider in ("baiduqianfancodingplan", "qianfan"):
         # Qianfan Coding Plan - 使用 Bearer token + messages 格式
         headers["Authorization"] = f"Bearer {api_key}"
         
