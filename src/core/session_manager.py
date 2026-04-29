@@ -1,14 +1,14 @@
 """Session Manager - 智能会话管理
 
-from core.logging_config import get_logger
-
-logger = get_logger(__name__)
-
 解决对话连续性问题：
 1. 自动加载最近的对话历史
 2. 智能会话窗口管理
 3. 语义相似度检索相关对话
 """
+
+from core.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 import time
 import uuid
@@ -180,7 +180,7 @@ def load_recent_conversations(
                     if history:
                         print(f"[SessionManager] Loaded {len(history)} semantically similar messages")
                         return history
-            except (ValueError) as e:
+            except ValueError as e:
                 print(f"[SessionManager] Semantic search failed: {e}, falling back to recent")
         
         # 策略 2: 加载最近的对话
@@ -206,7 +206,7 @@ def load_recent_conversations(
         print(f"[SessionManager] Loaded {len(history)} recent messages")
         return history
         
-    except (ValueError) as e:
+    except ValueError as e:
         print(f"[SessionManager] Failed to load conversations: {e}")
         return []
 

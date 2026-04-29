@@ -1,15 +1,14 @@
 """Tool Registry — Define and dispatch Omnia's hands and feet.
 
-
-from core.logging_config import get_logger
-
-logger = get_logger(__name__)
-
 All tools are JSON-schema compatible for OpenAI function-calling.
 Supports both native tools and external MCP servers.
 """
 
 from __future__ import annotations
+
+from core.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 from core.config import MEMORY_PALACE_DB
 import subprocess
@@ -458,12 +457,9 @@ def dispatch_tool(name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
             result = fn(**arguments)
             logger.info(f"[dispatch_tool] Tool executed successfully")
             return result
-        except TypeError as e:
-            print(f"[dispatch_tool] TypeError: {e}")
-            return {"error": f"Tool call failed: {e}. Arguments received: {arguments}"}
-        except (ValueError, TypeError) as e:
+        except (TypeError, ValueError) as e:
             print(f"[dispatch_tool] Error: {e}")
-            return {"error": str(e)}
+            return {"error": f"Tool call failed: {e}. Arguments received: {arguments}"}
     
     # Try MCP tool
     if _mcp_available and _mcp_registry:

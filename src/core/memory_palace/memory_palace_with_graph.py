@@ -61,7 +61,7 @@ class MemoryPalace:
     def vector_service(self):
         """Lazy-load vector service (singleton)."""
         if self._vector_service is None:
-            self._vector_service = get_hybrid_vector_service()
+            self._vector_service = get_vector_service()
         return self._vector_service
 
     def initialize(self, schema_path: Optional[Path] = None) -> None:

@@ -378,7 +378,7 @@ class ToolExecutionOptimizer:
             
             # 尝试错误恢复
             if self.recovery:
-                recovery_result = self.recovery.handle_error(tool_name, arguments, e)
+                recovery_result = self.recovery.get_recovery_action(str(e), tool_name, arguments)
                 if recovery_result:
                     result = recovery_result
                     success = True

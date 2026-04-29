@@ -1,9 +1,5 @@
 """Shared Vector Service for Omnia.
 
-from core.logging_config import get_logger
-
-logger = get_logger(__name__)
-
 A singleton service that provides vector embeddings for:
 - Memory Palace (facts, habits, timeline)
 - Neural Graph (nodes)
@@ -15,6 +11,10 @@ This ensures:
 """
 
 from __future__ import annotations
+
+from core.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 import os
 import threading
@@ -36,7 +36,7 @@ if 'HF_ENDPOINT' not in os.environ:
         socket.setdefaulttimeout(3)
         socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect(('huggingface.co', 443))
         # Connection OK, use default
-    except (sqlite3.Error) as e:
+    except (socket.error, OSError, TimeoutError) as e:
         # Connection failed, use mirror
         os.environ['HF_ENDPOINT'] = 'https://hf-mirror.com'
         logger.info("[SharedVectorService] Using HuggingFace mirror: hf-mirror.com")

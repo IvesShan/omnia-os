@@ -252,6 +252,7 @@ def _env_snapshot() -> dict:
         "qianfan": ("QIANFAN_MODEL", "qianfan-code-latest"),
         "kimi": ("MOONSHOT_MODEL", "K2.6-code-preview"),
         "openai": ("OPENAI_MODEL", "gpt-4o"),
+        "xiaomi": ("MIMO_MODEL", "mimo-v2.5-pro"),
         "anthropic": ("ANTHROPIC_MODEL", "claude-3-5-sonnet-20241022"),
     }
     
@@ -276,6 +277,7 @@ def _env_snapshot() -> dict:
             "qianfan": ("QIANFAN_API_KEY", "QIANFAN_ACCESS_KEY"),
             "kimi": ("MOONSHOT_API_KEY", "MOONSHOT_API_KEY"),
             "openai": ("OPENAI_API_KEY", "OPENAI_API_KEY"),
+            "xiaomi": ("MIMO_API_KEY", "MIMO_API_KEY"),
             "anthropic": ("ANTHROPIC_API_KEY", "ANTHROPIC_API_KEY"),
         }
         
@@ -796,6 +798,7 @@ def create_app() -> Flask:
         
         # Check if any provider is configured
         env_vars = {
+            "xiaomi": "MIMO_API_KEY",
             "deepseek": "DEEPSEEK_API_KEY",
             "qianfan": "QIANFAN_API_KEY",
             "kimi": "MOONSHOT_API_KEY", 
@@ -880,6 +883,7 @@ def create_app() -> Flask:
         
         providers = []
         env_vars = {
+            "xiaomi": ("MIMO_API_KEY", "小米 MiMo", "mimo-v2.5-pro"),
             "deepseek": ("DEEPSEEK_API_KEY", "DeepSeek", "deepseek-v4-flash"),
             "qianfan": ("QIANFAN_API_KEY", "百度千帆", "baiduqianfancodingplan/qianfan-code-latest"),
             "kimi": ("MOONSHOT_API_KEY", "Moonshot", "K2.6-code-preview"),
@@ -953,7 +957,7 @@ def create_app() -> Flask:
         data = request.get_json(force=True, silent=True) or {}
         provider = data.get("provider")
         
-        valid_providers = ["deepseek", "qianfan", "kimi", "openai", "anthropic"]
+        valid_providers = ["deepseek", "qianfan", "kimi", "openai", "anthropic", "xiaomi"]
         if provider not in valid_providers:
             return jsonify({"error": f"Invalid provider: {provider}"}), 400
         
@@ -963,6 +967,7 @@ def create_app() -> Flask:
             "qianfan": "QIANFAN_API_KEY",
             "kimi": "MOONSHOT_API_KEY",
             "openai": "OPENAI_API_KEY",
+            "xiaomi": "MIMO_API_KEY",
             "anthropic": "ANTHROPIC_API_KEY",
         }[provider]
         
@@ -1235,12 +1240,14 @@ def create_app() -> Flask:
                 provider = "kimi"
                 if key_name == "DEEPSEEK_API_KEY":
                     provider = "deepseek"
-                if key_name in ("QIANFAN_API_KEY", "QIANFAN_ACCESS_KEY"):
+                elif key_name in ("QIANFAN_API_KEY", "QIANFAN_ACCESS_KEY"):
                     provider = "qianfan"
                 elif key_name == "OPENAI_API_KEY":
                     provider = "openai"
                 elif key_name == "ANTHROPIC_API_KEY":
                     provider = "anthropic"
+                elif key_name == "MIMO_API_KEY":
+                    provider = "xiaomi"
             
             # 根据选中的 provider 加载对应的 API key
             key_name, api_key = _load_api_key(prefer_provider=provider)

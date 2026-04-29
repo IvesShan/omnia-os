@@ -306,7 +306,7 @@ def _stream_chat_unified(
                             yield f"data: {json.dumps({'type': 'token', 'content': text_chunk})}\n\n"
                         
                         # 工具调用 - 增量合并
-                        if 'tool_calls' in delta:
+                        if 'tool_calls' in delta and delta['tool_calls']:
                             for tc in delta['tool_calls']:
                                 tc_id = tc.get('id', '')
                                 tc_index = tc.get('index', 0)

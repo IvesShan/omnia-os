@@ -1717,6 +1717,7 @@ function getProviderName(id) {
     qianfan: '百度千帆',
     kimi: 'Moonshot',
     openai: 'OpenAI',
+    xiaomi: '小米 MiMo',
     anthropic: 'Anthropic'
   };
   return names[id] || id;
