@@ -1311,8 +1311,18 @@ def create_app() -> Flask:
         provider = _current_provider or "deepseek"
         
         def generate():
-            for event in stream_chat(message, history, provider=provider):
-                yield event
+            import json, traceback
+            try:
+                for event in stream_chat(message, history, provider=provider):
+                    yield event
+            except Exception as e:
+                tb = traceback.format_exc()
+                print(f'[StreamError] Chat stream crashed: {e}')
+                print(tb)
+                err_msg = 'data: ' + json.dumps({"type": "error", "message": "Stream error: " + str(e)}) + '\n\n'
+                done_msg = 'data: ' + json.dumps({"type": "done", "full_content": ""}) + '\n\n'
+                yield err_msg
+                yield done_msg
         
         return Response(
             generate(),

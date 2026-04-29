@@ -1,9 +1,5 @@
 """Vector IPC Service — Inter-process communication for shared vector embeddings.
 
-from core.logging_config import get_logger
-
-logger = get_logger(__name__)
-
 Architecture:
     ┌─────────────┐         Unix Socket        ┌──────────────┐
     │  Web Server │ ────────────────────────→  │   Daemon     │
@@ -18,6 +14,10 @@ Benefits:
 """
 
 from __future__ import annotations
+
+from core.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 import json
 import os
@@ -110,13 +110,14 @@ class VectorIPCServer:
                     if self.running:
                         print(f"[VectorIPC] Accept error: {e}")
         
-        except (ValueError) as e:
+        except (ValueError, OSError) as e:
             print(f"[VectorIPC] Server error: {e}")
         finally:
             self.stop()
     
     def _handle_client(self, client_socket):
         """Handle a single client request."""
+        request = None  # Initialize to avoid UnboundLocalError
         try:
             # Read request
             data = b""
@@ -133,17 +134,20 @@ class VectorIPCServer:
                     continue  # Need more data
             
             # Process request
-            response = self._process_request(request)
+            if request is None:
+                response = {"error": "No valid request received"}
+            else:
+                response = self._process_request(request)
             
             # Send response
             response_data = json.dumps(response).encode('utf-8')
             client_socket.sendall(response_data)
         
-        except (json.JSONDecodeError) as e:
+        except Exception as e:
             try:
                 error_response = {"error": str(e)}
                 client_socket.sendall(json.dumps(error_response).encode('utf-8'))
-            except (json.JSONDecodeError) as e:
+            except Exception:
                 pass
         finally:
             client_socket.close()
@@ -227,7 +231,7 @@ class VectorIPCClient:
             sock.close()
             self._available = True
             return True
-        except (sqlite3.Error) as e:
+        except (socket.error, OSError, ConnectionError) as e:
             self._available = False
             return False
     
