@@ -1466,10 +1466,36 @@ function handlePanelClick(action) {
       appendOmnia('[系统] 环境快照显示当前运行主机、模型、Shell 与系统版本。');
       break;
     case 'quick':
+      // 快捷操作菜单
+      const quickActions = [
+        { label: '📋 清空聊天', action: () => { messagesEl.innerHTML = ''; chatHistory = []; saveChatHistory(); appendOmnia('[系统] 聊天记录已清空。'); } },
+        { label: '🔄 刷新状态', action: () => { loadStatus(); appendOmnia('[系统] 状态已刷新。'); } },
+        { label: '📊 系统资源', action: () => { fetch(API_BASE + '/api/status').then(r => r.json()).then(d => { const s = d.system || {}; appendOmnia(`[系统] CPU: ${(s.cpu_percent || 0).toFixed(0)}% | 内存: ${(s.memory_percent || 0).toFixed(0)}% | 磁盘: ${(s.disk_percent || 0).toFixed(0)}%`); }).catch(() => appendOmnia('[系统] 无法获取系统信息。')); } },
+        { label: '📁 打开项目', action: () => { fetch(API_BASE + '/api/open-ide', { method: 'POST' }).then(r => r.json()).then(d => appendOmnia(d.message || '[系统] 已尝试打开 IDE。')).catch(() => appendOmnia('[系统] 无法打开 IDE。')); } },
+      ];
+      const menuHtml = quickActions.map((a, i) => `<button class="quick-action-btn" data-idx="${i}">${a.label}</button>`).join('');
+      const html = `<div class="msg omnia"><div class="bubble"><div class="quick-menu"><div class="quick-menu-title">快捷操作</div><div class="quick-menu-actions">${menuHtml}</div></div></div><div class="meta">Omnia · 刚刚</div></div>`;
+      messagesEl.insertAdjacentHTML('beforeend', html);
+      // 绑定按钮事件
+      messagesEl.lastElementChild.querySelectorAll('.quick-action-btn').forEach((btn, i) => {
+        btn.addEventListener('click', () => { quickActions[i].action(); btn.closest('.msg').remove(); });
+      });
+      scrollToBottom();
       break;
     case 'ide':
-      appendOmnia('[提示] 正在尝试打开 VS Code…（请确保已安装）');
-      fetch(`${API_BASE}/api/open-ide`, { method: 'POST' }).catch(() => {});
+      // 先检测 VS Code 是否可用
+      fetch(`${API_BASE}/api/open-ide`, { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+          if (data.error) {
+            appendOmnia(`[提示] ${data.error}`);
+          } else {
+            appendOmnia(`[提示] ${data.message || '已尝试打开 VS Code'}`);
+          }
+        })
+        .catch(() => {
+          appendOmnia('[错误] 无法连接到服务器，请检查 Omnia 是否运行。');
+        });
       break;
     case 'system':
       appendOmnia('[系统] 系统体征显示当前机器资源占用。');
@@ -1559,18 +1585,85 @@ function handlePanelClick(action) {
       break;
     
     case 'api-selector':
-      // 切换 API 提供商
-      var currentApi = localStorage.getItem('omnia_api_provider') || 'deepseek';
-      var nextApi = currentApi === 'baidu' ? 'kimi' : 'baidu';
+      // 智能切换 API 提供商
+      const providers = ['deepseek', 'baidu', 'kimi', 'anthropic'];
+      const currentApi = localStorage.getItem('omnia_api_provider') || 'deepseek';
+      const currentIdx = providers.indexOf(currentApi);
+      const nextIdx = (currentIdx + 1) % providers.length;
+      const nextApi = providers[nextIdx];
+      
       localStorage.setItem('omnia_api_provider', nextApi);
-      appendOmnia('[系统] API 已切换为: ' + (nextApi === 'deepseek' ? 'DeepSeek' : nextApi.toUpperCase()) + '，下次对话将使用新的 API。');
-      var apiLabel = document.querySelector('#api-panel .api-current');
-      if (apiLabel) apiLabel.textContent = nextApi.toUpperCase();
+      
+      const apiNames = {
+        deepseek: 'DeepSeek',
+        baidu: '百度千帆',
+        kimi: 'Moonshot Kimi',
+        anthropic: 'Anthropic Claude'
+      };
+      
+      appendOmnia(`[系统] API 已切换为: ${apiNames[nextApi] || nextApi}，下次对话将使用新的 API。`);
+      
+      // 更新 HUD 显示
+      const apiLabel = document.querySelector('#api-panel .api-current');
+      if (apiLabel) apiLabel.textContent = apiNames[nextApi] || nextApi.toUpperCase();
       break;
     
     case 'memory-search':
-      appendOmnia('[系统] 记忆搜索已激活。请使用输入框输入搜索关键词，或输入 /memory <关键词> 命令搜索记忆宫殿。');
-      if (composer) composer.focus();
+      // 显示记忆搜索 UI
+      const searchHtml = `
+        <div class="msg omnia">
+          <div class="bubble">
+            <div class="memory-search-ui">
+              <div class="search-title">🔍 记忆搜索</div>
+              <input type="text" id="memory-search-input" placeholder="输入关键词搜索记忆宫殿..." style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:6px;background:var(--bg-secondary);color:var(--text);margin:8px 0;">
+              <div id="memory-search-results" style="max-height:200px;overflow-y:auto;"></div>
+            </div>
+          </div>
+          <div class="meta">Omnia · 刚刚</div>
+        </div>
+      `;
+      messagesEl.insertAdjacentHTML('beforeend', searchHtml);
+      const searchInput = document.getElementById('memory-search-input');
+      const resultsDiv = document.getElementById('memory-search-results');
+      
+      // 绑定搜索事件
+      let searchTimeout;
+      searchInput.addEventListener('input', (e) => {
+        clearTimeout(searchTimeout);
+        const query = e.target.value.trim();
+        if (query.length < 2) {
+          resultsDiv.innerHTML = '<div style="color:var(--text-muted);font-size:12px;">输入至少2个字符开始搜索...</div>';
+          return;
+        }
+        resultsDiv.innerHTML = '<div style="color:var(--text-muted);">搜索中...</div>';
+        searchTimeout = setTimeout(() => {
+          fetch(`${API_BASE}/api/memory/search`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query })
+          })
+          .then(r => r.json())
+          .then(data => {
+            const results = data.results || [];
+            if (results.length === 0) {
+              resultsDiv.innerHTML = '<div style="color:var(--text-muted);">未找到相关记忆</div>';
+              return;
+            }
+            resultsDiv.innerHTML = results.slice(0, 5).map(r => `
+              <div class="memory-result-item" style="padding:6px 8px;border-bottom:1px solid var(--border);cursor:pointer;" data-layer="${r.layer}" data-id="${r.id}">
+                <div style="font-size:11px;color:var(--cyan);">${r.layer}</div>
+                <div style="font-size:13px;">${r.snippet.slice(0, 100)}...</div>
+              </div>
+            `).join('');
+          })
+          .catch(() => {
+            resultsDiv.innerHTML = '<div style="color:var(--danger);">搜索失败</div>';
+          });
+        }, 300);
+      });
+      
+      searchInput.focus();
+      scrollToBottom();
       break;
     
     case 'workflow':

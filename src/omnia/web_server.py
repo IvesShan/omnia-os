@@ -505,12 +505,18 @@ def create_app() -> Flask:
             # Flatten results from all layers
             for layer_name, items in search_results.items():
                 for item, score in items:
+                    # 安全序列化：只保留基本类型
+                    safe_item = {
+                        "id": item.get("id", 0),
+                        "content": str(item.get("content", ""))[:500],
+                        "created_at": str(item.get("created_at", "")),
+                    }
                     results.append({
                         "layer": layer_name,
                         "id": item.get("id", 0),
-                        "snippet": item.get("content", "")[:200],
-                        "score": score,
-                        "data": item
+                        "snippet": str(item.get("content", ""))[:200],
+                        "score": float(score) if score else 0.0,
+                        "data": safe_item
                     })
             
             # Sort by score and limit
@@ -1097,6 +1103,18 @@ def create_app() -> Flask:
         except Exception as e:
             reply = f"[执行完成，但总结时出错: {e}]"
         return jsonify({"reply": reply, "steps": [step]})
+
+    @app.route("/api/workflow/status", methods=["GET"])
+    def workflow_status():
+        """返回工作流引擎状态"""
+        # 简单实现：检查是否有活动的工作流日志
+        seo_log = Path("/tmp/omnia_workflow_seo.log")
+        active = seo_log.exists() and seo_log.stat().st_size > 0
+        return jsonify({
+            "active": active,
+            "current": "SEO Pipeline" if active else None,
+            "last_check": datetime.now().isoformat()
+        })
 
     @app.route("/api/workflow", methods=["POST"])
     def run_workflow():
