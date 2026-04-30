@@ -1,185 +1,126 @@
 from __future__ import annotations
-# Omnia Chat Handler V2 - 彻底解决工具调用问题
-# 改进：
-# 1. 使用统一的 tool_trigger 模块
-# 2. 工具执行后保留最近 3 轮对话
-# 3. 智能终止检测
-# 4. 增强错误恢复
+# Omnia Chat Handler - 融合三家最佳实践
+# 核心策略：工具执行后完全重建消息列表
+# 新增：神经图谱上下文增强 + 会话历史自动加载
 
 import json
 from core.config import MEMORY_PALACE_DB, OMNIA_HOME
-from typing import Any, List, Dict, Optional
-import re
+from typing import Any
 
-
-def analyze_tool_results(steps: list) -> dict:
+def should_require_tool(user_message: str, provider: str = "deepseek") -> str | None:
     """
-    分析工具执行结果，判断是否已获得足够信息。
+    智能判断是否应该强制调用工具。
+    
+    策略：
+    - kimi/openai/anthropic: 支持 tool_choice: "required"，强制调用
+    - deepseek: 不支持 "required"，返回 "auto" + 依赖系统提示引导
+    
+    Args:
+        user_message: 用户消息
+        provider: 当前使用的 provider
     
     Returns:
-        {
-            "sufficient": bool,  # 是否已足够回答问题
-            "has_error": bool,   # 是否有错误
-            "summary": str,      # 结果摘要
-        }
+        "required" - 强制调用工具（仅对支持的 provider）
+        "auto" - 建议模型考虑调用工具
+        None - 不传此参数，使用 API 默认行为
     """
-    if not steps:
-        return {"sufficient": False, "has_error": False, "summary": "无工具执行"}
+    trigger_keywords = [
+        # 中文关键词
+        "检查", "确认", "验证", "查看", "读取", "读文件",
+        "改好了吗", "生效了吗", "有没有", "状态",
+        "检查一下", "看一下", "看一下代码", "看看代码",
+        "分析", "重新分析", "完整分析", "全面分析",
+        # 英文关键词
+        "check", "verify", "confirm", "read", "analyze",
+    ]
     
-    has_error = False
-    successful_count = 0
-    result_types = set()
+    user_lower = user_message.lower()
     
-    for step in steps:
-        result = step.get("result_summary", "")
-        
-        # 检查错误
-        if "error" in result.lower() or "失败" in result or "exception" in result.lower():
-            has_error = True
-        else:
-            successful_count += 1
-        
-        # 分析结果类型
-        if "read_file" in step.get("tool", ""):
-            result_types.add("file_content")
-        elif "execute_shell" in step.get("tool", ""):
-            result_types.add("command_output")
-        elif "list_directory" in step.get("tool", ""):
-            result_types.add("directory_listing")
+    # 检查是否命中关键词
+    triggered = False
+    for kw in trigger_keywords:
+        if kw in user_lower:
+            triggered = True
+            break
     
-    # 判断是否足够
-    # 如果有成功的文件读取或命令执行，通常已足够
-    sufficient = successful_count > 0 and not has_error
+    if not triggered:
+        return None
     
-    summary = f"执行了 {len(steps)} 个工具，成功 {successful_count} 个"
-    if has_error:
-        summary += "，有错误"
+    # 根据 provider 决定策略
+    providers_support_required = ["kimi", "openai", "anthropic"]
     
-    return {
-        "sufficient": sufficient,
-        "has_error": has_error,
-        "summary": summary,
-        "result_types": list(result_types),
-    }
-
-
-def build_context_aware_prompt(
-    original_message: str,
-    steps: list,
-    analysis: dict,
-    recent_history: List[dict] = None,
-) -> str:
-    """
-    构建上下文感知的提示。
-    根据工具执行情况，生成合适的提示。
-    """
-    base_prompt = f"原始问题：{original_message}\n\n"
-    
-    # 添加工具执行摘要
-    if steps:
-        base_prompt += "## 已执行的工具\n\n"
-        for i, step in enumerate(steps, 1):
-            tool = step.get("tool", "unknown")
-            args = step.get("arguments", {})
-            result_preview = step.get("result_summary", "")[:200]
-            base_prompt += f"{i}. **{tool}**\n"
-            base_prompt += f"   参数: {json.dumps(args, ensure_ascii=False)}\n"
-            base_prompt += f"   结果: {result_preview}\n\n"
-    
-    # 根据分析结果生成指导
-    if analysis["has_error"]:
-        base_prompt += """## ⚠️ 注意
-
-部分工具执行失败。请：
-1. 分析失败原因
-2. 如果可以，尝试其他方法
-3. 如果无法完成，明确告知用户原因
-"""
-    elif analysis["sufficient"]:
-        base_prompt += """## ✅ 信息已足够
-
-工具已返回足够信息。请：
-1. 基于工具结果回答问题
-2. 不要编造或臆测
-3. 如果结果不完整，明确说明
-"""
+    if provider.lower() in providers_support_required:
+        return "required"  # 强制调用
     else:
-        base_prompt += """## 📋 需要更多信息
-
-当前信息可能不足以完整回答问题。请：
-1. 评估是否需要继续调用工具
-2. 如果需要，调用合适的工具
-3. 如果已有足够信息，直接回答
-"""
-    
-    # 添加历史上下文（如果有）
-    if recent_history and len(recent_history) > 0:
-        base_prompt += "\n## 最近对话\n\n"
-        for msg in recent_history[-4:]:  # 最近 2 轮
-            role = msg.get("role", "unknown")
-            content = msg.get("content", "")[:100]
-            base_prompt += f"[{role}] {content}...\n"
-    
-    return base_prompt
+        return "auto"  # 依赖系统提示引导
 
 
-def handle_chat(
-    message: str,
-    history: list,
-    api_key: str,
-    provider: str,
-    system_prompt: str,
-    all_tools_schema: list = None
-) -> dict:
+
+
+def handle_chat(message: str, history: list, api_key: str, provider: str, system_prompt: str, all_tools_schema: list = None) -> dict:
     """
-    改进版聊天处理器。
+    融合 Hermes + FreeCode + OpenClaw 最佳实践的聊天处理器。
     
-    核心改进：
-    1. 使用 tool_trigger 模块统一判断
-    2. 工具执行后保留最近 3 轮对话
-    3. 智能终止检测
-    4. 增强错误恢复
+    核心策略：
+    1. 工具执行后完全重建消息列表（FreeCode）
+    2. 工具结果添加明确警告（OpenClaw）
+    3. 双系统提示强化禁止（Hermes）
+    4. 极简总结提示
+    5. 神经图谱上下文增强（NEW）
+    6. 会话历史自动加载（NEW - 解决对话连续性问题）
     """
     from omnia.chat import _call_model_messages
     from core.actuator.tool_registry import TOOLS_SCHEMA, check_tool_safety, dispatch_tool
+    from core.cognition.context_compressor import ContextCompressor
     from core.plugin.hooks import HookRegistry, HookType, HookContext, get_hook_registry
     from core.cognition.prompt_builder import PromptBuilder, PromptContext, get_prompt_builder
     from core.neural_graph.context_enhancer import get_graph_enhancer
     from core.memory_palace.memory_palace_with_graph import MemoryPalace
     from core.neural_graph.updater import NeuralGraphUpdater
     from core.session_manager import get_session_manager, load_recent_conversations, merge_histories
-    from core.context_manager import ContextManager, save_current_context
-    from omnia.tool_trigger import analyze_message, get_tool_choice_for_provider, get_suggested_tool_prompt
+    from core.context_manager import ContextManager, SessionContext, save_current_context
     from pathlib import Path
+    
 
     hooks = get_hook_registry()
     prompt_builder = get_prompt_builder()
     
-    # ========== 会话管理 ==========
+    # ========== 会话管理（NEW）==========
     session_manager = get_session_manager()
     session_id = session_manager.get_or_create_session()
     
+    # 初始化 MemoryPalace（带 Neural Graph Hook）
     memory_db = MEMORY_PALACE_DB
     
+    # 初始化 NeuralGraphUpdater 并设置 hook
     try:
         graph_updater = NeuralGraphUpdater()
         mp = MemoryPalace(str(memory_db), graph_updater=graph_updater)
         print(f"[Chat] MemoryPalace initialized with NeuralGraphUpdater hook")
     except Exception as e:
-        print(f"[Chat] Failed to init NeuralGraphUpdater: {e}")
+        print(f"[Chat] Failed to init NeuralGraphUpdater, falling back to basic MemoryPalace: {e}")
         mp = MemoryPalace(str(memory_db))
     
-    # ========== 自动加载历史 ==========
-    if len(history) < 10:
-        print(f"[Chat] Loading history from database...")
-        db_history = load_recent_conversations(limit=40, current_message=message, min_similarity=0.3)
-        history = merge_histories(history, db_history, max_total=80)
+    # ========== 自动加载历史（NEW - 解决对话连续性）==========
+    # 如果前端传来的历史很短（< 5 条），从数据库加载
+    if len(history) < 10:  # 优化: 提高阈值，确保加载足够历史
+        print(f"[Chat] Frontend history too short ({len(history)}), loading from database...")
+        db_history = load_recent_conversations(
+            limit=40,  # 优化: 加载更多历史
+            current_message=message,
+            min_similarity=0.3,  # 优化: 启用语义搜索
+        )
+        history = merge_histories(history, db_history, max_total=80)  # 优化: 增加上下文容量
         print(f"[Chat] History merged: {len(history)} messages")
     
+    # ========== 加载上次上下文（NEW）==========
     context_manager = ContextManager(OMNIA_HOME)
     last_context = context_manager.load_context()
     
-    # ========== 触发 Hooks ==========
+    if last_context:
+        print(f"[Chat] Last context loaded: {last_context.topic}")
+    
+    # ========== 触发 ON_MESSAGE Hook ==========
     try:
         on_message_context = HookContext(
             type=HookType.ON_MESSAGE,
@@ -188,34 +129,45 @@ def handle_chat(
                 "session_id": session_id,
                 "history_length": len(history),
                 "provider": provider,
+                "last_context": last_context.to_dict() if last_context else None,
             }
         )
         hooks.trigger(HookType.ON_MESSAGE, on_message_context)
+        print(f"[Chat] ON_MESSAGE Hook triggered for: {message[:50]}...")
     except Exception as e:
-        print(f"[Chat] Hook error: {e}")
+        print(f"[Chat] Failed to trigger ON_MESSAGE hook: {e}")
     
+    # 记录用户消息
     try:
         mp.log_conversation(session_id, 0, "user", message)
+        print(f"[Chat] Logged user message to conversation_logs, session={session_id}")
     except Exception as e:
-        print(f"[Chat] Failed to log: {e}")
+        print(f"[Chat] Failed to log user message: {e}")
     
+    # 使用传入的工具 schema，如果没有则使用原生工具
     tools_schema = all_tools_schema if all_tools_schema else TOOLS_SCHEMA
+    
     MAX_TOOL_ROUNDS = 5
     
+    # 保存原始消息
     original_message = message
     
-    # ========== 神经图谱增强 ==========
+    # ========== 神经图谱上下文增强 ==========
     graph_context_prompt = ""
     try:
         graph_enhancer = get_graph_enhancer()
         graph_context_prompt = graph_enhancer.get_context_prompt(message)
+        if graph_context_prompt:
+            print(f"[Chat] Graph context enhanced for: {message[:50]}...")
     except Exception as e:
         print(f"[Chat] Graph enhancement failed: {e}")
+        graph_context_prompt = ""
     
-    # ========== 构建系统提示 ==========
+    # 构建初始提示
     prompt_context = PromptContext(mode="normal")
     dynamic_prompt = prompt_builder.build_for_provider(provider, prompt_context)
     
+    # 如果有上次上下文，追加到系统提示
     if last_context:
         context_prompt = f"""
 
@@ -225,90 +177,75 @@ def handle_chat(
 📌 主题: {last_context.topic}
 📝 摘要: {last_context.summary}
 """
+        if last_context.active_project:
+            context_prompt += f"\n🏗️ 项目: {last_context.active_project}"
         if last_context.next_steps:
             context_prompt += f"\n➡️ 下一步: {', '.join(last_context.next_steps[:3])}"
+        
         dynamic_prompt = dynamic_prompt + context_prompt
     
+    # 如果有图谱上下文，追加到系统提示
     if graph_context_prompt:
         dynamic_prompt = dynamic_prompt + "\n" + graph_context_prompt
     
-    # ========== 工具触发分析 ==========
-    last_assistant_msg = ""
-    if history and len(history) > 0:
-        for h in reversed(history):
-            if h.get("role") == "assistant":
-                last_assistant_msg = h.get("content", "")
-                break
-    
-    trigger_result = analyze_message(message, last_assistant_msg, history)
-    print(f"[Chat] Trigger analysis: type={trigger_result.trigger_type}, confidence={trigger_result.confidence:.2f}")
-    
-    # 对于不支持 required 的 Provider，添加提示
-    tool_hint = ""
-    if trigger_result.should_trigger and provider.lower() not in ["kimi", "openai", "anthropic"]:
-        tool_hint = get_suggested_tool_prompt(trigger_result)
-        if tool_hint:
-            dynamic_prompt = dynamic_prompt + "\n" + tool_hint
-    
-    # ========== 构建消息列表 ==========
     messages: list[dict] = [{"role": "system", "content": dynamic_prompt}]
     
+    # 添加历史
     for h in history:
         if h.get("role") in ("user", "assistant"):
             messages.append({"role": h["role"], "content": h["content"]})
     
+    # 添加当前用户消息
     messages.append({"role": "user", "content": message})
     
-    print(f"[Chat] Initial messages: {len(messages)}")
+    print(f"[Chat] Initial messages: {len(messages)} (system + {len(history)} history + 1 current)")
     
     steps = []
     tool_calls_executed = False
-    recent_history = []  # 保存最近对话
     
     for round_num in range(MAX_TOOL_ROUNDS):
         print(f"\n[Chat] === Round {round_num + 1}/{MAX_TOOL_ROUNDS} ===")
         
-        # ========== 改进：工具执行后保留最近 3 轮对话 ==========
+        # 策略 1: 工具执行后完全重建（FreeCode 方案）
         if tool_calls_executed:
-            # 保存最近 3 轮（6 条消息）
-            recent_history = messages[-7:] if len(messages) >= 7 else messages[1:]  # 排除 system
-            
-            # 分析工具结果
-            analysis = analyze_tool_results(steps)
-            print(f"[Chat] Tool analysis: {analysis}")
-            
-            # 构建上下文感知提示
-            context_prompt = build_context_aware_prompt(original_message, steps, analysis, recent_history)
-            
-            # 重建消息列表（保留系统提示 + 最近对话摘要）
+            # 清空消息列表，只保留系统提示和关键信息
             messages = [{"role": "system", "content": dynamic_prompt}]
             
-            # 添加上下文提示
+            # 策略 2: 添加极简的总结提示（改进：允许继续调用工具）
             messages.append({
                 "role": "user",
-                "content": context_prompt
+                "content": f"""基于之前的工具执行结果，请回答：{original_message}
+
+注意：
+1. 如果工具结果已足够回答问题，用自然语言回答即可
+2. 如果还需要更多信息（如读取其他文件、执行其他命令），请继续调用工具
+3. 不要编造或臆测，确保回答基于工具返回的实际结果"""
             })
             
-            print(f"[Chat] Rebuilt messages with context: {len(messages)}")
+            print(f"[Chat] Rebuilt messages: {len(messages)} (no history)")
         
-        # ========== 调用模型 ==========
+        # 调用模型
+        # 策略改进：工具执行后仍然可以继续调用工具（不再禁用）
+        # 但通过 MAX_TOOL_ROUNDS 限制总轮数
         use_tools = tools_schema
-        tool_choice = get_tool_choice_for_provider(trigger_result, provider) if use_tools else None
         
+        # 智能判断 tool_choice（不传 None 即为 API 默认行为）
+        tool_choice = should_require_tool(message, provider) if use_tools else None
         if tool_choice:
             print(f"[Chat] Tool choice: {tool_choice}")
         
         data = _call_model_messages(api_key, provider, messages, tools=use_tools, tool_choice=tool_choice)
         msg = data["choices"][0]["message"]
         
+        # 检查是否调用了工具
         tool_calls = msg.get("tool_calls") or []
         content = msg.get("content", "")
         
-        # ========== 没有工具调用 ==========
         if not tool_calls:
+            # 没有工具调用，处理返回文本
             reply = content
             
-            # Hook: POST_RESPONSE
+            # Hook: POST_RESPONSE (自动记忆)
             hook_context = HookContext(
                 type=HookType.POST_RESPONSE,
                 response=reply,
@@ -321,19 +258,28 @@ def handle_chat(
             )
             hooks.trigger(HookType.POST_RESPONSE, hook_context)
             
+            # 记录助手回复
             try:
                 mp.log_conversation(session_id, 0, "assistant", reply)
+                print(f"[Chat] Logged assistant reply to conversation_logs, session={session_id}")
             except Exception as e:
-                print(f"[Chat] Failed to log reply: {e}")
+                print(f"[Chat] Failed to log assistant reply: {e}")
             
-            # 保存上下文
+            # ========== 保存当前上下文（NEW）==========
             try:
+                # 提取主题和摘要
+                topic = extract_topic(message)
+                summary = summarize_conversation(message, reply)
+                active_project = detect_active_project(message, reply)
+                next_steps = extract_next_steps(reply)
+                
                 save_current_context(
-                    topic=extract_topic(message),
-                    summary=summarize_conversation(message, reply),
-                    active_project=detect_active_project(message, reply),
-                    next_steps=extract_next_steps(reply),
+                    topic=topic,
+                    summary=summary,
+                    active_project=active_project,
+                    next_steps=next_steps,
                 )
+                print(f"[Chat] Context saved: {topic}")
             except Exception as e:
                 print(f"[Chat] Failed to save context: {e}")
             
@@ -344,15 +290,11 @@ def handle_chat(
                 "graph_context_used": bool(graph_context_prompt),
                 "session_id": session_id,
                 "history_loaded": len(history),
-                "trigger_analysis": {
-                    "type": trigger_result.trigger_type,
-                    "confidence": trigger_result.confidence,
-                },
             }
         
-        # ========== 有工具调用 ==========
+        # 有工具调用
         print(f"[Chat] Tool calls: {len(tool_calls)}")
-        messages.append(msg)
+        messages.append(msg)  # 添加 assistant 消息
         
         for tc in tool_calls:
             tool_name = tc.get("function", {}).get("name", "")
@@ -360,15 +302,22 @@ def handle_chat(
             
             print(f"[Chat] Tool: {tool_name}, Raw args: {raw_arguments[:100]}")
             
+            # 解析参数
             try:
                 tool_args = json.loads(raw_arguments)
+                print(f"[Chat] Parsed args: {tool_args}")
             except json.JSONDecodeError as e:
-                print(f"[Chat] JSON parse error: {e}")
+                print(f"[Chat] JSON parse error: {e}, raw={raw_arguments}")
                 tool_args = {}
+            except Exception as e:
+                print(f"[Chat] Unexpected error parsing args: {e}")
+                tool_args = {}
+            
+            print(f"[Chat] Tool: {tool_name}, Args: {tool_args}")
             
             # 安全检查
             if not check_tool_safety(tool_name, tool_args):
-                print(f"[Chat] Tool blocked: {tool_name}")
+                print(f"[Chat] Tool blocked by safety check: {tool_name}")
                 messages.append({
                     "role": "tool",
                     "name": tool_name,
@@ -381,6 +330,7 @@ def handle_chat(
                 result = dispatch_tool(tool_name, tool_args)
                 print(f"[Chat] Tool result: {str(result)[:200]}")
                 
+                # 记录步骤
                 steps.append({
                     "tool": tool_name,
                     "arguments": tool_args,
@@ -389,6 +339,7 @@ def handle_chat(
                 
                 tool_calls_executed = True
                 
+                # 添加工具结果
                 messages.append({
                     "role": "tool",
                     "name": tool_name,
@@ -404,25 +355,11 @@ def handle_chat(
                     "name": tool_name,
                     "content": json.dumps({"error": str(e)})
                 })
-        
-        # ========== 智能终止检测 ==========
-        if tool_calls_executed and round_num >= 1:
-            analysis = analyze_tool_results(steps)
-            
-            # 如果已经有足够信息且没有错误，下一轮不再强制工具
-            if analysis["sufficient"] and not analysis["has_error"]:
-                print(f"[Chat] Smart termination: sufficient results detected")
-                # 下一轮将不再强制工具调用
-                trigger_result = type('obj', (object,), {
-                    'should_trigger': False,
-                    'trigger_type': 'auto_terminated',
-                    'confidence': 0.0,
-                    'suggested_tools': []
-                })()
     
-    # ========== 超过最大轮数 ==========
+    # 超过最大轮数
     reply = "抱歉，工具调用次数超过限制。请尝试简化您的请求。"
     
+    # 保存上下文
     try:
         save_current_context(
             topic=extract_topic(message),
@@ -443,6 +380,8 @@ def handle_chat(
 # ========== 辅助函数 ==========
 
 def extract_topic(message: str) -> str:
+    """从消息中提取主题"""
+    # 简单实现：取前 50 个字符
     topic = message.strip()[:50]
     if len(message) > 50:
         topic += "..."
@@ -450,6 +389,8 @@ def extract_topic(message: str) -> str:
 
 
 def summarize_conversation(user_message: str, assistant_reply: str) -> str:
+    """总结对话"""
+    # 简单实现：取用户消息的前 100 个字符
     summary = user_message.strip()[:100]
     if len(user_message) > 100:
         summary += "..."
@@ -457,6 +398,8 @@ def summarize_conversation(user_message: str, assistant_reply: str) -> str:
 
 
 def detect_active_project(user_message: str, assistant_reply: str) -> str:
+    """检测活跃项目"""
+    # 简单实现：查找关键词
     keywords = ["Omnia", "喵修匠", "懂机帝", "OpenClaw", "项目"]
     text = user_message + " " + assistant_reply
     for keyword in keywords:
@@ -466,7 +409,10 @@ def detect_active_project(user_message: str, assistant_reply: str) -> str:
 
 
 def extract_next_steps(reply: str) -> list:
+    """从回复中提取下一步"""
+    # 简单实现：查找"下一步"关键词
     if "下一步" in reply:
+        # 提取包含"下一步"的句子
         lines = reply.split("\n")
         steps = []
         for line in lines:
