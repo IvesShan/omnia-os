@@ -5,15 +5,136 @@ const API_BASE = `${window.location.origin}`;
 // =========================================
 
 // 页面可见性感知 - 后台暂停动画
+// =========================================
+// 连接状态追踪
+// =========================================
 let isPageVisible = true;
+let connectionState = 'unknown';  // 'connected' | 'disconnected' | 'unknown'
+let lastSuccessfulPing = 0;
+let consecutiveFailures = 0;
+
+function setConnectionState(state) {
+  const prevState = connectionState;
+  connectionState = state;
+  
+  // 更新 UI 指示器
+  const indicator = document.getElementById('connection-banner');
+  if (state === 'disconnected') {
+    if (!indicator) {
+      const banner = document.createElement('div');
+      banner.id = 'connection-banner';
+      banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:rgba(239,68,68,0.9);color:white;text-align:center;padding:6px 0;font-size:13px;font-family:system-ui;backdrop-filter:blur(8px);transition:opacity 0.3s;';
+      banner.textContent = '⚠️ 与服务器的连接已断开，正在重连…';
+      document.body.appendChild(banner);
+    }
+  } else if (state === 'connected') {
+    if (indicator) {
+      indicator.style.opacity = '0';
+      setTimeout(() => indicator.remove(), 300);
+    }
+    if (prevState === 'disconnected') {
+      console.log('[Connection] 已恢复连接');
+    }
+  }
+}
+
+// 带超时的 fetch（防止请求挂起导致 UI 卡死）
+async function fetchWithTimeout(url, options = {}, timeoutMs = 8000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, { cache: "no-store", ...options, signal: controller.signal });
+    clearTimeout(timer);
+    return response;
+  } catch (err) {
+    clearTimeout(timer);
+    throw err;
+  }
+}
+
+// 心跳检测 - 轻量级 ping
+async function heartbeatPing() {
+  try {
+    const res = await fetchWithTimeout(`${API_BASE}/health`, {}, 5000);
+    if (res.ok) {
+      lastSuccessfulPing = Date.now();
+      consecutiveFailures = 0;
+      setConnectionState('connected');
+      return true;
+    }
+  } catch (e) {
+    // 静默失败
+  }
+  consecutiveFailures++;
+  if (consecutiveFailures >= 3) {
+    setConnectionState('disconnected');
+  }
+  return false;
+}
+
+// 页面可见性感知 - V3（防抖 + 防重复）
+let _visibilityTimer = null;
+let _lastVisibilityAction = 0;
 document.addEventListener('visibilitychange', () => {
   isPageVisible = !document.hidden;
   if (document.hidden) {
     document.body.classList.add('page-hidden');
-  } else {
-    document.body.classList.remove('page-hidden');
+    return;
   }
+  
+  // 防抖：3秒内不重复执行
+  const now = Date.now();
+  if (now - _lastVisibilityAction < 3000) return;
+  _lastVisibilityAction = now;
+  
+  clearTimeout(_visibilityTimer);
+  _visibilityTimer = setTimeout(() => {
+    document.body.classList.remove('page-hidden');
+    console.log('[Visibility] 页面恢复可见，执行恢复序列');
+    
+    // 1. 强制重新布局（解决渲染死锁）
+    if (messagesEl) {
+      messagesEl.style.display = 'none';
+      messagesEl.offsetHeight;
+      messagesEl.style.display = '';
+    }
+    
+    // 2. 心跳检测（只在断连时才刷新状态）
+    heartbeatPing().then(ok => {
+      if (ok) {
+        if (connectionState === 'disconnected') {
+          setConnectionState('connected');
+          loadStatus();
+          loadApiProviders();
+        }
+        if (scrollEl) scrollEl.scrollTop = scrollEl.scrollHeight;
+      } else {
+        console.warn('[Visibility] 心跳失败，进入重连模式');
+        reconnectLoop();
+      }
+    });
+  }, 500); // 延迟 500ms 等浏览器稳定
 });
+
+// 指数退避重连
+async function reconnectLoop() {
+  let delay = 2000;
+  const maxDelay = 30000;
+  
+  while (connectionState === 'disconnected') {
+    console.log(`[Reconnect] ${delay/1000}s 后重试...`);
+    await new Promise(r => setTimeout(r, delay));
+    
+    const ok = await heartbeatPing();
+    if (ok) {
+      // 恢复后刷新页面状态
+      if (typeof loadStatus === 'function') loadStatus();
+      if (typeof loadApiProviders === 'function') loadApiProviders();
+      return;
+    }
+    delay = Math.min(delay * 1.5, maxDelay);
+  }
+}
 
 // 滚动节流
 let scrollPending = false;
@@ -654,7 +775,7 @@ function appendSwarmBadge(agent) {
     </div>
   `;
   messagesEl.insertAdjacentHTML('beforeend', html);
-  pushChat(html, 'tool');
+  addToHistory('assistant', '[swarm]', html);
   scrollToBottom();
 }
 
@@ -1124,7 +1245,7 @@ function appendWorkflowResult(label, text, isError = false) {
     </div>
   `;
   messagesEl.insertAdjacentHTML('beforeend', html);
-  pushChat(html, 'workflow');
+  addToHistory('assistant', '[workflow]', html);
   scrollToBottom();
 }
 
@@ -1154,9 +1275,37 @@ function pulseIfChanged(el, newVal) {
 }
 
 // --- 加载状态 ---
+// --- loadStatus 防抖：防止并发调用 ---
+let _loadStatusPromise = null;
+let _loadStatusLastCall = 0;
+let _loadStatusLastFailed = false;
+let _backgroundIntervalId = null;
 async function loadStatus() {
+  // 防抖：3秒内不重复调用，复用正在进行的请求
+  const now = Date.now();
+  if (_loadStatusPromise && (now - _loadStatusLastCall) < 3000) {
+    // 如果上一次请求失败了，允许立即重试
+    if (_loadStatusLastFailed) {
+      _loadStatusLastFailed = false;
+      // 继续执行新请求
+    } else {
+      return _loadStatusPromise;
+    }
+  }
+  _loadStatusLastCall = now;
+  _loadStatusLastFailed = false;
+  _loadStatusPromise = _doLoadStatus().catch(e => {
+    _loadStatusLastFailed = true;
+    throw e;
+  });
+  try { await _loadStatusPromise; } finally { 
+    if (!_loadStatusLastFailed) _loadStatusPromise = null; 
+  }
+}
+
+async function _doLoadStatus() {
   try {
-    const res = await fetch(`${API_BASE}/api/status`);
+    const res = await fetchWithTimeout(`${API_BASE}/api/status`, { cache: "no-store" }, 15000);
     const data = await res.json();
 
     // 头像框
@@ -1286,7 +1435,18 @@ async function loadStatus() {
     if (envOs && env.os) envOs.textContent = env.os;
 
   } catch (e) {
-    console.error('状态加载失败', e);
+    // AbortError 是防抖机制的正常行为，不需要报错
+    if (e.name === 'AbortError') {
+      return; // 静默忽略
+    }
+    console.warn('状态加载失败:', e.message);
+    // fetch 超时或网络错误时标记断连
+    if (e.message.includes('fetch') || e.message.includes('network') || e.message.includes('Failed')) {
+      consecutiveFailures++;
+      if (consecutiveFailures >= 2) {
+        setConnectionState('disconnected');
+      }
+    }
   }
 }
 
@@ -1678,7 +1838,7 @@ async function loadApiProviders() {
   const apiList = $('#api-list');
   
   try {
-    const res = await fetch(`${API_BASE}/api/providers`);
+    const res = await fetch(`${API_BASE}/api/providers`, { cache: 'no-store' });
     const data = await res.json();
     const providers = data.providers || [];
     const active = data.active;
@@ -1754,19 +1914,76 @@ restorePendingConfirm();
 loadStatus();
 loadApiProviders();
 
-// 状态刷新节流 - 页面不可见时跳过
-let statusIntervalId = null;
-function scheduleStatusRefresh() {
-  if (!isPageVisible) return;
-  if ('requestIdleCallback' in window) {
-    requestIdleCallback(() => loadStatus(), { timeout: 20000 });
-  } else {
-    loadStatus();
+let _apiProviderTimer = null;
+
+// 统一状态刷新 - 单一定时器，前台30s/后台60s
+// 合并原 scheduleStatusRefresh + heartbeatPing 两个30s间隔为一个
+let _statusTimerId = null;
+let _isBackground = false;
+
+function startUnifiedPolling() {
+  // 清除已有的定时器
+  if (_statusTimerId) clearInterval(_statusTimerId);
+  
+  const interval = document.hidden ? 60000 : 30000;
+  _isBackground = document.hidden;
+  
+  _statusTimerId = setInterval(() => {
+    // 后台模式：降低心跳频率，不刷新UI状态
+    if (document.hidden) {
+      // 每60秒只做轻量心跳，不调用 loadStatus（节省资源）
+      heartbeatPing();
+      return;
+    }
+    // 前台模式：正常刷新状态
+    if ('requestIdleCallback' in window) {
+      requestIdleCallback(() => {
+        loadStatus();
+        heartbeatPing();
+      }, { timeout: 5000 });
+    } else {
+      loadStatus();
+      heartbeatPing();
+    }
+  }, interval);
+  
+  // API列表单独用60秒间隔
+  if (!_apiProviderTimer) {
+    _apiProviderTimer = setInterval(loadApiProviders, 60000);
   }
 }
-setInterval(scheduleStatusRefresh, 15000);
 
-setInterval(loadApiProviders, 60000); // 每分钟刷新 API 列表
+// 可见性变化时切换间隔
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    _isBackground = true;
+    // 切到60秒间隔
+    if (_statusTimerId) clearInterval(_statusTimerId);
+    _statusTimerId = setInterval(() => {
+      heartbeatPing(); // 后台只做心跳
+    }, 60000);
+    document.body.classList.add('page-hidden');
+  } else {
+    _isBackground = false;
+    document.body.classList.remove('page-hidden');
+    // 立即刷新一次 + 切回30秒
+    loadStatus();
+    heartbeatPing();
+    if (_statusTimerId) clearInterval(_statusTimerId);
+    _statusTimerId = setInterval(() => {
+      if ('requestIdleCallback' in window) {
+        requestIdleCallback(() => { loadStatus(); heartbeatPing(); }, { timeout: 5000 });
+      } else {
+        loadStatus();
+        heartbeatPing();
+      }
+    }, 30000);
+  }
+});
+
+// 启动统一轮询
+startUnifiedPolling();
+
 composer.focus();
 
 // =========================================
@@ -2160,17 +2377,25 @@ async function checkTokenStatus() {
   
   try {
     const response = await fetch(`${API_BASE}/api/token/status`, {
+      cache: 'no-store',
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ messages: messages, model: currentApiProvider || 'deepseek' })
     });
     
     if (response.ok) {
-      const status = await response.json();
-      updateTokenDisplay(status);
+      const text = await response.text();
+      try {
+        const status = JSON.parse(text);
+        updateTokenDisplay(status);
+      } catch (parseErr) {
+        console.warn('[Token Status] 响应不是 JSON:', text.substring(0, 100));
+      }
     }
   } catch (e) {
-    console.log('[Token Status] Check failed:', e);
+    if (e.name !== 'AbortError') {
+      console.warn('[Token Status] Check failed:', e.message);
+    }
   }
 }
 

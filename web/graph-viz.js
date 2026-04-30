@@ -1,7 +1,6 @@
 /**
- * 神经图谱可视化 - 3D 全息大脑版本
- * 融合 porweb 视觉风格 + VowVector 架构
- * 特性：全息粒子大脑、知识图谱节点、Bloom 后处理
+ * 神经图谱可视化 - Obsidian 风格升级版
+ * 特性：力导向布局、悬停高亮、节点拖拽、发光效果
  */
 
 const GraphViz = {
@@ -14,62 +13,65 @@ const GraphViz = {
   
   // 粒子系统
   brainParticles: null,
-  particleCount: 2000,
-  
-  // 页面可见性控制（后台标签页时暂停渲染，省 GPU）
-  isPageVisible: true,
+  particleCount: 5000,
   
   // 知识图谱
   graphData: { nodes: [], edges: [] },
   nodeObjects: [],
   connectionLines: [],
+  nodeMap: {},
+  
+  // 力导向模拟
+  simulation: {
+    nodes: [],
+    running: true,
+    alpha: 1.0,
+    alphaDecay: 0.01,
+    velocityDecay: 0.4
+  },
+  
+  // 交互状态
+  hoveredNode: null,
+  selectedNode: null,
+  draggedNode: null,
+  raycaster: null,
+  mouse: new THREE.Vector2(),
   
   // 动画
   animationId: null,
   time: 0,
-  mouse: { x: 0, y: 0 },
   
-  // 类型颜色映射 (porweb 风格)
+  // 类型颜色映射 (Obsidian 风格)
   typeColors: {
-    'PERSON': 0x22d3ee,    // 青色
-    'PROJECT': 0xa855f7,   // 紫色
-    'FILE': 0x10b981,      // 绿色
-    'CONCEPT': 0xff8a00,   // 橙色
-    'DATE': 0x6366f1,      // 靛蓝
-    'ENTITY': 0xec4899,    // 粉色
-    'DEFAULT': 0x64748b    // 灰色
+    'PERSON': 0x22d3ee,
+    'PROJECT': 0xa855f7,
+    'FILE': 0x10b981,
+    'CONCEPT': 0xff8a00,
+    'DATE': 0x6366f1,
+    'ENTITY': 0xec4899,
+    'DEFAULT': 0x64748b
   },
   
   async init() {
-    console.log('[GraphViz] 初始化 3D 全息大脑');
+    console.log("[GraphViz] 初始化 Obsidian 风格神经图谱");
     
-    // 先加载统计数据
-    await this.loadStats();
-    
-    // 加载图谱数据
-    await this.loadGraph();
-    
-    // 初始化 3D 场景
-    this.initThreeJS();
-    
-    // 创建全息大脑粒子
-    this.createBrainParticles();
-    
-    // 创建知识图谱节点
-    this.createKnowledgeNodes();
-    
-    // 设置后处理
-    this.setupPostProcessing();
-    
-    // 页面可见性变化时暂停/恢复渲染
-    document.addEventListener('visibilitychange', () => {
-      this.isPageVisible = !document.hidden;
-    });
-    
-    // 开始动画
-    this.animate();
+    try {
+      await this.loadStats();
+      await this.loadGraph();
+      this.initThreeJS();
+      this.createBrainParticles();
+      this.createKnowledgeNodes();
+      this.initForceSimulation();
+      this.setupInteraction();
+      this.setupPostProcessing();
+      this.animate();
+      
+      console.log("[GraphViz] 初始化完成");
+    } catch (error) {
+      console.error("[GraphViz] 初始化错误:", error);
+    }
   },
-  
+
   initThreeJS() {
     const container = document.getElementById('graph-canvas');
     if (!container) {
@@ -77,48 +79,21 @@ const GraphViz = {
       return;
     }
     
-    // 调试：输出容器尺寸
-    console.log('[GraphViz] 容器尺寸:', {
-      clientWidth: container.clientWidth,
-      clientHeight: container.clientHeight,
-      offsetWidth: container.offsetWidth,
-      offsetHeight: container.offsetHeight,
-      getBoundingClientRect: container.getBoundingClientRect()
-    });
+    let width = container.clientWidth || 300;
+    let height = container.clientHeight || 280;
     
-    // 如果容器尺寸为0，强制设置
-    let width = container.clientWidth || container.offsetWidth || 300;
-    let height = container.clientHeight || container.offsetHeight || 280;
-    
-    if (width === 0 || height === 0) {
-      console.warn('[GraphViz] 容器尺寸为0，使用默认值 300x280');
-      width = 300;
-      height = 280;
-    }
-    
-    console.log('[GraphViz] 使用尺寸:', width, 'x', height);
-    
-    // 清空容器
     container.innerHTML = '';
     
-    // 场景
     this.scene = new THREE.Scene();
-    // this.scene.background = new THREE.Color(0x0a0e27); // 已移除背景
     
-    // 相机
     const aspect = width / height;
     this.camera = new THREE.PerspectiveCamera(60, aspect, 0.1, 1000);
-    this.camera.position.set(0, 0, 5);
+    this.camera.position.set(0, 0, 8);
     
-    console.log('[GraphViz] 相机设置:', { aspect, position: this.camera.position });
-    
-    // 渲染器
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     this.renderer.setSize(width, height);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     container.appendChild(this.renderer.domElement);
-    
-    console.log('[GraphViz] 渲染器尺寸:', this.renderer.domElement.width, 'x', this.renderer.domElement.height);
     
     // 轨道控制器
     if (typeof OrbitControls !== 'undefined') {
@@ -126,85 +101,52 @@ const GraphViz = {
       this.controls.enableDamping = true;
       this.controls.dampingFactor = 0.05;
       this.controls.enableZoom = true;
-      this.controls.autoRotate = true;
-      this.controls.autoRotateSpeed = 1.0;
-      console.log('[GraphViz] OrbitControls 已初始化');
-    } else {
-      console.error('[GraphViz] OrbitControls 未加载！');
+      this.controls.autoRotate = false;
     }
     
-    // 环境光
+    // 射线检测器
+    this.raycaster = new THREE.Raycaster();
+    
+    // 光源
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
     this.scene.add(ambientLight);
     
-    // 点光源
-    const pointLight = new THREE.PointLight(0x00ffff, 1, 10);
-    pointLight.position.set(2, 2, 2);
+    const pointLight = new THREE.PointLight(0x00ffff, 1, 20);
+    pointLight.position.set(5, 5, 5);
     this.scene.add(pointLight);
     
-    const pointLight2 = new THREE.PointLight(0xff8a00, 1, 10);
-    pointLight2.position.set(-2, -2, 2);
+    const pointLight2 = new THREE.PointLight(0xff8a00, 1, 20);
+    pointLight2.position.set(-5, -5, 5);
     this.scene.add(pointLight2);
     
-    // 鼠标事件
-    container.addEventListener('mousemove', (e) => {
-      this.mouse.x = (e.clientX / container.clientWidth) * 2 - 1;
-      this.mouse.y = -(e.clientY / container.clientHeight) * 2 + 1;
-    });
-    
-    // 窗口大小调整
+    // 窗口调整
     window.addEventListener('resize', () => {
       if (!this.camera || !this.renderer) return;
-      
       const w = container.clientWidth || 300;
       const h = container.clientHeight || 280;
-      
       this.camera.aspect = w / h;
       this.camera.updateProjectionMatrix();
       this.renderer.setSize(w, h);
     });
   },
-  
+
   createBrainParticles() {
-    // 大脑形状的全息粒子 - 两个半球 + 中间凹陷
     const positions = new Float32Array(this.particleCount * 3);
     const colors = new Float32Array(this.particleCount * 3);
     
-    // 橙青配色
     const colorOrange = new THREE.Color(0xff8a00);
     const colorCyan = new THREE.Color(0x22d3ee);
     
     for (let i = 0; i < this.particleCount; i++) {
-      // 大脑形状分布
-      const theta = Math.random() * Math.PI * 2;  // 水平角度
-      const phi = Math.acos(2 * Math.random() - 1);  // 垂直角度
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos(2 * Math.random() - 1);
+      const r = 1.5 + Math.random() * 0.5;
       
-      // 基础半径
-      let r = 1.5 + Math.random() * 0.5;
+      positions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+      positions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+      positions[i * 3 + 2] = r * Math.cos(phi);
       
-      // 椭球形变 - 前后略长，上下略扁
-      const xBase = r * Math.sin(phi) * Math.cos(theta);
-      const yBase = r * Math.sin(phi) * Math.sin(theta) * 0.85;  // 上下压缩
-      const zBase = r * Math.cos(phi) * 1.1;  // 前后略长
-      
-      // 中间凹陷（胼胝体区域）- Y轴中间位置向内收缩
-      const yNorm = (yBase + 1.5) / 3;  // 归一化到 0-1
-      const grooveFactor = 1 - 0.3 * Math.exp(-Math.pow((yBase) / 0.3, 2));
-      
-      // 左右半球分离
-      const hemisphere = xBase > 0 ? 1 : -1;
-      const separation = 0.15;  // 两半球间隙
-      const xFinal = xBase * grooveFactor + hemisphere * separation * (1 - Math.abs(yBase) / 1.5);
-      
-      // 添加表面褶皱效果
-      const wrinkle = 0.05 * Math.sin(theta * 8 + phi * 6);
-      
-      positions[i * 3] = xFinal + wrinkle;
-      positions[i * 3 + 1] = yBase;
-      positions[i * 3 + 2] = zBase;
-      
-      // 颜色：左半球青色，右半球橙色
-      const color = hemisphere > 0 ? colorCyan : colorOrange;
+      const color = Math.random() > 0.5 ? colorOrange : colorCyan;
       colors[i * 3] = color.r;
       colors[i * 3 + 1] = color.g;
       colors[i * 3 + 2] = color.b;
@@ -214,11 +156,10 @@ const GraphViz = {
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     
-    // 自定义着色器材质
     const material = new THREE.ShaderMaterial({
       uniforms: {
         time: { value: 0 },
-        pointSize: { value: 1.2 }
+        pointSize: { value: 1.0 }
       },
       vertexShader: `
         attribute vec3 color;
@@ -228,13 +169,11 @@ const GraphViz = {
         
         void main() {
           vColor = color;
-          
           vec3 pos = position;
-          pos += 0.08 * sin(time + position.x * 8.0) * normalize(position);
-          
+          pos += 0.1 * sin(time + position.x * 10.0) * normalize(position);
           vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
           gl_Position = projectionMatrix * mvPosition;
-          gl_PointSize = pointSize * (25.0 / -mvPosition.z);
+          gl_PointSize = pointSize * (30.0 / -mvPosition.z);
         }
       `,
       fragmentShader: `
@@ -243,9 +182,8 @@ const GraphViz = {
         void main() {
           float dist = length(gl_PointCoord - vec2(0.5));
           if (dist > 0.5) discard;
-          
-          float alpha = 1.0 - smoothstep(0.2, 0.5, dist);
-          gl_FragColor = vec4(vColor, alpha * 0.7);
+          float alpha = 1.0 - smoothstep(0.3, 0.5, dist);
+          gl_FragColor = vec4(vColor, alpha * 0.3);
         }
       `,
       transparent: true,
@@ -255,131 +193,465 @@ const GraphViz = {
     
     this.brainParticles = new THREE.Points(geometry, material);
     this.scene.add(this.brainParticles);
-    
-    console.log('[GraphViz] 大脑粒子系统已创建:', this.particleCount, '个粒子');
   },
-  
+
   async loadStats() {
     try {
-      const response = await fetch('/api/graph/stats');
-      const data = await response.json();
-      
-      const nodesEl = document.getElementById('gs-nodes');
-      const edgesEl = document.getElementById('gs-edges');
-      
-      if (nodesEl) nodesEl.textContent = data.nodes || '—';
-      if (edgesEl) edgesEl.textContent = data.edges || '—';
-      
-      console.log('[GraphViz] 统计数据:', data);
+      const response = await fetch('/api/graph/stats', { cache: 'no-store' });
+      const text = await response.text();
+      try {
+        const data = JSON.parse(text);
+        const nodesEl = document.getElementById('gs-nodes');
+        const edgesEl = document.getElementById('gs-edges');
+        if (nodesEl) nodesEl.textContent = data.nodes || '—';
+        if (edgesEl) edgesEl.textContent = data.edges || '—';
+      } catch (parseErr) {
+        // Response was not JSON (likely HTML error page) — silently ignore
+        console.warn('[GraphViz] stats 非 JSON 响应，跳过');
+      }
     } catch (error) {
-      console.error('[GraphViz] 加载统计失败:', error);
+      if (error.name !== 'AbortError') {
+        console.warn('[GraphViz] 加载统计失败:', error.message);
+      }
     }
   },
   
   async loadGraph() {
     try {
-      console.log('[GraphViz] 正在加载图谱数据...');
-      const response = await fetch('/api/graph');
-      const data = await response.json();
-      
-      this.graphData = {
-        nodes: data.nodes || [],
-        edges: data.edges || []
-      };
-      
-      console.log('[GraphViz] 加载图谱:', this.graphData.nodes.length, '节点');
+      const response = await fetch('/api/graph', { cache: 'no-store' });
+      const text = await response.text();
+      try {
+        const data = JSON.parse(text);
+        this.graphData = {
+          nodes: data.nodes || [],
+          edges: data.edges || []
+        };
+        console.log('[GraphViz] 加载图谱:', this.graphData.nodes.length, '节点');
+      } catch (parseErr) {
+        console.warn('[GraphViz] graph 非 JSON 响应，跳过');
+        this.graphData = { nodes: [], edges: [] };
+      }
     } catch (error) {
-      console.error('[GraphViz] 加载图谱失败:', error);
+      if (error.name !== 'AbortError') {
+        console.warn('[GraphViz] 加载图谱失败:', error.message);
+      }
+      this.graphData = { nodes: [], edges: [] };
     }
   },
-  
+
   createKnowledgeNodes() {
-    const nodeMap = {};
-    
     console.log('[GraphViz] 创建知识节点:', this.graphData.nodes.length, '个');
     
-    // 创建节点 - 融入大脑内部，更小更亮
+    // 初始化力导向节点数据
+    this.simulation.nodes = this.graphData.nodes.map((node, i) => ({
+      id: node.name || node.id,
+      x: (Math.random() - 0.5) * 6,
+      y: (Math.random() - 0.5) * 6,
+      z: (Math.random() - 0.5) * 6,
+      vx: 0, vy: 0, vz: 0,
+      data: node
+    }));
+    
+    // 创建 3D 节点对象
     this.graphData.nodes.forEach((node, i) => {
       node.label = node.label || node.name || node.id;
       node.type = node.type || 'ENTITY';
       const color = this.typeColors[node.type] || this.typeColors.DEFAULT;
       
-      // 更小的球体节点，融入大脑
-      const geometry = new THREE.SphereGeometry(0.08, 12, 12);
+      // 主球体
+      const geometry = new THREE.SphereGeometry(0.12, 16, 16);
       const material = new THREE.MeshStandardMaterial({
         color: color,
         emissive: color,
-        emissiveIntensity: 1.2,
-        metalness: 0.9,
-        roughness: 0.1
+        emissiveIntensity: 0.3,
+        metalness: 0.7,
+        roughness: 0.3
       });
       
       const mesh = new THREE.Mesh(geometry, material);
       
-      // 分布在大脑内部（半径 0.8-1.2）
-      const theta = (i / this.graphData.nodes.length) * Math.PI * 2;
-      const phi = Math.random() * Math.PI;
-      const r = 0.8 + Math.random() * 0.4;
+      // 初始位置
+      const simNode = this.simulation.nodes[i];
+      mesh.position.set(simNode.x, simNode.y, simNode.z);
       
-      mesh.position.set(
-        r * Math.sin(phi) * Math.cos(theta),
-        r * Math.sin(phi) * Math.sin(theta),
-        r * Math.cos(phi)
-      );
+      // 发光光晕
+      const glowGeometry = new THREE.SphereGeometry(0.18, 16, 16);
+      const glowMaterial = new THREE.MeshBasicMaterial({
+        color: color,
+        transparent: true,
+        opacity: 0.15,
+        side: THREE.BackSide
+      });
+      const glow = new THREE.Mesh(glowGeometry, glowMaterial);
+      mesh.add(glow);
       
-      mesh.userData = node;
+      mesh.userData = { node, index: i, originalColor: color };
       this.scene.add(mesh);
       this.nodeObjects.push(mesh);
-      nodeMap[node.name || node.id] = mesh;
+      this.nodeMap[node.name || node.id] = mesh;
     });
     
-    // 不再创建连线 - 节点融入大脑
-    console.log('[GraphViz] 知识节点已融入大脑，无连线');
+    // 创建连线
+    this.createConnections();
+  },
+
+  createConnections() {
+    this.connectionLines = [];
+    
+    this.graphData.edges.forEach(edge => {
+      const sourceMesh = this.nodeMap[edge.source];
+      const targetMesh = this.nodeMap[edge.target];
+      
+      if (sourceMesh && targetMesh) {
+        const points = [sourceMesh.position.clone(), targetMesh.position.clone()];
+        const geometry = new THREE.BufferGeometry().setFromPoints(points);
+        const material = new THREE.LineBasicMaterial({
+          color: 0x22d3ee,
+          transparent: true,
+          opacity: 0.2
+        });
+        
+        const line = new THREE.Line(geometry, material);
+        line.userData = { source: edge.source, target: edge.target };
+        this.scene.add(line);
+        this.connectionLines.push(line);
+      }
+    });
+    
+    console.log('[GraphViz] 创建连线:', this.connectionLines.length, '条');
   },
   
-  setupPostProcessing() {
-    // Bloom 后处理
-    if (typeof EffectComposer === 'undefined') {
-      console.warn('[GraphViz] EffectComposer 未加载，跳过后处理');
-      return;
+  initForceSimulation() {
+    // 力导向参数
+    this.simulation.alpha = 1.0;
+    this.simulation.running = true;
+  },
+  
+  updateForceSimulation() {
+    if (!this.simulation.running) return;
+    
+    const nodes = this.simulation.nodes;
+    const alpha = this.simulation.alpha;
+    
+    // 斥力（节点之间）
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        const dx = nodes[j].x - nodes[i].x;
+        const dy = nodes[j].y - nodes[i].y;
+        const dz = nodes[j].z - nodes[i].z;
+        const dist = Math.sqrt(dx * dx + dy * dy + dz * dz) || 0.1;
+        const force = (2.0 * alpha) / (dist * dist);
+        
+        const fx = (dx / dist) * force;
+        const fy = (dy / dist) * force;
+        const fz = (dz / dist) * force;
+        
+        nodes[i].vx -= fx;
+        nodes[i].vy -= fy;
+        nodes[i].vz -= fz;
+        nodes[j].vx += fx;
+        nodes[j].vy += fy;
+        nodes[j].vz += fz;
+      }
     }
     
-    this.composer = new EffectComposer(this.renderer);
+    // 引力（连接的节点）
+    this.graphData.edges.forEach(edge => {
+      const source = nodes.find(n => n.id === edge.source);
+      const target = nodes.find(n => n.id === edge.target);
+      
+      if (source && target) {
+        const dx = target.x - source.x;
+        const dy = target.y - source.y;
+        const dz = target.z - source.z;
+        const dist = Math.sqrt(dx * dx + dy * dy + dz * dz) || 0.1;
+        const force = (dist - 1.5) * 0.1 * alpha;
+        
+        const fx = (dx / dist) * force;
+        const fy = (dy / dist) * force;
+        const fz = (dz / dist) * force;
+        
+        source.vx += fx;
+        source.vy += fy;
+        source.vz += fz;
+        target.vx -= fx;
+        target.vy -= fy;
+        target.vz -= fz;
+      }
+    });
     
-    const renderPass = new RenderPass(this.scene, this.camera);
-    this.composer.addPass(renderPass);
+    // 向心力
+    nodes.forEach(node => {
+      const dist = Math.sqrt(node.x * node.x + node.y * node.y + node.z * node.z);
+      if (dist > 4) {
+        const force = (dist - 4) * 0.02 * alpha;
+        node.vx -= (node.x / dist) * force;
+        node.vy -= (node.y / dist) * force;
+        node.vz -= (node.z / dist) * force;
+      }
+    });
     
-    const bloomPass = new UnrealBloomPass(
-      new THREE.Vector2(window.innerWidth, window.innerHeight),
-      0.15, // 强度（降低避免光球效果）
-      0.4,  // 半径
-      0.85  // 阈值
-    );
-    this.composer.addPass(bloomPass);
+    // 更新位置
+    const decay = this.simulation.velocityDecay;
+    nodes.forEach((node, i) => {
+      if (this.draggedNode && this.nodeObjects[i] === this.draggedNode) return;
+      
+      node.vx *= (1 - decay);
+      node.vy *= (1 - decay);
+      node.vz *= (1 - decay);
+      
+      node.x += node.vx;
+      node.y += node.vy;
+      node.z += node.vz;
+      
+      this.nodeObjects[i].position.set(node.x, node.y, node.z);
+    });
     
-    console.log('[GraphViz] 后处理已设置');
+    // 更新连线
+    this.connectionLines.forEach(line => {
+      const sourceMesh = this.nodeMap[line.userData.source];
+      const targetMesh = this.nodeMap[line.userData.target];
+      if (sourceMesh && targetMesh) {
+        const positions = line.geometry.attributes.position.array;
+        positions[0] = sourceMesh.position.x;
+        positions[1] = sourceMesh.position.y;
+        positions[2] = sourceMesh.position.z;
+        positions[3] = targetMesh.position.x;
+        positions[4] = targetMesh.position.y;
+        positions[5] = targetMesh.position.z;
+        line.geometry.attributes.position.needsUpdate = true;
+      }
+    });
+    
+    // 衰减
+    this.simulation.alpha -= this.simulation.alphaDecay;
+    if (this.simulation.alpha < 0.01) {
+      this.simulation.running = false;
+    }
+  },
+
+  setupInteraction() {
+    const container = document.getElementById('graph-canvas');
+    if (!container) return;
+    
+    // 鼠标移动 - 悬停检测
+    container.addEventListener('mousemove', (e) => {
+      const rect = container.getBoundingClientRect();
+      this.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      this.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+      
+      this.checkHover();
+    });
+    
+    // 鼠标按下 - 开始拖拽
+    container.addEventListener('mousedown', (e) => {
+      if (this.hoveredNode) {
+        this.draggedNode = this.hoveredNode;
+        this.controls.enabled = false;
+      }
+    });
+    
+    // 鼠标释放 - 结束拖拽
+    container.addEventListener('mouseup', () => {
+      if (this.draggedNode) {
+        this.draggedNode = null;
+        this.controls.enabled = true;
+        // 重新启动力导向
+        this.simulation.alpha = 0.3;
+        this.simulation.running = true;
+      }
+    });
+    
+    // 鼠标点击 - 显示详情
+    container.addEventListener('click', (e) => {
+      if (this.hoveredNode && !this.draggedNode) {
+        this.showNodeDetails(this.hoveredNode.userData.node);
+      }
+    });
+    
+    // 拖拽移动
+    container.addEventListener('mousemove', (e) => {
+      if (this.draggedNode) {
+        this.raycaster.setFromCamera(this.mouse, this.camera);
+        const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -this.draggedNode.position.z);
+        const point = new THREE.Vector3();
+        this.raycaster.ray.intersectPlane(plane, point);
+        
+        if (point) {
+          this.draggedNode.position.copy(point);
+          
+          // 更新模拟数据
+          const idx = this.draggedNode.userData.index;
+          this.simulation.nodes[idx].x = point.x;
+          this.simulation.nodes[idx].y = point.y;
+          this.simulation.nodes[idx].z = point.z;
+        }
+      }
+    });
+  },
+  
+  checkHover() {
+    this.raycaster.setFromCamera(this.mouse, this.camera);
+    const intersects = this.raycaster.intersectObjects(this.nodeObjects);
+    
+    // 重置之前悬停的节点
+    if (this.hoveredNode && (!intersects.length || intersects[0].object !== this.hoveredNode)) {
+      this.setNodeHighlight(this.hoveredNode, false);
+      this.hoveredNode = null;
+    }
+    
+    // 设置新的悬停节点
+    if (intersects.length > 0) {
+      const node = intersects[0].object;
+      if (node !== this.hoveredNode) {
+        this.hoveredNode = node;
+        this.setNodeHighlight(node, true);
+      }
+    }
+  },
+  
+  setNodeHighlight(node, highlight) {
+    if (!node) return;
+    
+    const scale = highlight ? 1.5 : 1.0;
+    node.scale.setScalar(scale);
+    
+    // 更新光晕
+    const glow = node.children[0];
+    if (glow) {
+      glow.material.opacity = highlight ? 0.4 : 0.15;
+      glow.scale.setScalar(highlight ? 1.3 : 1.0);
+    }
+    
+    // 高亮连接的节点和连线
+    const nodeId = node.userData.node?.name || node.userData.node?.id;
+    
+    this.connectionLines.forEach(line => {
+      const isConnected = line.userData.source === nodeId || line.userData.target === nodeId;
+      line.material.opacity = highlight && isConnected ? 0.6 : 0.2;
+      line.material.color.setHex(highlight && isConnected ? 0xff8a00 : 0x22d3ee);
+    });
+    
+    this.nodeObjects.forEach(otherNode => {
+      const otherId = otherNode.userData.node?.name || otherNode.userData.node?.id;
+      const isNeighbor = this.graphData.edges.some(
+        e => (e.source === nodeId && e.target === otherId) || 
+             (e.target === nodeId && e.source === otherId)
+      );
+      
+      if (highlight && isNeighbor && otherNode !== node) {
+        otherNode.scale.setScalar(1.3);
+        const otherGlow = otherNode.children[0];
+        if (otherGlow) otherGlow.material.opacity = 0.3;
+      } else if (!highlight || otherNode !== node) {
+        otherNode.scale.setScalar(1.0);
+        const otherGlow = otherNode.children[0];
+        if (otherGlow) otherGlow.material.opacity = 0.15;
+      }
+    });
+  },
+
+  showNodeDetails(node) {
+    console.log('[GraphViz] 显示节点详情:', node);
+    
+    // 创建或更新详情面板
+    let panel = document.getElementById('node-detail-panel');
+    if (!panel) {
+      panel = document.createElement('div');
+      panel.id = 'node-detail-panel';
+      panel.style.cssText = `
+        position: fixed;
+        top: 50%;
+        right: 20px;
+        transform: translateY(-50%);
+        background: rgba(10, 14, 39, 0.95);
+        border: 1px solid rgba(34, 211, 238, 0.3);
+        border-radius: 12px;
+        padding: 20px;
+        min-width: 280px;
+        max-width: 350px;
+        color: #e2e8f0;
+        font-family: 'Inter', sans-serif;
+        z-index: 1000;
+        box-shadow: 0 0 30px rgba(34, 211, 238, 0.2);
+      `;
+      document.body.appendChild(panel);
+    }
+    
+    const color = this.typeColors[node.type] || this.typeColors.DEFAULT;
+    const colorHex = '#' + color.toString(16).padStart(6, '0');
+    
+    panel.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h3 style="margin: 0; color: ${colorHex}; font-size: 18px;">${node.label || node.name}</h3>
+        <button onclick="this.parentElement.parentElement.remove()" style="background: none; border: none; color: #64748b; cursor: pointer; font-size: 20px;">&times;</button>
+      </div>
+      <div style="margin-bottom: 12px;">
+        <span style="color: #64748b; font-size: 12px;">类型</span>
+        <div style="color: ${colorHex}; font-weight: 500;">${node.type || 'ENTITY'}</div>
+      </div>
+      ${node.evidence ? `
+        <div style="margin-bottom: 12px;">
+          <span style="color: #64748b; font-size: 12px;">来源</span>
+          <div style="color: #94a3b8; font-size: 14px;">${node.evidence}</div>
+        </div>
+      ` : ''}
+      <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid rgba(100, 116, 139, 0.3);">
+        <span style="color: #64748b; font-size: 12px;">连接数</span>
+        <div style="color: #22d3ee; font-weight: 500;">${this.getConnectionCount(node.name || node.id)}</div>
+      </div>
+    `;
+    
+    // 3秒后自动关闭
+    setTimeout(() => {
+      if (panel.parentElement) panel.remove();
+    }, 5000);
+  },
+  
+  getConnectionCount(nodeId) {
+    return this.graphData.edges.filter(
+      e => e.source === nodeId || e.target === nodeId
+    ).length;
+  },
+
+  setupPostProcessing() {
+    try {
+      if (typeof EffectComposer === 'undefined' || typeof RenderPass === 'undefined') {
+        console.warn('[GraphViz] 后处理库未加载，降级为基本渲染');
+        this.composer = null;
+        return;
+      }
+      
+      this.composer = new EffectComposer(this.renderer);
+      
+      const renderPass = new RenderPass(this.scene, this.camera);
+      this.composer.addPass(renderPass);
+      
+      const bloomPass = new UnrealBloomPass(
+        new THREE.Vector2(window.innerWidth, window.innerHeight),
+        0.4,
+        0.4,
+        0.85
+      );
+      this.composer.addPass(bloomPass);
+    } catch (e) {
+      console.warn('[GraphViz] 后处理初始化失败，降级为基本渲染:', e.message);
+      this.composer = null;
+    }
   },
   
   animate() {
-    // 页面不可见时跳过渲染（省 GPU/CPU）
-    if (!this.isPageVisible) {
-      this.animationId = requestAnimationFrame(() => this.animate());
-      return;
-    }
     this.animationId = requestAnimationFrame(() => this.animate());
     
     this.time += 0.01;
     
-    // 更新粒子着色器时间
+    // 更新粒子
     if (this.brainParticles && this.brainParticles.material.uniforms) {
       this.brainParticles.material.uniforms.time.value = this.time;
     }
     
-    // 节点脉动
-    this.nodeObjects.forEach((mesh, i) => {
-      const scale = 1 + Math.sin(this.time * 2 + i) * 0.1;
-      mesh.scale.setScalar(scale);
-    });
+    // 更新力导向
+    this.updateForceSimulation();
     
     // 更新控制器
     if (this.controls) {

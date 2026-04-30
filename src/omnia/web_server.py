@@ -345,7 +345,16 @@ def _project_wings() -> list:
 def create_app() -> Flask:
     app = Flask(__name__, static_folder=str(WEB_DIR))
     CORS(app)
-    
+
+    @app.after_request
+    def add_no_cache_headers(response):
+        """防止浏览器缓存 API 响应"""
+        if request.path.startswith("/api/") or request.path == "/health":
+            response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
+        return response
+
     # Initialize MCP tools on startup
     mcp_initialized = False
     try:
@@ -1646,55 +1655,85 @@ def handle_feishu_message(app, event):
 
 
 def _check_port_in_use(port: int, host: str = "127.0.0.1") -> bool:
-    """Check if a port is already in use."""
+    """Check if a port is genuinely in use by another process.
+    
+    Uses SO_REUSEADDR to distinguish TIME_WAIT (safe to bind) from
+    genuine occupation by a running process.
+    """
     import socket
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         try:
             s.bind((host, port))
-            return False
+            return False  # Port is free (or in TIME_WAIT, which is fine)
         except OSError:
-            return True
+            return True   # Port is genuinely in use by a live process
 
 
 def main():
-    # Wait for port to be available (helps with systemd restart race)
     import time
-    max_wait = 30  # seconds
-    waited = 0
+    import traceback
     
-    while _check_port_in_use(5001) and waited < max_wait:
-        if waited == 0:
-            print("[web_server] 端口 5001 被占用，等待释放...")
-        time.sleep(1)
-        waited += 1
+    CRASH_LOG = Path("/tmp/omnia_web_crash.log")
     
+    # Check if port is genuinely in use by another LIVE process
+    # (SO_REUSEADDR lets us bind to TIME_WAIT sockets, so this only
+    # returns True if another process is actually listening)
     if _check_port_in_use(5001):
         print("=" * 60)
-        print("⚠️  端口 5001 已被占用且等待超时!")
+        print("WARNING: Port 5001 is occupied by another live process!")
         print("=" * 60)
-        print("\n可能原因:")
-        print("  1. 另一个 Omnia web 服务器正在运行")
-        print("  2. 其他程序占用了该端口")
-        print("\n解决方案:")
-        print("  1. 查找并终止占用进程:")
-        print("     lsof -i :5001")
-        print("     kill -9 <PID>")
+        print("\nSolution:")
+        print("  lsof -i :5001")
+        print("  kill -9 <PID>")
         print("=" * 60)
         sys.exit(1)
     
-    if waited > 0:
-        print(f"[web_server] 端口已释放，等待了 {waited} 秒")
-    
-    app = create_app()
-    print("Omnia Web UI 启动于 http://127.0.0.1:5001/")
-    
     try:
+        app = create_app()
+        print("Omnia Web UI started at http://127.0.0.1:5001/")
+        # Werkzeug's BaseWSGIServer sets allow_reuse_address=True (SO_REUSEADDR)
+        # by default, so we can bind to TIME_WAIT sockets without waiting.
         app.run(host="0.0.0.0", port=5001, threaded=True)
+    except OSError as e:
+        if "Address already in use" in str(e) or "errno 98" in str(e):
+            print(f"[FATAL] Port 5001 bind failed: {e}")
+            print("[FATAL] Waiting 60s for TIME_WAIT to expire...")
+            time.sleep(60)
+            sys.exit(1)
+        else:
+            tb = traceback.format_exc()
+            print(f"[FATAL] Web Server startup failed: {e}")
+            print(tb)
+            try:
+                CRASH_LOG.write_text(
+                    f"=== {datetime.now().isoformat()} ===\n"
+                    f"Startup failed (OSError): {e}\n{tb}\n",
+                    encoding="utf-8"
+                )
+            except Exception:
+                pass
+            sys.exit(1)
+    except Exception as e:
+        tb = traceback.format_exc()
+        print(f"[FATAL] Web Server crashed: {e}")
+        print(tb)
+        try:
+            CRASH_LOG.write_text(
+                f"=== {datetime.now().isoformat()} ===\n"
+                f"Web Server crash: {e}\n{tb}\n",
+                encoding="utf-8"
+            )
+        except Exception:
+            pass
+        sys.exit(1)
     finally:
-        # Cleanup MCP connections on shutdown
         print("[MCP] Shutting down...")
-        shutdown_mcp()
-        print("[MCP] ✓ Disconnected")
+        try:
+            _cleanup_mcp()
+        except Exception:
+            pass
+        print("[MCP] Disconnected")
 
 
 if __name__ == "__main__":
