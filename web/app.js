@@ -206,15 +206,9 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function renderChatFromStorage() {
-  console.log("[Chat History Debug] renderChatFromStorage 被调用, chatHistory.length =", chatHistory.length);
-  console.log("[Chat History Debug] localStorage 内容:", localStorage.getItem(CHAT_KEY)?.slice(0, 200));
+  // 🧹 启动时不加载历史，减少内存占用
+  console.log("[Chat History] 启动时跳过历史加载，减少内存占用");
   messagesEl.innerHTML = '';
-  for (const item of chatHistory) {
-    if (item.html) {
-      messagesEl.insertAdjacentHTML('beforeend', item.html);
-    }
-  }
-  scrollToBottom();
 }
 
 function saveChatHistory() {
@@ -225,10 +219,11 @@ function saveChatHistory() {
 }
 
 function addToHistory(role, content, html) {
+  // 🧹 内存优化：不存完整 HTML，只存纯文本摘要
+  const summary = content.length > 200 ? content.slice(0, 200) + '...' : content;
   chatHistory.push({
-    role: role,  // 'user' or 'assistant'
-    content: content,  // 纯文本内容
-    html: html,  // 渲染后的 HTML
+    role: role,
+    content: summary,  // 只存摘要，减少内存占用
     time: Date.now()
   });
   saveChatHistory();
@@ -2046,26 +2041,26 @@ function startUnifiedPolling() {
   }
 }
 
-// 可见性变化时切换间隔
-document.addEventListener('visibilitychange', () => {
-  if (document.hidden) {
-    _isBackground = true;
-    // 切到60秒间隔
-    if (_statusTimerId) clearInterval(_statusTimerId);
-    _statusTimerId = setInterval(() => {
-      heartbeatPing(); // 后台只做心跳
-    }, 60000);
-    document.body.classList.add('page-hidden');
-  } else {
-    _isBackground = false;
-    document.body.classList.remove('page-hidden');
-    // 立即刷新一次 + 切回30秒
-    loadStatus();
-    heartbeatPing();
-    if (_statusTimerId) clearInterval(_statusTimerId);
-    _statusTimerId = setInterval(() => {
-      if ('requestIdleCallback' in window) {
-        requestIdleCallback(() => { loadStatus(); heartbeatPing(); }, { timeout: 5000 });
+// [已合并到 Line 78] // 可见性变化时切换间隔
+// [已合并到 Line 78] document.addEventListener('visibilitychange', () => {
+// [已合并到 Line 78]   if (document.hidden) {
+// [已合并到 Line 78]     _isBackground = true;
+// [已合并到 Line 78]     // 切到60秒间隔
+// [已合并到 Line 78]     if (_statusTimerId) clearInterval(_statusTimerId);
+// [已合并到 Line 78]     _statusTimerId = setInterval(() => {
+// [已合并到 Line 78]       heartbeatPing(); // 后台只做心跳
+// [已合并到 Line 78]     }, 60000);
+// [已合并到 Line 78]     document.body.classList.add('page-hidden');
+// [已合并到 Line 78]   } else {
+// [已合并到 Line 78]     _isBackground = false;
+// [已合并到 Line 78]     document.body.classList.remove('page-hidden');
+// [已合并到 Line 78]     // 立即刷新一次 + 切回30秒
+// [已合并到 Line 78]     loadStatus();
+// [已合并到 Line 78]     heartbeatPing();
+// [已合并到 Line 78]     if (_statusTimerId) clearInterval(_statusTimerId);
+// [已合并到 Line 78]     _statusTimerId = setInterval(() => {
+// [已合并到 Line 78]       if ('requestIdleCallback' in window) {
+// [已合并到 Line 78]         requestIdleCallback(() => { loadStatus(); heartbeatPing(); }, { timeout: 5000 });
       } else {
         loadStatus();
         heartbeatPing();
@@ -2504,3 +2499,27 @@ saveChatHistory = function() {
 document.addEventListener('DOMContentLoaded', () => {
   setTimeout(checkTokenStatus, 500);
 });
+
+
+// =========================================
+// 页面卸载清理（防止内存泄漏）
+// =========================================
+window.addEventListener('beforeunload', () => {
+  // 清除所有定时器
+  if (typeof _statusTimerId !== 'undefined' && _statusTimerId) clearInterval(_statusTimerId);
+  if (typeof _apiProviderTimer !== 'undefined' && _apiProviderTimer) clearInterval(_apiProviderTimer);
+  if (typeof _visibilityTimer !== 'undefined' && _visibilityTimer) clearTimeout(_visibilityTimer);
+  
+  // 清空大对象
+  chatHistory = [];
+  
+  console.log('[Cleanup] 页面卸载，已清理资源');
+});
+
+// 定期清理 DOM 节点（防止长时间运行后 DOM 累积）
+setInterval(() => {
+  // 保留最近 30 条消息
+  while (messagesEl && messagesEl.children.length > 30) {
+    messagesEl.removeChild(messagesEl.firstChild);
+  }
+}, 60000); // 每分钟检查一次
