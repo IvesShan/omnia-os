@@ -39,6 +39,7 @@ const GraphViz = {
   
   // 动画
   animationId: null,
+  isPaused: false,
   time: 0,
   
   // 类型颜色映射 (Obsidian 风格)
@@ -127,6 +128,17 @@ const GraphViz = {
       this.camera.aspect = w / h;
       this.camera.updateProjectionMatrix();
       this.renderer.setSize(w, h);
+    });
+
+    // 页面可见性检测 - 后台时暂停渲染
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        this.isPaused = true;
+        console.log('[GraphViz] 页面隐藏，暂停渲染');
+      } else {
+        this.isPaused = false;
+        console.log('[GraphViz] 页面可见，恢复渲染');
+      }
     });
   },
 
@@ -642,6 +654,9 @@ const GraphViz = {
   
   animate() {
     this.animationId = requestAnimationFrame(() => this.animate());
+
+    // 后台时跳过渲染
+    if (this.isPaused) return;
     
     this.time += 0.01;
     
