@@ -558,7 +558,7 @@ class MemoryPalace:
         include_deprecated: bool = False,
     ) -> List[Dict[str, Any]]:
         conn = self._connect()
-        status_filter = "" if include_deprecated else (" AND status = 'active'" if domain else " WHERE status = 'active'")
+        status_filter = "" if include_deprecated else " AND status = 'active'"
         
         if direction == "out":
             sql = f"SELECT * FROM relations WHERE subject = ?{status_filter}"

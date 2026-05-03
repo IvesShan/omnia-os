@@ -5,23 +5,136 @@ const API_BASE = `${window.location.origin}`;
 // =========================================
 
 // 页面可见性感知 - 后台暂停动画
+// =========================================
+// 连接状态追踪
+// =========================================
 let isPageVisible = true;
+let connectionState = 'unknown';  // 'connected' | 'disconnected' | 'unknown'
+let lastSuccessfulPing = 0;
+let consecutiveFailures = 0;
+
+function setConnectionState(state) {
+  const prevState = connectionState;
+  connectionState = state;
+  
+  // 更新 UI 指示器
+  const indicator = document.getElementById('connection-banner');
+  if (state === 'disconnected') {
+    if (!indicator) {
+      const banner = document.createElement('div');
+      banner.id = 'connection-banner';
+      banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:rgba(239,68,68,0.9);color:white;text-align:center;padding:6px 0;font-size:13px;font-family:system-ui;backdrop-filter:blur(8px);transition:opacity 0.3s;';
+      banner.textContent = '⚠️ 与服务器的连接已断开，正在重连…';
+      document.body.appendChild(banner);
+    }
+  } else if (state === 'connected') {
+    if (indicator) {
+      indicator.style.opacity = '0';
+      setTimeout(() => indicator.remove(), 300);
+    }
+    if (prevState === 'disconnected') {
+      console.log('[Connection] 已恢复连接');
+    }
+  }
+}
+
+// 带超时的 fetch（防止请求挂起导致 UI 卡死）
+async function fetchWithTimeout(url, options = {}, timeoutMs = 8000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, { cache: "no-store", ...options, signal: controller.signal });
+    clearTimeout(timer);
+    return response;
+  } catch (err) {
+    clearTimeout(timer);
+    throw err;
+  }
+}
+
+// 心跳检测 - 轻量级 ping
+async function heartbeatPing() {
+  try {
+    const res = await fetchWithTimeout(`${API_BASE}/health`, {}, 5000);
+    if (res.ok) {
+      lastSuccessfulPing = Date.now();
+      consecutiveFailures = 0;
+      setConnectionState('connected');
+      return true;
+    }
+  } catch (e) {
+    // 静默失败
+  }
+  consecutiveFailures++;
+  if (consecutiveFailures >= 3) {
+    setConnectionState('disconnected');
+  }
+  return false;
+}
+
+// 页面可见性感知 - V3（防抖 + 防重复）
+let _visibilityTimer = null;
+let _lastVisibilityAction = 0;
 document.addEventListener('visibilitychange', () => {
   isPageVisible = !document.hidden;
   if (document.hidden) {
     document.body.classList.add('page-hidden');
-  } else {
-    document.body.classList.remove('page-hidden');
-    // 页面恢复可见时，立即刷新状态（修复待机后UI卡死问题）
-    console.log('[Visibility] 页面恢复可见，刷新状态');
-    if (typeof loadStatus === 'function') {
-      loadStatus();
-    }
-    if (typeof loadApiProviders === 'function') {
-      loadApiProviders();
-    }
+    return;
   }
+  
+  // 防抖：3秒内不重复执行
+  const now = Date.now();
+  if (now - _lastVisibilityAction < 3000) return;
+  _lastVisibilityAction = now;
+  
+  clearTimeout(_visibilityTimer);
+  _visibilityTimer = setTimeout(() => {
+    document.body.classList.remove('page-hidden');
+    console.log('[Visibility] 页面恢复可见，执行恢复序列');
+    
+    // 1. 强制重新布局（解决渲染死锁）
+    if (messagesEl) {
+      messagesEl.style.display = 'none';
+      messagesEl.offsetHeight;
+      messagesEl.style.display = '';
+    }
+    
+    // 2. 心跳检测（只在断连时才刷新状态）
+    heartbeatPing().then(ok => {
+      if (ok) {
+        if (connectionState === 'disconnected') {
+          setConnectionState('connected');
+          loadStatus();
+          loadApiProviders();
+        }
+        if (scrollEl) scrollEl.scrollTop = scrollEl.scrollHeight;
+      } else {
+        console.warn('[Visibility] 心跳失败，进入重连模式');
+        reconnectLoop();
+      }
+    });
+  }, 500); // 延迟 500ms 等浏览器稳定
 });
+
+// 指数退避重连
+async function reconnectLoop() {
+  let delay = 2000;
+  const maxDelay = 30000;
+  
+  while (connectionState === 'disconnected') {
+    console.log(`[Reconnect] ${delay/1000}s 后重试...`);
+    await new Promise(r => setTimeout(r, delay));
+    
+    const ok = await heartbeatPing();
+    if (ok) {
+      // 恢复后刷新页面状态
+      if (typeof loadStatus === 'function') loadStatus();
+      if (typeof loadApiProviders === 'function') loadApiProviders();
+      return;
+    }
+    delay = Math.min(delay * 1.5, maxDelay);
+  }
+}
 
 // 滚动节流
 let scrollPending = false;
@@ -93,15 +206,9 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function renderChatFromStorage() {
-  console.log("[Chat History Debug] renderChatFromStorage 被调用, chatHistory.length =", chatHistory.length);
-  console.log("[Chat History Debug] localStorage 内容:", localStorage.getItem(CHAT_KEY)?.slice(0, 200));
+  // 🧹 启动时不加载历史，减少内存占用
+  console.log("[Chat History] 启动时跳过历史加载，减少内存占用");
   messagesEl.innerHTML = '';
-  for (const item of chatHistory) {
-    if (item.html) {
-      messagesEl.insertAdjacentHTML('beforeend', item.html);
-    }
-  }
-  scrollToBottom();
 }
 
 function saveChatHistory() {
@@ -112,10 +219,11 @@ function saveChatHistory() {
 }
 
 function addToHistory(role, content, html) {
+  // 🧹 内存优化：不存完整 HTML，只存纯文本摘要
+  const summary = content.length > 200 ? content.slice(0, 200) + '...' : content;
   chatHistory.push({
-    role: role,  // 'user' or 'assistant'
-    content: content,  // 纯文本内容
-    html: html,  // 渲染后的 HTML
+    role: role,
+    content: summary,  // 只存摘要，减少内存占用
     time: Date.now()
   });
   saveChatHistory();
@@ -662,7 +770,7 @@ function appendSwarmBadge(agent) {
     </div>
   `;
   messagesEl.insertAdjacentHTML('beforeend', html);
-  pushChat(html, 'tool');
+  addToHistory('assistant', '[swarm]', html);
   scrollToBottom();
 }
 
@@ -1132,7 +1240,7 @@ function appendWorkflowResult(label, text, isError = false) {
     </div>
   `;
   messagesEl.insertAdjacentHTML('beforeend', html);
-  pushChat(html, 'workflow');
+  addToHistory('assistant', '[workflow]', html);
   scrollToBottom();
 }
 
@@ -1162,9 +1270,37 @@ function pulseIfChanged(el, newVal) {
 }
 
 // --- 加载状态 ---
+// --- loadStatus 防抖：防止并发调用 ---
+let _loadStatusPromise = null;
+let _loadStatusLastCall = 0;
+let _loadStatusLastFailed = false;
+let _backgroundIntervalId = null;
 async function loadStatus() {
+  // 防抖：3秒内不重复调用，复用正在进行的请求
+  const now = Date.now();
+  if (_loadStatusPromise && (now - _loadStatusLastCall) < 3000) {
+    // 如果上一次请求失败了，允许立即重试
+    if (_loadStatusLastFailed) {
+      _loadStatusLastFailed = false;
+      // 继续执行新请求
+    } else {
+      return _loadStatusPromise;
+    }
+  }
+  _loadStatusLastCall = now;
+  _loadStatusLastFailed = false;
+  _loadStatusPromise = _doLoadStatus().catch(e => {
+    _loadStatusLastFailed = true;
+    throw e;
+  });
+  try { await _loadStatusPromise; } finally { 
+    if (!_loadStatusLastFailed) _loadStatusPromise = null; 
+  }
+}
+
+async function _doLoadStatus() {
   try {
-    const res = await fetch(`${API_BASE}/api/status`);
+    const res = await fetchWithTimeout(`${API_BASE}/api/status`, { cache: "no-store" }, 15000);
     const data = await res.json();
 
     // 头像框
@@ -1294,7 +1430,18 @@ async function loadStatus() {
     if (envOs && env.os) envOs.textContent = env.os;
 
   } catch (e) {
-    console.error('状态加载失败', e);
+    // AbortError 是防抖机制的正常行为，不需要报错
+    if (e.name === 'AbortError') {
+      return; // 静默忽略
+    }
+    console.warn('状态加载失败:', e.message);
+    // fetch 超时或网络错误时标记断连
+    if (e.message.includes('fetch') || e.message.includes('network') || e.message.includes('Failed')) {
+      consecutiveFailures++;
+      if (consecutiveFailures >= 2) {
+        setConnectionState('disconnected');
+      }
+    }
   }
 }
 
@@ -1314,10 +1461,36 @@ function handlePanelClick(action) {
       appendOmnia('[系统] 环境快照显示当前运行主机、模型、Shell 与系统版本。');
       break;
     case 'quick':
+      // 快捷操作菜单
+      const quickActions = [
+        { label: '📋 清空聊天', action: () => { messagesEl.innerHTML = ''; chatHistory = []; saveChatHistory(); appendOmnia('[系统] 聊天记录已清空。'); } },
+        { label: '🔄 刷新状态', action: () => { loadStatus(); appendOmnia('[系统] 状态已刷新。'); } },
+        { label: '📊 系统资源', action: () => { fetch(API_BASE + '/api/status').then(r => r.json()).then(d => { const s = d.system || {}; appendOmnia(`[系统] CPU: ${(s.cpu_percent || 0).toFixed(0)}% | 内存: ${(s.memory_percent || 0).toFixed(0)}% | 磁盘: ${(s.disk_percent || 0).toFixed(0)}%`); }).catch(() => appendOmnia('[系统] 无法获取系统信息。')); } },
+        { label: '📁 打开项目', action: () => { fetch(API_BASE + '/api/open-ide', { method: 'POST' }).then(r => r.json()).then(d => appendOmnia(d.message || '[系统] 已尝试打开 IDE。')).catch(() => appendOmnia('[系统] 无法打开 IDE。')); } },
+      ];
+      const menuHtml = quickActions.map((a, i) => `<button class="quick-action-btn" data-idx="${i}">${a.label}</button>`).join('');
+      const html = `<div class="msg omnia"><div class="bubble"><div class="quick-menu"><div class="quick-menu-title">快捷操作</div><div class="quick-menu-actions">${menuHtml}</div></div></div><div class="meta">Omnia · 刚刚</div></div>`;
+      messagesEl.insertAdjacentHTML('beforeend', html);
+      // 绑定按钮事件
+      messagesEl.lastElementChild.querySelectorAll('.quick-action-btn').forEach((btn, i) => {
+        btn.addEventListener('click', () => { quickActions[i].action(); btn.closest('.msg').remove(); });
+      });
+      scrollToBottom();
       break;
     case 'ide':
-      appendOmnia('[提示] 正在尝试打开 VS Code…（请确保已安装）');
-      fetch(`${API_BASE}/api/open-ide`, { method: 'POST' }).catch(() => {});
+      // 先检测 VS Code 是否可用
+      fetch(`${API_BASE}/api/open-ide`, { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+          if (data.error) {
+            appendOmnia(`[提示] ${data.error}`);
+          } else {
+            appendOmnia(`[提示] ${data.message || '已尝试打开 VS Code'}`);
+          }
+        })
+        .catch(() => {
+          appendOmnia('[错误] 无法连接到服务器，请检查 Omnia 是否运行。');
+        });
       break;
     case 'system':
       appendOmnia('[系统] 系统体征显示当前机器资源占用。');
@@ -1407,18 +1580,85 @@ function handlePanelClick(action) {
       break;
     
     case 'api-selector':
-      // 切换 API 提供商
-      var currentApi = localStorage.getItem('omnia_api_provider') || 'deepseek';
-      var nextApi = currentApi === 'baidu' ? 'kimi' : 'baidu';
+      // 智能切换 API 提供商
+      const providers = ['deepseek', 'baidu', 'kimi', 'anthropic'];
+      const currentApi = localStorage.getItem('omnia_api_provider') || 'deepseek';
+      const currentIdx = providers.indexOf(currentApi);
+      const nextIdx = (currentIdx + 1) % providers.length;
+      const nextApi = providers[nextIdx];
+      
       localStorage.setItem('omnia_api_provider', nextApi);
-      appendOmnia('[系统] API 已切换为: ' + (nextApi === 'deepseek' ? 'DeepSeek' : nextApi.toUpperCase()) + '，下次对话将使用新的 API。');
-      var apiLabel = document.querySelector('#api-panel .api-current');
-      if (apiLabel) apiLabel.textContent = nextApi.toUpperCase();
+      
+      const apiNames = {
+        deepseek: 'DeepSeek',
+        baidu: '百度千帆',
+        kimi: 'Moonshot Kimi',
+        anthropic: 'Anthropic Claude'
+      };
+      
+      appendOmnia(`[系统] API 已切换为: ${apiNames[nextApi] || nextApi}，下次对话将使用新的 API。`);
+      
+      // 更新 HUD 显示
+      const apiLabel = document.querySelector('#api-panel .api-current');
+      if (apiLabel) apiLabel.textContent = apiNames[nextApi] || nextApi.toUpperCase();
       break;
     
     case 'memory-search':
-      appendOmnia('[系统] 记忆搜索已激活。请使用输入框输入搜索关键词，或输入 /memory <关键词> 命令搜索记忆宫殿。');
-      if (composer) composer.focus();
+      // 显示记忆搜索 UI
+      const searchHtml = `
+        <div class="msg omnia">
+          <div class="bubble">
+            <div class="memory-search-ui">
+              <div class="search-title">🔍 记忆搜索</div>
+              <input type="text" id="memory-search-input" placeholder="输入关键词搜索记忆宫殿..." style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:6px;background:var(--bg-secondary);color:var(--text);margin:8px 0;">
+              <div id="memory-search-results" style="max-height:200px;overflow-y:auto;"></div>
+            </div>
+          </div>
+          <div class="meta">Omnia · 刚刚</div>
+        </div>
+      `;
+      messagesEl.insertAdjacentHTML('beforeend', searchHtml);
+      const searchInput = document.getElementById('memory-search-input');
+      const resultsDiv = document.getElementById('memory-search-results');
+      
+      // 绑定搜索事件
+      let searchTimeout;
+      searchInput.addEventListener('input', (e) => {
+        clearTimeout(searchTimeout);
+        const query = e.target.value.trim();
+        if (query.length < 2) {
+          resultsDiv.innerHTML = '<div style="color:var(--text-muted);font-size:12px;">输入至少2个字符开始搜索...</div>';
+          return;
+        }
+        resultsDiv.innerHTML = '<div style="color:var(--text-muted);">搜索中...</div>';
+        searchTimeout = setTimeout(() => {
+          fetch(`${API_BASE}/api/memory/search`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query })
+          })
+          .then(r => r.json())
+          .then(data => {
+            const results = data.results || [];
+            if (results.length === 0) {
+              resultsDiv.innerHTML = '<div style="color:var(--text-muted);">未找到相关记忆</div>';
+              return;
+            }
+            resultsDiv.innerHTML = results.slice(0, 5).map(r => `
+              <div class="memory-result-item" style="padding:6px 8px;border-bottom:1px solid var(--border);cursor:pointer;" data-layer="${r.layer}" data-id="${r.id}">
+                <div style="font-size:11px;color:var(--cyan);">${r.layer}</div>
+                <div style="font-size:13px;">${r.snippet.slice(0, 100)}...</div>
+              </div>
+            `).join('');
+          })
+          .catch(() => {
+            resultsDiv.innerHTML = '<div style="color:var(--danger);">搜索失败</div>';
+          });
+        }, 300);
+      });
+      
+      searchInput.focus();
+      scrollToBottom();
       break;
     
     case 'workflow':
@@ -1686,7 +1926,7 @@ async function loadApiProviders() {
   const apiList = $('#api-list');
   
   try {
-    const res = await fetch(`${API_BASE}/api/providers`);
+    const res = await fetch(`${API_BASE}/api/providers`, { cache: 'no-store' });
     const data = await res.json();
     const providers = data.providers || [];
     const active = data.active;
@@ -1762,31 +2002,76 @@ restorePendingConfirm();
 loadStatus();
 loadApiProviders();
 
-// 状态刷新节流 - 页面不可见时跳过
-let statusIntervalId = null;
-function scheduleStatusRefresh() {
-  // 后台标签页也定期刷新（每60秒），防止连接断开后UI卡死
-  // 前台标签页保持15秒间隔（由 setInterval 控制）
-  if (document.hidden) {
-    // 后台标签页：静默刷新，不用 requestIdleCallback
-    loadStatus();
-    return;
-  }
-  if ('requestIdleCallback' in window) {
-    requestIdleCallback(() => loadStatus(), { timeout: 20000 });
-  } else {
-    loadStatus();
+let _apiProviderTimer = null;
+
+// 统一状态刷新 - 单一定时器，前台30s/后台60s
+// 合并原 scheduleStatusRefresh + heartbeatPing 两个30s间隔为一个
+let _statusTimerId = null;
+let _isBackground = false;
+
+function startUnifiedPolling() {
+  // 清除已有的定时器
+  if (_statusTimerId) clearInterval(_statusTimerId);
+  
+  const interval = document.hidden ? 60000 : 30000;
+  _isBackground = document.hidden;
+  
+  _statusTimerId = setInterval(() => {
+    // 后台模式：降低心跳频率，不刷新UI状态
+    if (document.hidden) {
+      // 每60秒只做轻量心跳，不调用 loadStatus（节省资源）
+      heartbeatPing();
+      return;
+    }
+    // 前台模式：正常刷新状态
+    if ('requestIdleCallback' in window) {
+      requestIdleCallback(() => {
+        loadStatus();
+        heartbeatPing();
+      }, { timeout: 5000 });
+    } else {
+      loadStatus();
+      heartbeatPing();
+    }
+  }, interval);
+  
+  // API列表单独用60秒间隔
+  if (!_apiProviderTimer) {
+    _apiProviderTimer = setInterval(loadApiProviders, 60000);
   }
 }
-setInterval(scheduleStatusRefresh, 15000);
-// 后台标签页更慢的刷新间隔（60秒），减少资源消耗
-setInterval(() => {
-  if (document.hidden && typeof loadStatus === 'function') {
-    loadStatus();
-  }
-}, 60000);
 
-setInterval(loadApiProviders, 60000); // 每分钟刷新 API 列表
+// [已合并到 Line 78] // 可见性变化时切换间隔
+// [已合并到 Line 78] document.addEventListener('visibilitychange', () => {
+// [已合并到 Line 78]   if (document.hidden) {
+// [已合并到 Line 78]     _isBackground = true;
+// [已合并到 Line 78]     // 切到60秒间隔
+// [已合并到 Line 78]     if (_statusTimerId) clearInterval(_statusTimerId);
+// [已合并到 Line 78]     _statusTimerId = setInterval(() => {
+// [已合并到 Line 78]       heartbeatPing(); // 后台只做心跳
+// [已合并到 Line 78]     }, 60000);
+// [已合并到 Line 78]     document.body.classList.add('page-hidden');
+// [已合并到 Line 78]   } else {
+// [已合并到 Line 78]     _isBackground = false;
+// [已合并到 Line 78]     document.body.classList.remove('page-hidden');
+// [已合并到 Line 78]     // 立即刷新一次 + 切回30秒
+// [已合并到 Line 78]     loadStatus();
+// [已合并到 Line 78]     heartbeatPing();
+// [已合并到 Line 78]     if (_statusTimerId) clearInterval(_statusTimerId);
+// [已合并到 Line 78]     _statusTimerId = setInterval(() => {
+// [已合并到 Line 78]       if ('requestIdleCallback' in window) {
+// [已合并到 Line 78]         requestIdleCallback(() => { loadStatus(); heartbeatPing(); }, { timeout: 5000 });
+      } else {
+        loadStatus();
+        heartbeatPing();
+      }
+    }, 30000);
+  }
+});
+
+// 启动统一轮询
+startUnifiedPolling();
+
 composer.focus();
 
 // =========================================
@@ -2180,17 +2465,25 @@ async function checkTokenStatus() {
   
   try {
     const response = await fetch(`${API_BASE}/api/token/status`, {
+      cache: 'no-store',
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ messages: messages, model: currentApiProvider || 'deepseek' })
     });
     
     if (response.ok) {
-      const status = await response.json();
-      updateTokenDisplay(status);
+      const text = await response.text();
+      try {
+        const status = JSON.parse(text);
+        updateTokenDisplay(status);
+      } catch (parseErr) {
+        console.warn('[Token Status] 响应不是 JSON:', text.substring(0, 100));
+      }
     }
   } catch (e) {
-    console.log('[Token Status] Check failed:', e);
+    if (e.name !== 'AbortError') {
+      console.warn('[Token Status] Check failed:', e.message);
+    }
   }
 }
 
@@ -2206,3 +2499,27 @@ saveChatHistory = function() {
 document.addEventListener('DOMContentLoaded', () => {
   setTimeout(checkTokenStatus, 500);
 });
+
+
+// =========================================
+// 页面卸载清理（防止内存泄漏）
+// =========================================
+window.addEventListener('beforeunload', () => {
+  // 清除所有定时器
+  if (typeof _statusTimerId !== 'undefined' && _statusTimerId) clearInterval(_statusTimerId);
+  if (typeof _apiProviderTimer !== 'undefined' && _apiProviderTimer) clearInterval(_apiProviderTimer);
+  if (typeof _visibilityTimer !== 'undefined' && _visibilityTimer) clearTimeout(_visibilityTimer);
+  
+  // 清空大对象
+  chatHistory = [];
+  
+  console.log('[Cleanup] 页面卸载，已清理资源');
+});
+
+// 定期清理 DOM 节点（防止长时间运行后 DOM 累积）
+setInterval(() => {
+  // 保留最近 30 条消息
+  while (messagesEl && messagesEl.children.length > 30) {
+    messagesEl.removeChild(messagesEl.firstChild);
+  }
+}, 60000); // 每分钟检查一次

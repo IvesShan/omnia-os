@@ -89,10 +89,10 @@ class TestMemoryPalace:
     
     def test_recall_relations(self, memory_palace):
         """测试查询关系"""
-        # 添加测试数据
+        # 添加测试数据 - 使用同一个实体作为连接点
         memory_palace.relate('用户', '创建了', 'Omnia项目')
-        memory_palace.relate('Omnia', '包含', 'MemoryPalace')
+        memory_palace.relate('Omnia项目', '包含', 'MemoryPalace')
         
-        # 测试查询
-        results = memory_palace.recall_relations(entity="用户")
-        assert len(results) >= 2
+        # 测试查询 - Omnia项目 在两条关系中都出现
+        results = memory_palace.recall_relations(entity="Omnia项目")
+        assert len(results) >= 2  # Omnia项目 是第一条的 object，第二条的 subject
