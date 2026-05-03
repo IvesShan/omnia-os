@@ -148,6 +148,9 @@ class MemoryPalace:
         # 迁移旧表：添加版本化字段
         self._migrate_old_schema()
         
+        # 确保 conflicts 表存在（FTS 索引可能引用）
+        self._ensure_versioning_tables()
+        
         # 然后建索引和 FTS（此时字段已存在）
         if schema_path is None:
             schema_path = Path(__file__).parent / "schema.sql"
