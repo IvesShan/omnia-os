@@ -140,8 +140,8 @@ const GraphViz = {
         console.log('[GraphViz] 页面可见，恢复渲染');
       }
     });
-  },
 
+  },
   createBrainParticles() {
     const positions = new Float32Array(this.particleCount * 3);
     const colors = new Float32Array(this.particleCount * 3);
