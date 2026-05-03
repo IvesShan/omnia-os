@@ -150,6 +150,7 @@ def handle_chat(
     from core.session_manager import get_session_manager, load_recent_conversations, merge_histories
     from core.context_manager import ContextManager, save_current_context
     from omnia.tool_trigger import analyze_message, get_tool_choice_for_provider, get_suggested_tool_prompt
+    from omnia.tool_call_validator import validate_tool_execution, build_retry_prompt
     from pathlib import Path
 
     hooks = get_hook_registry()
@@ -307,6 +308,43 @@ def handle_chat(
         # ========== 没有工具调用 ==========
         if not tool_calls:
             reply = content
+            # ========== 工具调用验证 ==========
+            # 检测模型是否虚假声称调用了工具
+            validation = validate_tool_execution(
+                response=reply,
+                tool_calls=[],
+                tool_results=[],
+                user_message=original_message
+            )
+            
+            if not validation["valid"] and validation["false_claim"]:
+                print(f"[Chat] ⚠️ 检测到虚假声称: {validation['reason']}")
+                
+                # 构建重试提示
+                retry_prompt = build_retry_prompt(
+                    original_message,
+                    reply,
+                    validation["reason"]
+                )
+                
+                # 添加重试消息
+                messages.append({
+                    "role": "user",
+                    "content": retry_prompt
+                })
+                
+                # 强制下一轮使用工具
+                trigger_result = type('obj', (object,), {
+                    'should_trigger': True,
+                    'trigger_type': 'forced_retry',
+                    'confidence': 1.0,
+                    'suggested_tools': []
+                })()
+                
+                # 继续下一轮循环
+                continue
+            # ========== 验证结束 ==========
+
             
             # Hook: POST_RESPONSE
             hook_context = HookContext(
