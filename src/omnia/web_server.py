@@ -834,6 +834,29 @@ def create_app() -> Flask:
             "openai": "OPENAI_API_KEY",
             "anthropic": "ANTHROPIC_API_KEY",
         }
+
+        # 添加本地模型
+        local_models = []
+        local_llm_config = PROJECT_ROOT / "config" / "local_llm.yaml"
+        if local_llm_config.exists():
+            try:
+                import yaml
+                with open(local_llm_config, 'r', encoding='utf-8') as f:
+                    config = yaml.safe_load(f)
+                for model_id, model_info in config.get('models', {}).items():
+                    local_models.append({
+                        "id": f"local-{model_id}",
+                        "name": model_info.get('display_name', model_id),
+                        "configured": True,  # 本地模型总是可用
+                        "model": model_id,
+                        "type": "local",
+                        "supports_tools": model_info.get('supports_tools', False),
+                        "supports_thinking": model_info.get('supports_thinking', False),
+                    })
+            except Exception as e:
+                print(f"[providers] Failed to load local_llm.yaml: {e}")
+        
+
         
         cloud_online = False
         for pid, env_key in env_vars.items():
@@ -943,6 +966,27 @@ def create_app() -> Flask:
                 "model": model,
             })
         
+        # 添加本地模型
+        local_models = []
+        local_llm_config = PROJECT_ROOT / "config" / "local_llm.yaml"
+        if local_llm_config.exists():
+            try:
+                import yaml
+                with open(local_llm_config, 'r', encoding='utf-8') as f:
+                    config = yaml.safe_load(f)
+                for model_id, model_info in config.get('models', {}).items():
+                    local_models.append({
+                        "id": f"local-{model_id}",
+                        "name": model_info.get('display_name', model_id),
+                        "configured": True,  # 本地模型总是可用
+                        "model": model_id,
+                        "type": "local",
+                        "supports_tools": model_info.get('supports_tools', False),
+                        "supports_thinking": model_info.get('supports_thinking', False),
+                    })
+            except Exception as e:
+                print(f"[providers] Failed to load local_llm.yaml: {e}")
+        
         # Determine active provider
         # Priority: .env file > system env vars
         # .env file is the user's explicit project config, should take precedence
@@ -974,6 +1018,11 @@ def create_app() -> Flask:
             if not active:
                 active = None
         
+        
+        # 添加本地模型到列表
+        for local_model in local_models:
+            providers.append(local_model)
+
         return jsonify({
             "providers": providers,
             "active": active,
@@ -986,9 +1035,14 @@ def create_app() -> Flask:
         data = request.get_json(force=True, silent=True) or {}
         provider = data.get("provider")
         
-        valid_providers = ["deepseek", "qianfan", "kimi", "openai", "anthropic", "xiaomi"]
+        valid_providers = ["deepseek", "qianfan", "kimi", "openai", "anthropic", "xiaomi", "local"]
         if provider not in valid_providers:
             return jsonify({"error": f"Invalid provider: {provider}"}), 400
+        
+        # 本地模型特殊处理
+        if provider == "local" or provider.startswith("local-"):
+            _current_provider = provider
+            return jsonify({"ok": True, "provider": provider})
         
         # Check if provider is configured
         env_key = {

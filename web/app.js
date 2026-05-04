@@ -1720,17 +1720,21 @@ async function loadApiProviders() {
     apiStatus.textContent = `当前: ${getProviderName(active)}`;
     apiStatus.classList.add('active');
     
-    apiList.innerHTML = providers.map(p => `
+    apiList.innerHTML = providers.map(p => {
+      const isLocal = p.type === 'local' || p.id.startsWith('local-');
+      const toolsBadge = p.supports_tools ? '<span class="badge-tool" title="支持工具调用">🔧</span>' : '';
+      const thinkBadge = p.supports_thinking ? '<span class="badge-think" title="支持思考链">🧠</span>' : '';
+      return `
       <div class="api-item ${p.id === active ? 'selected' : ''} ${p.configured ? '' : 'disabled'}" 
            data-provider="${p.id}" 
            onclick="selectProvider('${p.id}', ${p.configured})">
-        <div class="api-dot ${p.configured ? p.id : 'disabled'}"></div>
+        <div class="api-dot ${isLocal ? 'local' : (p.configured ? p.id : 'disabled')}"></div>
         <div class="api-info">
-          <div class="api-name">${p.name} ${p.id === active ? '<span class="badge">使用中</span>' : ''}</div>
-          <div class="api-model">${p.model}</div>
+          <div class="api-name">${p.name} ${p.id === active ? '<span class="badge">使用中</span>' : ''} ${toolsBadge}${thinkBadge}</div>
+          <div class="api-model">${isLocal ? '本地模型' : p.model}</div>
         </div>
       </div>
-    `).join('');
+    `}).join('');
   } catch (err) {
     apiStatus.textContent = '加载失败';
     apiList.innerHTML = `<div style="color:var(--danger);font-size:11px;padding:8px;">错误: ${escapeHtml(err.message)}</div>`;
@@ -1738,8 +1742,15 @@ async function loadApiProviders() {
 }
 
 function getProviderName(id) {
+  // 本地模型特殊处理
+  if (id.startsWith('local-')) {
+    return id.replace('local-', '本地: ');
+  }
+  if (id === 'local') {
+    return '本地 GPU';
+  }
+  
   const names = {
-    local: '本地 GPU',
     deepseek: 'DeepSeek',
     qianfan: '百度千帆',
     kimi: 'Moonshot',

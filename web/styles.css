@@ -2187,3 +2187,36 @@ EOF
   50% { opacity: 0.6; }
 }
 
+
+/* 本地模型徽章样式 */
+.badge-tool, .badge-think {
+  font-size: 10px;
+  margin-left: 4px;
+  opacity: 0.8;
+}
+
+.api-item:hover .badge-tool,
+.api-item:hover .badge-think {
+  opacity: 1;
+}
+
+/* 本地模型特殊样式 */
+.api-dot.local {
+  background: linear-gradient(135deg, #22d3ee, #a855f7);
+  box-shadow: 0 0 8px rgba(34, 211, 238, 0.6);
+  animation: pulse-local 2s ease-in-out infinite;
+}
+
+@keyframes pulse-local {
+  0%, 100% { box-shadow: 0 0 8px rgba(34, 211, 238, 0.6); }
+  50% { box-shadow: 0 0 12px rgba(168, 85, 247, 0.8); }
+}
+
+.api-item[data-provider^="local-"].selected {
+  border-color: #a855f7;
+  background: rgba(168, 85, 247, 0.1);
+}
+
+.api-item[data-provider^="local-"].selected .api-dot {
+  box-shadow: 0 0 12px rgba(168, 85, 247, 0.9);
+}

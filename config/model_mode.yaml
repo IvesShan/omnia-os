@@ -1,14 +1,15 @@
 # Omnia 模型模式配置
-# 当前模式: cloud (云端)
+# 当前模式: local (本地)
 
-current_mode: cloud
+current_mode: local
 
 # 本地模型配置
 local:
   enabled: true
-  endpoint: "http://localhost:8080/v1"
-  model: "gemma-4-E4B-it-OBLITERATED-Q8_0.gguf"
-
+  backend: "transformers"  # transformers, vllm, llama.cpp
+  model: "qwen3-8b"
+  model_path: "/home/shan/models/Qwen3-8B"
+  
 # 云端模型配置
 cloud:
   enabled: true
