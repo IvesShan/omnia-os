@@ -6,22 +6,41 @@ const API_BASE = `${window.location.origin}`;
 
 // 页面可见性感知 - 后台暂停动画
 let isPageVisible = true;
+
+// 定时器 ID（用于后台暂停）
+let statusTimerId = null;
+let apiProviderTimerId = null;
+let backgroundTimerId = null;
+
 document.addEventListener('visibilitychange', () => {
   isPageVisible = !document.hidden;
   if (document.hidden) {
     document.body.classList.add('page-hidden');
+    // 后台时暂停所有定时器
+    console.log('[Visibility] 页面隐藏，暂停定时器');
+    if (statusTimerId) { clearInterval(statusTimerId); statusTimerId = null; }
+    if (apiProviderTimerId) { clearInterval(apiProviderTimerId); apiProviderTimerId = null; }
+    if (backgroundTimerId) { clearInterval(backgroundTimerId); backgroundTimerId = null; }
   } else {
     document.body.classList.remove('page-hidden');
-    // 页面恢复可见时，立即刷新状态（修复待机后UI卡死问题）
-    console.log('[Visibility] 页面恢复可见，刷新状态');
+    // 页面恢复可见时，恢复定时器
+    console.log('[Visibility] 页面恢复可见，恢复定时器');
     if (typeof loadStatus === 'function') {
       loadStatus();
     }
     if (typeof loadApiProviders === 'function') {
       loadApiProviders();
     }
+    // 重新启动定时器
+    if (typeof scheduleStatusRefresh === 'function' && !statusTimerId) {
+      statusTimerId = setInterval(scheduleStatusRefresh, 15000);
+    }
+    if (typeof loadApiProviders === 'function' && !apiProviderTimerId) {
+      apiProviderTimerId = setInterval(loadApiProviders, 60000);
+    }
   }
 });
+
 
 // 滚动节流
 let scrollPending = false;
@@ -1778,15 +1797,16 @@ function scheduleStatusRefresh() {
     loadStatus();
   }
 }
-setInterval(scheduleStatusRefresh, 15000);
+statusTimerId = setInterval(scheduleStatusRefresh, 15000);
 // 后台标签页更慢的刷新间隔（60秒），减少资源消耗
-setInterval(() => {
+// 注意：此定时器已被 visibilitychange 管理，后台时会暂停
+backgroundTimerId = setInterval(() => {
   if (document.hidden && typeof loadStatus === 'function') {
     loadStatus();
   }
 }, 60000);
 
-setInterval(loadApiProviders, 60000); // 每分钟刷新 API 列表
+apiProviderTimerId = setInterval(loadApiProviders, 60000); // 每分钟刷新 API 列表
 composer.focus();
 
 // =========================================
