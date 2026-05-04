@@ -36,7 +36,7 @@ from core.neuro_center.notification_queue import NotificationQueue
 from core.plugin import get_hook_registry  # Auto-register hooks
 from omnia.chat import _load_api_key, _call_model_messages
 from omnia.wake import assemble_wake_prompt
-from omnia.tool_preroll import check_and_run, should_force_tool_check
+from omnia.tool_trigger import check_and_run, should_force_tool_check
 
 WEB_DIR = PROJECT_ROOT / "web"
 WORKSPACE = PROJECT_ROOT  # Git repo is here, not parent

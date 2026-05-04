@@ -17,7 +17,7 @@ from pathlib import Path
 
 from core.config import MEMORY_PALACE_DB
 from omnia.wake import assemble_wake_prompt
-from omnia.tool_preroll import check_and_run
+from omnia.tool_trigger import check_and_run
 from omnia.chat import _load_api_key, _build_model_config
 from omnia.tool_optimizer import ToolExecutionOptimizer, ParallelToolExecutor
 from core.actuator.tool_registry import TOOLS_SCHEMA

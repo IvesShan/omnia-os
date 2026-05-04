@@ -1,25 +1,29 @@
 """
 tool_trigger.py — 统一工具触发判断模块
 
-整合 chat_handler.py 和 tool_preroll.py 的触发逻辑，
-提供统一的工具调用判断接口。
+整合了:
+- chat_handler.py 的触发逻辑
+- tool_preroll.py 的前置检查逻辑
 
 设计原则：
 1. 宁可多触发，不可漏触发
 2. 支持正则表达式和模糊匹配
 3. 上下文感知（考虑历史消息）
+4. 前置检查（某些场景直接执行并注入结果）
 """
 
 import re
-from typing import List, Tuple, Optional
+import subprocess
+from typing import List, Optional
 from dataclasses import dataclass
+from pathlib import Path
 
 
 @dataclass
 class ToolTriggerResult:
     """工具触发判断结果"""
     should_trigger: bool
-    trigger_type: str  # "keyword", "context", "explicit", "promise"
+    trigger_type: str  # "keyword", "context", "explicit", "promise", "preroll"
     matched_keyword: Optional[str] = None
     confidence: float = 0.0
     suggested_tools: List[str] = None
@@ -30,13 +34,13 @@ class ToolTriggerResult:
 
 
 # ─── 核心关键词定义 ───
-# 分类整理，便于维护和扩展
+# 简化版：只保留最关键的关键词
 
 KEYWORD_CATEGORIES = {
     # 文件操作类
     "file_ops": {
         "keywords": [
-            "读文件", "读取", "read", "cat ", "查看文件", "检查文件",
+            "读文件", "读取", "read", "查看文件", "检查文件",
             "看看文件", "文件内容", "读一下", "打开文件",
             "write", "写文件", "保存文件", "修改文件",
             "list", "列出", "目录", "文件夹", "ls ", "dir ",
@@ -47,8 +51,8 @@ KEYWORD_CATEGORIES = {
     # 命令执行类
     "command_exec": {
         "keywords": [
-            "执行", "运行", "跑一下", "跑个", "命令", "cmd", "shell",
-            "bash", "终端", "命令行", "execute", "run ",
+            "执行", "运行", "跑一下", "跑个", "命令", "shell",
+            "bash", "终端", "命令行", "execute",
         ],
         "tools": ["execute_shell"],
     },
@@ -56,16 +60,9 @@ KEYWORD_CATEGORIES = {
     # 状态检查类（高频场景）
     "status_check": {
         "keywords": [
-            # 中文
-            "检查", "确认", "验证", "核实", "查一下", "看一下", "看看",
-            "检查一下", "看一下", "检测", "测试", "试一下",
-            "改好了吗", "生效了吗", "有没有生效", "完成了吗", "成功了吗",
-            "好了没", "有没有问题", "状态", "怎么样了", "效果",
-            "分析", "重新分析", "完整分析", "全面分析", "深入分析",
-            "查看", "查看一下", "确认一下", "验证一下",
-            # 英文
-            "check", "verify", "confirm", "test", "analyze",
-            "status", "state",
+            "检查", "确认", "验证", "查一下", "看一下", "看看",
+            "检测", "测试", "试一下", "改好了吗", "生效了吗",
+            "状态", "怎么样了", "分析",
         ],
         "tools": ["execute_shell", "read_file", "list_directory"],
     },
@@ -74,8 +71,7 @@ KEYWORD_CATEGORIES = {
     "git_ops": {
         "keywords": [
             "git", "提交", "commit", "push", "pull", "branch", "分支",
-            "有没有提交", "生效了没", "提交记录", "git log", "git status",
-            "改了什么", "最近提交", "代码提交",
+            "提交记录", "git log", "git status",
         ],
         "tools": ["execute_shell"],
     },
@@ -83,72 +79,51 @@ KEYWORD_CATEGORIES = {
     # 服务/进程检查
     "service_check": {
         "keywords": [
-            "服务", "运行", "启动", "端口", "进程", "daemon", "守护",
-            "重启", "在线", "离线", "监听", "5001", "8765",
+            "服务", "运行", "启动", "端口", "进程", "daemon",
+            "重启", "在线", "监听",
         ],
         "tools": ["execute_shell"],
     },
     
     # 网络搜索
     "web_search": {
-        "keywords": [
-            "搜索", "查找", "search", "google", "百度", "bing",
-            "网上", "网络", "最新", "新闻", "文档",
-        ],
+        "keywords": ["搜索", "search", "google", "最新", "文档"],
         "tools": ["web_search"],
     },
     
     # 记忆查询
     "memory_query": {
-        "keywords": [
-            "记忆", "回忆", "remember", "之前", "上次", "历史",
-            "记住", "忘记", "recall", "memory",
-        ],
+        "keywords": ["记忆", "回忆", "之前", "上次", "历史"],
         "tools": ["query_memory"],
-    },
-    
-    # 代码分析
-    "code_analysis": {
-        "keywords": [
-            "代码", "函数", "方法", "类", "class ", "def ", "function",
-            "实现", "逻辑", "算法", "源码", "源代码",
-            "分析代码", "理解代码", "解释代码",
-        ],
-        "tools": ["read_file", "execute_shell"],
     },
 }
 
+# ─── 前置检查规则 ───
+# 这些场景直接执行命令并注入结果，不需要模型决策
 
-# ─── 上下文触发规则 ───
-# 基于历史消息判断是否需要工具
+PROJECT_ROOT = Path(__file__).parent.parent.parent
 
-CONTEXT_TRIGGER_PATTERNS = [
-    # 助手承诺检查但未执行
-    (r"让我(检查|看看|查一下|读一下|验证)", "promise"),
-    (r"我(来|会|将)(检查|看看|读取|验证)", "promise"),
-    (r"(需要|应该)(调用|使用)工具", "promise"),
+PREROLL_RULES = [
+    # Git 状态
+    (r"(git|提交|commit|有没有提交|提交记录)",
+     [
+         ("Git状态", f"git -C {PROJECT_ROOT} status --short 2>/dev/null | head -20 || echo '不是git仓库'"),
+         ("最近提交", f"git -C {PROJECT_ROOT} log --oneline -5 2>/dev/null || echo '不是git仓库'"),
+     ]),
     
-    # 用户追问（暗示上次回答不完整）
-    (r"然后呢", "follow_up"),
-    (r"继续", "follow_up"),
-    (r"还有呢", "follow_up"),
-    (r"具体(是|有)什么", "follow_up"),
+    # 服务/端口检查
+    (r"(服务|运行|端口|5001|8765|进程|daemon|重启.*成功)",
+     [
+         ("端口监听", "ss -tlnp 2>/dev/null | grep -E '5001|8765' || echo '无相关端口'"),
+     ]),
 ]
 
-
-
 # ─── 排除规则 ───
-# 这些场景不应该触发工具调用
 
 EXCLUDE_PATTERNS = [
-    # 创意生成
-    r"写.*诗", r"作.*诗", r"写.*歌", r"作.*歌",
-    r"写.*故事", r"讲.*故事",
-    # 纯闲聊
+    r"写.*诗", r"作.*诗", r"写.*歌",
     r"^你好", r"^嗨", r"^hi", r"^hello",
     r"^再见", r"^bye",
-    # 纯知识问答
-    r"^什么是", r"^为什么是", r"^如何.*吗$",
 ]
 
 
@@ -159,45 +134,28 @@ def analyze_message(
 ) -> ToolTriggerResult:
     """
     综合分析是否需要触发工具调用。
-    
-    Args:
-        user_message: 当前用户消息
-        last_assistant_message: 上一条助手消息
-        history: 历史消息列表
-    
-    Returns:
-        ToolTriggerResult: 触发判断结果
     """
     user_lower = user_message.lower()
     
-    # 0. 排除检查（优先级最高）
+    # 0. 排除检查
     for pattern in EXCLUDE_PATTERNS:
         if re.search(pattern, user_message, re.IGNORECASE):
             return ToolTriggerResult(
                 should_trigger=False,
                 trigger_type="excluded",
                 confidence=0.0,
-                suggested_tools=[],
             )
     
-    # 1. 显式工具请求（最高优先级）
-    explicit_patterns = [
-        r"(调用|使用|执行)(工具|tool)",
-        r"用工具(查|看|检查|分析)",
-        r"tool_call",
-    ]
-    for pattern in explicit_patterns:
-        if re.search(pattern, user_lower):
-            return ToolTriggerResult(
-                should_trigger=True,
-                trigger_type="explicit",
-                matched_keyword=pattern,
-                confidence=1.0,
-                suggested_tools=["read_file", "execute_shell", "list_directory"],
-            )
+    # 1. 显式工具请求
+    if re.search(r"(调用|使用|执行)(工具|tool)", user_lower):
+        return ToolTriggerResult(
+            should_trigger=True,
+            trigger_type="explicit",
+            confidence=1.0,
+            suggested_tools=["read_file", "execute_shell", "list_directory"],
+        )
     
     # 2. 关键词匹配
-    all_keywords = []
     for category, data in KEYWORD_CATEGORIES.items():
         for kw in data["keywords"]:
             if kw.lower() in user_lower:
@@ -208,24 +166,19 @@ def analyze_message(
                     confidence=0.9,
                     suggested_tools=data["tools"],
                 )
-            all_keywords.append((kw, data["tools"]))
     
-    # 3. 上下文触发（基于历史消息）
+    # 3. 上下文触发（助手承诺但未执行）
     if last_assistant_message:
-        for pattern, trigger_type in CONTEXT_TRIGGER_PATTERNS:
-            if re.search(pattern, last_assistant_message, re.IGNORECASE):
-                return ToolTriggerResult(
-                    should_trigger=True,
-                    trigger_type=trigger_type,
-                    matched_keyword=pattern,
-                    confidence=0.8,
-                    suggested_tools=["read_file", "execute_shell", "list_directory"],
-                )
+        if re.search(r"让我(检查|看看|查一下)", last_assistant_message, re.IGNORECASE):
+            return ToolTriggerResult(
+                should_trigger=True,
+                trigger_type="promise",
+                confidence=0.8,
+                suggested_tools=["read_file", "execute_shell"],
+            )
     
-    # 4. 模糊匹配（编辑距离）
-    # 对于短消息（< 20 字），更积极地触发
+    # 4. 短消息模糊匹配
     if len(user_message) < 20:
-        # 检查是否包含动词
         verbs = ["看", "查", "检", "测", "试", "读", "写", "跑", "执"]
         for v in verbs:
             if v in user_message:
@@ -236,23 +189,6 @@ def analyze_message(
                     confidence=0.7,
                     suggested_tools=["read_file", "execute_shell"],
                 )
-    
-    # 5. 历史消息分析（如果提供了）
-    if history and len(history) > 0:
-        # 检查最近 3 轮是否有未完成的工具请求
-        recent = history[-6:] if len(history) >= 6 else history
-        for msg in recent:
-            if msg.get("role") == "assistant":
-                content = msg.get("content", "")
-                # 助手提到需要工具但未调用
-                if re.search(r"需要(检查|查看|读取|验证)", content):
-                    return ToolTriggerResult(
-                        should_trigger=True,
-                        trigger_type="context",
-                        matched_keyword="历史未完成",
-                        confidence=0.6,
-                        suggested_tools=["read_file", "execute_shell"],
-                    )
     
     return ToolTriggerResult(
         should_trigger=False,
@@ -267,15 +203,6 @@ def get_tool_choice_for_provider(
 ) -> Optional[str]:
     """
     根据 Provider 和触发结果决定 tool_choice 参数。
-    
-    Args:
-        result: 触发判断结果
-        provider: Provider 名称
-    
-    Returns:
-        "required" - 强制调用
-        "auto" - 建议调用
-        None - API 默认行为
     """
     if not result.should_trigger:
         return None
@@ -284,13 +211,12 @@ def get_tool_choice_for_provider(
     providers_support_required = ["kimi", "openai", "anthropic"]
     
     if provider.lower() in providers_support_required:
-        # 高置信度时强制调用
         if result.confidence >= 0.8:
             return "required"
         else:
             return "auto"
     else:
-        # DeepSeek 等不支持 required，返回 auto 或 None
+        # DeepSeek 等不支持 required
         if result.confidence >= 0.7:
             return "auto"
         return None
@@ -327,19 +253,52 @@ def get_suggested_tool_prompt(result: ToolTriggerResult) -> str:
 """
 
 
-# ─── 兼容旧接口 ───
+# ─── 前置检查功能（从 tool_preroll.py 合并）───
 
-def should_require_tool(user_message: str, provider: str = "deepseek") -> Optional[str]:
+def check_and_run(user_message: str) -> str:
     """
-    兼容 chat_handler.py 的旧接口。
+    前置工具检查：直接执行命令并返回结果。
+    用于某些确定性的场景（如 git status）。
     """
-    result = analyze_message(user_message)
-    return get_tool_choice_for_provider(result, provider)
+    results = []
+    
+    for pattern, commands in PREROLL_RULES:
+        if re.search(pattern, user_message, re.IGNORECASE):
+            results.append(f"🔍 [前置检查] 命中: '{pattern}'")
+            for desc, cmd in commands:
+                try:
+                    result = subprocess.run(
+                        cmd,
+                        shell=True,
+                        capture_output=True,
+                        text=True,
+                        timeout=15,
+                    )
+                    output = result.stdout.strip() or result.stderr.strip() or "(无输出)"
+                    if len(output) > 300:
+                        output = output[:300] + "..."
+                    results.append(f"  📋 {desc}:")
+                    results.append(f"    {output}")
+                except subprocess.TimeoutExpired:
+                    results.append(f"  ⏱️ {desc}: 超时")
+                except Exception as e:
+                    results.append(f"  ❌ {desc}: 错误 - {e}")
+            break
+    
+    return "\n".join(results) if results else ""
 
 
 def should_force_tool_check(user_message: str, last_assistant_message: str = "") -> bool:
     """
-    兼容 tool_preroll.py 的旧接口。
+    判断是否应该强制执行工具检查。
     """
     result = analyze_message(user_message, last_assistant_message)
     return result.should_trigger
+
+
+# ─── 兼容旧接口 ───
+
+def should_require_tool(user_message: str, provider: str = "deepseek") -> Optional[str]:
+    """兼容 chat_handler.py 的旧接口"""
+    result = analyze_message(user_message)
+    return get_tool_choice_for_provider(result, provider)
