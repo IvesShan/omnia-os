@@ -118,7 +118,7 @@ async def api_status():
 
 # ========== 挂载路由模块 ==========
 
-from src.omnia.routers import provider, chat
+from src.omnia.routers import provider, chat, memory, graph
 
 # Provider 管理
 app.include_router(provider.router, prefix="/api", tags=["provider"])
@@ -126,10 +126,14 @@ app.include_router(provider.router, prefix="/api", tags=["provider"])
 # 聊天核心
 app.include_router(chat.router, prefix="/api", tags=["chat"])
 
+# 记忆搜索
+app.include_router(memory.router, prefix="/api", tags=["memory"])
+
+# 神经图谱
+app.include_router(graph.router, prefix="/api", tags=["graph"])
+
 # 后续添加其他路由
-# from src.omnia.routers import memory, graph, workflow, feishu, status
-# app.include_router(memory.router, prefix="/api", tags=["memory"])
-# app.include_router(graph.router, prefix="/api", tags=["graph"])
+# from src.omnia.routers import workflow, feishu, status
 # app.include_router(workflow.router, prefix="/api", tags=["workflow"])
 # app.include_router(feishu.router, prefix="/webhook", tags=["feishu"])
 # app.include_router(status.router, prefix="/api", tags=["status"])
