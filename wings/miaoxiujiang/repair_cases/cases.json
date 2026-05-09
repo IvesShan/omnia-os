@@ -1,0 +1,420 @@
+[
+  {
+    "source_file": "CAS-295109-3Dep大疆Air3维修_20260331191255.pdf",
+    "drone_model": "",
+    "case_id": "CAS-示例-001",
+    "symptoms": [
+      "外观检测：炸机导致主板变形",
+      "底壳破损",
+      "机臂断裂",
+      "相机损坏",
+      "云台信号 检测结果 线损坏",
+      "p电机异常",
+      "r电机异常",
+      "中框损坏"
+    ],
+    "diagnosis": "外观检测：炸机导致主板变形，底壳破损，机臂断裂，相机损坏，云台信号 检测结果 线损坏，p电机异常，r电机异常，中框损坏；",
+    "parts": [],
+    "labor_cost": 0,
+    "parts_cost": 0,
+    "total_cost": 0,
+    "has_recycle_option": false,
+    "notes": "脱敏处理：已移除客户及工程师隐私信息"
+  },
+  {
+    "source_file": "CAS-152470-KXBa大疆御3-维修报价_20251021175351.pdf",
+    "drone_model": "御",
+    "case_id": "CAS-示例-002",
+    "symptoms": [
+      "外观检测：云台下支架断裂",
+      "检测结果"
+    ],
+    "diagnosis": "外观检测：云台下支架断裂； 检测结果",
+    "parts": [],
+    "labor_cost": 195,
+    "parts_cost": 0,
+    "total_cost": 195,
+    "has_recycle_option": false,
+    "notes": "脱敏处理：已移除客户及工程师隐私信息"
+  },
+  {
+    "source_file": "CAS-20241031_MAVIC 2-维修报价_20240807_20250610153426.pdf",
+    "drone_model": "",
+    "case_id": "CAS-示例-003",
+    "symptoms": [
+      "外观检测：左前转轴断裂",
+      "左后机臂断裂",
+      "转轴错位",
+      "上壳微变形",
+      "右前转轴 断裂 检测结果 功能检测：云台自检异常",
+      "云台无力",
+      "APP报云台被卡住"
+    ],
+    "diagnosis": "外观检测：左前转轴断裂，左后机臂断裂，转轴错位，上壳微变形，右前转轴 断裂 检测结果 功能检测：云台自检异常，云台无力，APP报云台被卡住",
+    "parts": [],
+    "labor_cost": 450,
+    "parts_cost": 0,
+    "total_cost": 450,
+    "has_recycle_option": false,
+    "notes": "脱敏处理：已移除客户及工程师隐私信息"
+  },
+  {
+    "source_file": "大疆御air2s维修报价_20260224152003.pdf",
+    "drone_model": "",
+    "case_id": "CAS-示例-004",
+    "symptoms": [
+      "外观检测：进水导致飞机多处腐蚀",
+      "检测结果"
+    ],
+    "diagnosis": "外观检测：进水导致飞机多处腐蚀； 检测结果",
+    "parts": [],
+    "labor_cost": 0,
+    "parts_cost": 0,
+    "total_cost": 0,
+    "has_recycle_option": false,
+    "notes": "脱敏处理：已移除客户及工程师隐私信息"
+  },
+  {
+    "source_file": "CAS-20250917Cyv1大疆Air3-维修报价_20250917182112.pdf",
+    "drone_model": "",
+    "case_id": "CAS-示例-005",
+    "symptoms": [
+      "外观检测：云台下支架断裂",
+      "r电机变形",
+      "机臂脚架损坏",
+      "驱动排线损坏",
+      "检测结果"
+    ],
+    "diagnosis": "外观检测：云台下支架断裂，r电机变形，机臂脚架损坏，驱动排线损坏； 检测结果",
+    "parts": [],
+    "labor_cost": 780,
+    "parts_cost": 0,
+    "total_cost": 780,
+    "has_recycle_option": false,
+    "notes": "脱敏处理：已移除客户及工程师隐私信息"
+  },
+  {
+    "source_file": "CAS-20241031_MAVIC 2-维修报价_20240807_20250610153520.pdf",
+    "drone_model": "",
+    "case_id": "CAS-示例-006",
+    "symptoms": [
+      "外观检测：左前转轴断裂",
+      "左后机臂断裂",
+      "转轴错位",
+      "上壳微变形",
+      "右前转轴 断裂 检测结果 功能检测：云台自检异常",
+      "云台无力",
+      "APP报云台被卡住"
+    ],
+    "diagnosis": "外观检测：左前转轴断裂，左后机臂断裂，转轴错位，上壳微变形，右前转轴 断裂 检测结果 功能检测：云台自检异常，云台无力，APP报云台被卡住",
+    "parts": [],
+    "labor_cost": 450,
+    "parts_cost": 0,
+    "total_cost": 450,
+    "has_recycle_option": false,
+    "notes": "脱敏处理：已移除客户及工程师隐私信息"
+  },
+  {
+    "source_file": "CAS-20241031_MAVIC 2-维修报价_20240807_20250702174316.pdf",
+    "drone_model": "",
+    "case_id": "CAS-示例-007",
+    "symptoms": [
+      "外观检测：桨叶破损",
+      "左后机臂断裂",
+      "云台上支架断裂",
+      "云台上支架后盖缺失",
+      "信号线断裂 检测结果 功能检测：云台自检异常",
+      "APP报云台被卡住"
+    ],
+    "diagnosis": "外观检测：桨叶破损，左后机臂断裂，云台上支架断裂，云台上支架后盖缺失， 信号线断裂 检测结果 功能检测：云台自检异常，APP报云台被卡住",
+    "parts": [],
+    "labor_cost": 720,
+    "parts_cost": 0,
+    "total_cost": 720,
+    "has_recycle_option": false,
+    "notes": "脱敏处理：已移除客户及工程师隐私信息"
+  },
+  {
+    "source_file": "CAS-652037-CiBx-维修报价_20251027134942.pdf",
+    "drone_model": "Air3",
+    "case_id": "CAS-示例-008",
+    "symptoms": [
+      "外观检测：无云台减震板",
+      "4个机臂损坏",
+      "右后机臂损坏",
+      "桨叶损坏",
+      "鱼眼 检测结果 损坏",
+      "上壳损坏",
+      "中框损坏",
+      "GPS部件损坏"
+    ],
+    "diagnosis": "外观检测：无云台减震板，4个机臂损坏，右后机臂损坏，桨叶损坏，鱼眼 检测结果 损坏，上壳损坏，中框损坏，GPS部件损坏；",
+    "parts": [],
+    "labor_cost": 0,
+    "parts_cost": 0,
+    "total_cost": 0,
+    "has_recycle_option": false,
+    "notes": "脱敏处理：已移除客户及工程师隐私信息"
+  },
+  {
+    "source_file": "CAS-404506-AkSj大疆Air3-维修报价_20260324173536.pdf",
+    "drone_model": "",
+    "case_id": "CAS-示例-009",
+    "symptoms": [
+      "外观检测：核心板变形损坏",
+      "y电机异常",
+      "4个机臂脚架损坏",
+      "长焦无法变焦 检测结果 对焦",
+      "主摄无法变焦"
+    ],
+    "diagnosis": "外观检测：核心板变形损坏，y电机异常，4个机臂脚架损坏，长焦无法变焦 检测结果 对焦，主摄无法变焦；",
+    "parts": [],
+    "labor_cost": 2325,
+    "parts_cost": 0,
+    "total_cost": 2325,
+    "has_recycle_option": true,
+    "notes": "脱敏处理：已移除客户及工程师隐私信息"
+  },
+  {
+    "source_file": "CAS-094753-retE 大疆Air2s-维修报价_20251021170639.pdf",
+    "drone_model": "迷你",
+    "case_id": "CAS-示例-010",
+    "symptoms": [
+      "外观检测：左前机臂电机变形",
+      "右前机臂下支架损坏",
+      "前视觉避障损坏",
+      "风 检测结果 扇异响",
+      "闪光灯接触点变形导致闪光灯无法开启"
+    ],
+    "diagnosis": "外观检测：左前机臂电机变形，右前机臂下支架损坏，前视觉避障损坏，风 检测结果 扇异响，闪光灯接触点变形导致闪光灯无法开启；",
+    "parts": [],
+    "labor_cost": 875,
+    "parts_cost": 0,
+    "total_cost": 875,
+    "has_recycle_option": false,
+    "notes": "脱敏处理：已移除客户及工程师隐私信息"
+  },
+  {
+    "source_file": "CAS-094753-retE 大疆Air2s-维修报价_20251021112630.pdf",
+    "drone_model": "迷你",
+    "case_id": "CAS-示例-011",
+    "symptoms": [
+      "外观检测：左前机臂电机变形",
+      "右前机臂下支架损坏",
+      "前视觉避障损坏",
+      "风 检测结果 扇异响",
+      "闪光灯接触点变形导致闪光灯无法开启"
+    ],
+    "diagnosis": "外观检测：左前机臂电机变形，右前机臂下支架损坏，前视觉避障损坏，风 检测结果 扇异响，闪光灯接触点变形导致闪光灯无法开启；",
+    "parts": [],
+    "labor_cost": 545,
+    "parts_cost": 0,
+    "total_cost": 545,
+    "has_recycle_option": false,
+    "notes": "脱敏处理：已移除客户及工程师隐私信息"
+  },
+  {
+    "source_file": "CAS-20241031_MAVIC 2-维修报价_20240807_20250610151256.pdf",
+    "drone_model": "",
+    "case_id": "CAS-示例-012",
+    "symptoms": [
+      "外观检测：无磕碰磨损 功能检测：云台自检异常",
+      "航向轴电机无力",
+      "APP报云台相机镜头故障",
+      "三倍 检测结果 以上无法变焦"
+    ],
+    "diagnosis": "外观检测：无磕碰磨损 功能检测：云台自检异常，航向轴电机无力，APP报云台相机镜头故障，三倍 检测结果 以上无法变焦",
+    "parts": [],
+    "labor_cost": 640,
+    "parts_cost": 0,
+    "total_cost": 640,
+    "has_recycle_option": false,
+    "notes": "脱敏处理：已移除客户及工程师隐私信息"
+  },
+  {
+    "source_file": "CAS-718943-EnOP大疆迷你3p-维修报价_20251019153809.pdf",
+    "drone_model": "迷你",
+    "case_id": "CAS-示例-013",
+    "symptoms": [
+      "外观检测：云台侧盖损坏",
+      "相机镜头前盖损坏",
+      "信号线损坏",
+      "检测结果"
+    ],
+    "diagnosis": "外观检测：云台侧盖损坏，相机镜头前盖损坏，信号线损坏； 检测结果",
+    "parts": [],
+    "labor_cost": 435,
+    "parts_cost": 0,
+    "total_cost": 435,
+    "has_recycle_option": false,
+    "notes": "脱敏处理：已移除客户及工程师隐私信息"
+  },
+  {
+    "source_file": "CAS-684323-yo0u大疆御3t-维修报价_20251021173329.pdf",
+    "drone_model": "御",
+    "case_id": "CAS-示例-014",
+    "symptoms": [
+      "外观检测：云台下支架断裂",
+      "左前机臂异常损坏",
+      "检测结果"
+    ],
+    "diagnosis": "外观检测：云台下支架断裂，左前机臂异常损坏； 检测结果",
+    "parts": [],
+    "labor_cost": 670,
+    "parts_cost": 0,
+    "total_cost": 670,
+    "has_recycle_option": false,
+    "notes": "脱敏处理：已移除客户及工程师隐私信息"
+  },
+  {
+    "source_file": "CAS-20241031_MAVIC 2-维修报价_20240807_20250702174259.pdf",
+    "drone_model": "",
+    "case_id": "CAS-示例-015",
+    "symptoms": [
+      "外观检测：桨叶破损",
+      "左后机臂断裂",
+      "云台上支架断裂",
+      "云台上支架后盖缺失",
+      "信号线断裂 检测结果 功能检测：云台自检异常",
+      "APP报云台被卡住"
+    ],
+    "diagnosis": "外观检测：桨叶破损，左后机臂断裂，云台上支架断裂，云台上支架后盖缺失， 信号线断裂 检测结果 功能检测：云台自检异常，APP报云台被卡住",
+    "parts": [],
+    "labor_cost": 720,
+    "parts_cost": 0,
+    "total_cost": 720,
+    "has_recycle_option": false,
+    "notes": "脱敏处理：已移除客户及工程师隐私信息"
+  },
+  {
+    "source_file": "CAS-20250910Cxn1大疆Airs2-维修报价_20250913140250.pdf",
+    "drone_model": "",
+    "case_id": "CAS-示例-016",
+    "symptoms": [
+      "外观检测：云台不自检",
+      "上视觉异常",
+      "检测结果"
+    ],
+    "diagnosis": "外观检测：云台不自检，上视觉异常； 检测结果",
+    "parts": [],
+    "labor_cost": 645,
+    "parts_cost": 0,
+    "total_cost": 645,
+    "has_recycle_option": false,
+    "notes": "脱敏处理：已移除客户及工程师隐私信息"
+  },
+  {
+    "source_file": "大疆御3c维修报价_20260307202226.pdf",
+    "drone_model": "御",
+    "case_id": "CAS-示例-017",
+    "symptoms": [
+      "外观检测：撞击导致外观破损",
+      "鱼眼损坏",
+      "gps板变形",
+      "开机机臂灯不亮",
+      "检测结果 无法对频",
+      "云台减震板及信号线损坏",
+      "核心板损坏"
+    ],
+    "diagnosis": "外观检测：撞击导致外观破损，鱼眼损坏，gps板变形，开机机臂灯不亮， 检测结果 无法对频，云台减震板及信号线损坏，核心板损坏；",
+    "parts": [],
+    "labor_cost": 0,
+    "parts_cost": 0,
+    "total_cost": 0,
+    "has_recycle_option": false,
+    "notes": "脱敏处理：已移除客户及工程师隐私信息"
+  },
+  {
+    "source_file": "CAS-20250905Cxe1 大疆Airs2-维修报价_20250909115420.pdf",
+    "drone_model": "",
+    "case_id": "CAS-示例-018",
+    "symptoms": [
+      "外观检测：左后机臂转轴断裂",
+      "核心板多出损坏无法开机",
+      "信号线变形",
+      "云 检测结果 台驱动排线损坏",
+      "底壳磨损严重"
+    ],
+    "diagnosis": "外观检测：左后机臂转轴断裂，核心板多出损坏无法开机，信号线变形，云 检测结果 台驱动排线损坏，底壳磨损严重；",
+    "parts": [],
+    "labor_cost": 1580,
+    "parts_cost": 0,
+    "total_cost": 1580,
+    "has_recycle_option": false,
+    "notes": "脱敏处理：已移除客户及工程师隐私信息"
+  },
+  {
+    "source_file": "CAS-20250910Cxn1大疆Airs2-维修报价_20250913140452.pdf",
+    "drone_model": "",
+    "case_id": "CAS-示例-019",
+    "symptoms": [
+      "外观检测：云台不自检",
+      "上视觉异常",
+      "检测结果"
+    ],
+    "diagnosis": "外观检测：云台不自检，上视觉异常； 检测结果",
+    "parts": [],
+    "labor_cost": 705,
+    "parts_cost": 0,
+    "total_cost": 705,
+    "has_recycle_option": false,
+    "notes": "脱敏处理：已移除客户及工程师隐私信息"
+  },
+  {
+    "source_file": "CAS-652037-CiBx-维修报价_20251017180417.pdf",
+    "drone_model": "Air3",
+    "case_id": "CAS-示例-020",
+    "symptoms": [
+      "外观检测：无云台减震板",
+      "4个机臂损坏",
+      "右后机臂损坏",
+      "桨叶损坏",
+      "鱼眼 检测结果 损坏",
+      "上壳损坏",
+      "中框损坏",
+      "GPS部件损坏"
+    ],
+    "diagnosis": "外观检测：无云台减震板，4个机臂损坏，右后机臂损坏，桨叶损坏，鱼眼 检测结果 损坏，上壳损坏，中框损坏，GPS部件损坏；",
+    "parts": [],
+    "labor_cost": 0,
+    "parts_cost": 0,
+    "total_cost": 0,
+    "has_recycle_option": false,
+    "notes": "脱敏处理：已移除客户及工程师隐私信息"
+  },
+  {
+    "source_file": "CAS-20251008大疆御3p-维修报价 - 副本_20251101160225.pdf",
+    "drone_model": "御",
+    "case_id": "CAS-示例-021",
+    "symptoms": [
+      "外观检测：核心板进水导致视觉系统异常无法起飞",
+      "检测结果"
+    ],
+    "diagnosis": "外观检测：核心板进水导致视觉系统异常无法起飞； 检测结果",
+    "parts": [],
+    "labor_cost": 0,
+    "parts_cost": 0,
+    "total_cost": 0,
+    "has_recycle_option": false,
+    "notes": "脱敏处理：已移除客户及工程师隐私信息"
+  },
+  {
+    "source_file": "CAS-20250922Cyy1大疆Airs2-维修报价_20250922140850.pdf",
+    "drone_model": "",
+    "case_id": "CAS-示例-022",
+    "symptoms": [
+      "外观检测：云台断裂",
+      "相机coms脱落",
+      "信号线断裂",
+      "右前机臂断裂",
+      "检测结果"
+    ],
+    "diagnosis": "外观检测：云台断裂，相机coms脱落，信号线断裂，右前机臂断裂； 检测结果",
+    "parts": [],
+    "labor_cost": 1104,
+    "parts_cost": 0,
+    "total_cost": 1104,
+    "has_recycle_option": false,
+    "notes": "脱敏处理：已移除客户及工程师隐私信息"
+  }
+]

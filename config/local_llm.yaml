@@ -1,27 +1,25 @@
 # Local LLM Configuration
-# 本地大模型配置 - 支持多种推理后端
+# 本地大模型配置 - llama.cpp server
 
 # 默认模型
 default_model: "local/qwen3-8b"
 
 # 模型列表
 models:
-  # Qwen3-8B - 主力模型（支持工具调用 + 思考链）
   qwen3-8b:
     model_id: "Qwen3-8B"
-    display_name: "Qwen3 8B (Local)"
-    model_path: "/home/shan/models/Qwen3-8B"
+    display_name: "Qwen3 8B (Local) 🔧🧠"
     context_window: 32768
-    max_output: 4096
+    max_output: 8192
     supports_vision: false
     supports_tools: true
     supports_thinking: true
     supports_streaming: true
-    backend: "transformers"  # transformers, vllm, llama.cpp
+    base_url: "http://localhost:8080"
+    model_path: "/home/shan/models/Qwen3-8B"
     gpu_layers: 99
-    gpu_memory: "16GB"
+    gpu_memory: "12GB"
     
-  # Gemma 4 4B - 备用模型
   gemma-4-4b:
     model_id: "gemma-4-E4B-it-OBLITERATED-Q8_0.gguf"
     display_name: "Gemma 4 4B (Local)"
@@ -31,7 +29,6 @@ models:
     supports_tools: false
     supports_streaming: true
     base_url: "http://localhost:8080"
-    backend: "llama.cpp"
     gpu_layers: 99
     gpu_memory: "5.5GB"
     
@@ -46,4 +43,4 @@ performance:
   gpu_acceleration: true
   gpu_type: "AMD Radeon RX 6800/6900 XT"
   gpu_memory_total: "16GB"
-  gpu_memory_used: "16GB"
+  gpu_memory_used: "12GB"

@@ -304,8 +304,14 @@ def _build_model_config(provider: str) -> tuple[str, str]:
 
 
 
-def call_local_llm(messages: list, tools: list | None = None) -> dict:
-    """Call local LLM server (llama.cpp with GPU acceleration)."""
+def call_local_llm(messages: list, tools: list | None = None, model_name: str | None = None) -> dict:
+    """Call local LLM server (llama.cpp with GPU acceleration).
+    
+    Args:
+        messages: 对话消息列表
+        tools: 工具列表（可选）
+        model_name: 模型名称（如 qwen3-8b），如果提供则覆盖环境变量
+    """
     import requests
     
     # Check if local mode is enabled
@@ -315,7 +321,13 @@ def call_local_llm(messages: list, tools: list | None = None) -> dict:
         raise RuntimeError(f"本地模型未启用 (OMNIA_MODEL_MODE={env_mode})，请先启动本地模型服务或切换到云端模式")
     
     url = os.environ.get("LOCAL_LLM_URL", "http://localhost:8080/v1/chat/completions")
-    model = os.environ.get("LOCAL_LLM_MODEL", "Qwen2.5-Coder-7B")
+    
+    # 如果指定了模型名称，使用它；否则使用环境变量
+    if model_name:
+        model = model_name
+        print(f"[call_local_llm] Using specified model: {model}")
+    else:
+        model = os.environ.get("LOCAL_LLM_MODEL", "Qwen2.5-Coder-7B")
     
     headers = {
         "Content-Type": "application/json",
@@ -375,9 +387,11 @@ def _call_model_messages(api_key: str, provider: str, messages: list, tools: lis
     """
     import requests
 
-    # Local LLM - use local server
-    if provider == "local":
-        return call_local_llm(messages, tools)
+    # Local LLM - use local server (支持 local 和 local-xxx 格式)
+    if provider == "local" or provider.startswith("local-"):
+        # 提取模型名称（如 local-qwen3-8b → qwen3-8b）
+        model_name = provider.replace("local-", "") if provider.startswith("local-") else None
+        return call_local_llm(messages, tools, model_name)
     
     # Kimi 使用 Anthropic Messages API 格式
     if provider == "kimi":

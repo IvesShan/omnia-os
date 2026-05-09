@@ -1,0 +1,16 @@
+[Unit]
+Description=Omnia Feishu Bot
+After=network.target
+
+[Service]
+Type=simple
+User=shan
+WorkingDirectory=/home/shan/omnia-os
+ExecStart=/home/shan/omnia-os/venv/bin/python3 /home/shan/omnia-os/scripts/feishu_bot_v3.py
+Restart=always
+RestartSec=10
+StandardOutput=append:/home/shan/omnia-os/logs/feishu_bot.log
+StandardError=append:/home/shan/omnia-os/logs/feishu_bot.log
+
+[Install]
+WantedBy=multi-user.target

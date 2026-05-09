@@ -59,6 +59,8 @@ atexit.register(_cleanup_mcp)
 _current_provider = None
 
 
+
+
 def _load_pending() -> dict[str, dict]:
     if PENDING_CONF_PATH.exists():
         try:
@@ -1035,8 +1037,9 @@ def create_app() -> Flask:
         data = request.get_json(force=True, silent=True) or {}
         provider = data.get("provider")
         
-        valid_providers = ["deepseek", "qianfan", "kimi", "openai", "anthropic", "xiaomi", "local"]
-        if provider not in valid_providers:
+        # 允许任何 local-* 的本地模型
+        valid_providers_set = {"deepseek", "qianfan", "kimi", "openai", "anthropic", "xiaomi", "local"}
+        if not provider.startswith("local-") and provider not in valid_providers_set:
             return jsonify({"error": f"Invalid provider: {provider}"}), 400
         
         # 本地模型特殊处理
@@ -1600,6 +1603,7 @@ def create_app() -> Flask:
 
     # === 启动飞书长连接 ===
     _start_feishu_adapter(app)
+    _add_feishu_routes(app)
 
 
     # === Token 状态 API ===
@@ -1668,76 +1672,92 @@ def create_app() -> Flask:
     return app
 
 
+
 def _start_feishu_adapter(app):
-    """启动飞书长连接适配器"""
-    import threading
-    import asyncio
-    from pathlib import Path
+    """启动飞书 WebSocket 机器人 - 集成到 Omnia 主服务"""
+    from omnia.feishu_bot import init_feishu_bot, start_feishu_bot
     
-    # 加载配置
-    feishu_config_path = PROJECT_ROOT / "config" / "feishu.json"
-    if not feishu_config_path.exists():
-        print("[Feishu] 配置文件不存在，跳过启动")
+    # 从环境变量读取配置
+    app_id = os.environ.get("FEISHU_APP_ID", "")
+    app_secret = os.environ.get("FEISHU_APP_SECRET", "")
+    
+    if not app_id or not app_secret:
+        # 尝试从 .env 文件读取
+        env_file = PROJECT_ROOT / ".env"
+        if env_file.exists():
+            for line in env_file.read_text(encoding="utf-8").splitlines():
+                line = line.strip()
+                if line.startswith("FEISHU_APP_ID="):
+                    app_id = line.split("=", 1)[1].strip()
+                elif line.startswith("FEISHU_APP_SECRET="):
+                    app_secret = line.split("=", 1)[1].strip()
+    
+    if not app_id or not app_secret:
+        print("[Feishu] 配置缺失，跳过启动")
         return
     
-    try:
-        feishu_config = json.loads(feishu_config_path.read_text(encoding="utf-8"))
-    except Exception as e:
-        print(f"[Feishu] 配置加载失败: {e}")
+    # 获取当前 Provider 的回调函数
+    def get_current_provider():
+        global _current_provider
+        return _current_provider
+    
+    # 初始化飞书机器人
+    bot = init_feishu_bot(
+        app_id=app_id,
+        app_secret=app_secret,
+        omnia_api_url="http://127.0.0.1:5001/api/chat",
+        get_provider=get_current_provider,
+    )
+    
+    if not bot:
+        print("[Feishu] 初始化失败")
         return
     
-    if not feishu_config.get("enabled"):
-        print("[Feishu] 未启用，跳过启动")
-        return
+    # 启动机器人
+    if start_feishu_bot():
+        print("[Feishu] ✅ WebSocket 机器人已启动")
+        app.config['FEISHU_BOT_RUNNING'] = True
+    else:
+        print("[Feishu] ❌ 启动失败")
+        app.config['FEISHU_BOT_RUNNING'] = False
+
+
+def _add_feishu_routes(app):
+    """添加飞书机器人管理 API"""
     
-    connection_mode = feishu_config.get("connection_mode", "webhook")
-    
-    if connection_mode != "websocket":
-        print(f"[Feishu] 当前模式: {connection_mode}，不启动长连接")
-        return
-    
-    print(f"[Feishu] 启动 WebSocket 长连接...")
-    
-    # 创建异步任务
-    async def run_feishu_adapter():
-        from core.gateway.feishu_adapter import FeishuAdapter
-        from core.gateway.runner import MessageEvent
+    @app.route("/api/feishu/status", methods=["GET"])
+    def feishu_status():
+        """获取飞书机器人状态"""
+        from omnia.feishu_bot import get_feishu_bot, FEISHU_SDK_AVAILABLE
         
-        adapter = FeishuAdapter(
-            app_id=feishu_config["app_id"],
-            app_secret=feishu_config["app_secret"],
-            connection_mode="websocket",
-            on_message=lambda event: handle_feishu_message(app, event)
-        )
+        bot = get_feishu_bot()
         
-        await adapter.start()
+        return jsonify({
+            "sdk_available": FEISHU_SDK_AVAILABLE,
+            "running": bot.running if bot else False,
+            "configured": bool(os.environ.get("FEISHU_APP_ID") or 
+                              (PROJECT_ROOT / ".env").exists()),
+        })
     
-    # 在后台线程中运行
-    def run_in_thread():
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            loop.run_until_complete(run_feishu_adapter())
-        except Exception as e:
-            print(f"[Feishu] 长连接错误: {e}")
-        finally:
-            loop.close()
+    @app.route("/api/feishu/start", methods=["POST"])
+    def feishu_start():
+        """启动飞书机器人"""
+        from omnia.feishu_bot import start_feishu_bot
+        
+        if start_feishu_bot():
+            app.config['FEISHU_BOT_RUNNING'] = True
+            return jsonify({"ok": True, "message": "飞书机器人已启动"})
+        else:
+            return jsonify({"ok": False, "error": "启动失败"}), 500
     
-    thread = threading.Thread(target=run_in_thread, daemon=True)
-    thread.start()
-    print("[Feishu] ✅ 长连接线程已启动")
-
-
-def handle_feishu_message(app, event):
-    """处理飞书消息（占位实现）"""
-    try:
-        content = getattr(event, 'content', str(event))[:100]
-        print(f"[Feishu] 收到消息: {content}...")
-        print(f"[Feishu] ⚠ 消息处理尚未实现，消息已记录到日志")
-    except Exception as e:
-        print(f"[Feishu] 处理消息时出错: {e}")
-
-
+    @app.route("/api/feishu/stop", methods=["POST"])
+    def feishu_stop():
+        """停止飞书机器人"""
+        from omnia.feishu_bot import stop_feishu_bot
+        
+        stop_feishu_bot()
+        app.config['FEISHU_BOT_RUNNING'] = False
+        return jsonify({"ok": True, "message": "飞书机器人已停止"})
 
 
 def _check_port_in_use(port: int, host: str = "127.0.0.1") -> bool:
@@ -1777,6 +1797,10 @@ def main():
     
     try:
         app = create_app()
+        
+        # 启动飞书机器人（后台线程，共享 API Provider）
+        _start_feishu_adapter(app)
+        
         print("Omnia Web UI started at http://127.0.0.1:5001/")
         # Werkzeug's BaseWSGIServer sets allow_reuse_address=True (SO_REUSEADDR)
         # by default, so we can bind to TIME_WAIT sockets without waiting.

@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+ <meta charset="UTF-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1.0">
+ <title>喵修匠 - 平台定价规则管理</title>
+ <style>
+ :root {
+ --bg-primary: #000000;
+ --bg-secondary: #1C1C1E;
+ --bg-tertiary: #2C2C2E;
+ --text-primary: #FFFFFF;
+ --text-secondary: rgba(255,255,255,0.6);
+ --text-tertiary: rgba(255,255,255,0.38);
+ --accent-orange: #FF9500;
+ --accent-blue: #0A84FF;
+ --accent-green: #30D158;
+ --accent-red: #FF453A;
+ --border-subtle: rgba(255,255,255,0.1);
+ }
+ * { margin: 0; padding: 0; box-sizing: border-box; }
+ body {
+ font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', sans-serif;
+ background: var(--bg-primary);
+ color: var(--text-primary);
+ line-height: 1.5;
+ padding: 20px;
+ }
+ .container { max-width: 900px; margin: 0 auto; }
+ h1 { font-size: 24px; margin-bottom: 8px; }
+ .subtitle { color: var(--text-secondary); font-size: 14px; margin-bottom: 24px; }
+ .card {
+ background: var(--bg-secondary);
+ border: 1px solid var(--border-subtle);
+ border-radius: 12px;
+ padding: 20px;
+ margin-bottom: 20px;
+ }
+ .card h2 { font-size: 16px; margin-bottom: 16px; }
+ .form-row {
+ display: grid;
+ grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+ gap: 12px;
+ margin-bottom: 12px;
+ }
+ .form-group { display: flex; flex-direction: column; }
+ .form-group label {
+ font-size: 12px;
+ color: var(--text-secondary);
+ margin-bottom: 6px;
+ }
+ .form-group input, .form-group textarea {
+ padding: 10px 12px;
+ background: var(--bg-tertiary);
+ border: 1px solid var(--border-subtle);
+ border-radius: 8px;
+ color: var(--text-primary);
+ font-size: 14px;
+ }
+ .form-group input:focus, .form-group textarea:focus {
+ outline: none;
+ border-color: var(--accent-orange);
+ }
+ .form-actions {
+ display: flex;
+ gap: 10px;
+ margin-top: 16px;
+ }
+ .btn {
+ padding: 10px 18px;
+ border: none;
+ border-radius: 8px;
+ font-weight: 600;
+ cursor: pointer;
+ font-size: 14px;
+ }
+ .btn-primary { background: var(--accent-orange); color: #000; }
+ .btn-secondary { background: var(--bg-tertiary); color: var(--text-primary); border: 1px solid var(--border-subtle); }
+ .btn-danger { background: var(--accent-red); color: #fff; }
+ .btn-sm { padding: 6px 12px; font-size: 13px; }
+
+ .toolbar {
+ display: flex;
+ gap: 10px;
+ margin-bottom: 16px;
+ flex-wrap: wrap;
+ }
+ .toolbar input {
+ flex: 1;
+ min-width: 200px;
+ padding: 10px 12px;
+ background: var(--bg-tertiary);
+ border: 1px solid var(--border-subtle);
+ border-radius: 8px;
+ color: var(--text-primary);
+ font-size: 14px;
+ }
+
+ table { width: 100%; border-collapse: collapse; font-size: 14px; }
+ th, td { text-align: left; padding: 12px 10px; border-bottom: 1px solid var(--border-subtle); }
+ th { color: var(--text-secondary); font-weight: 500; font-size: 12px; text-transform: uppercase; }
+ tr:hover td { background: rgba(255,255,255,0.02); }
+ .price { font-weight: 600; color: var(--accent-orange); }
+ .actions { display: flex; gap: 8px; }
+ .empty { text-align: center; padding: 40px; color: var(--text-secondary); }
+ .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 12px; background: rgba(255,149,0,0.15); color: var(--accent-orange); }
+ .toast {
+ position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+ background: var(--bg-secondary); color: var(--text-primary); padding: 12px 24px;
+ border-radius: 8px; border: 1px solid var(--border-subtle); display: none;
+ }
+ .toast.show { display: block; }
+ </style>
+</head>
+<body>
+ <div class="container">
+ <h1>平台定价规则管理</h1>
+ <div class="subtitle">统一管控所有维修项目的配件费和工时费，商户端报价将严格据此执行</div>
+
+ <!-- 添加/编辑规则 -->
+ <div class="card">
+ <h2 id="formTitle">➕ 新增定价规则</h2>
+ <div class="form-row">
+ <div class="form-group">
+ <label>机型 *</label>
+ <input type="text" id="fModel" placeholder="如：Mini 3 Pro">
+ </div>
+ <div class="form-group">
+ <label>故障类型 *</label>
+ <input type="text" id="fFault" placeholder="如：云台电机损坏">
+ </div>
+ <div class="form-group">
+ <label>配件名称</label>
+ <input type="text" id="fPart" placeholder="如：云台轴臂组件">
+ </div>
+ </div>
+ <div class="form-row">
+ <div class="form-group">
+ <label>配件费 (¥)</label>
+ <input type="number" id="fPartPrice" placeholder="0" step="0.01" onchange="calcTotal()">
+ </div>
+ <div class="form-group">
+ <label>工时费 (¥)</label>
+ <input type="number" id="fLaborPrice" placeholder="0" step="0.01" onchange="calcTotal()">
+ </div>
+ <div class="form-group">
+ <label>总报价 (¥) *</label>
+ <input type="number" id="fTotal" placeholder="0" step="0.01">
+ </div>
+ </div>
+ <div class="form-group">
+ <label>备注 / 说明</label>
+ <textarea id="fNotes" rows="2" placeholder="可选：补充报价条件或特殊说明"></textarea>
+ </div>
+ <div class="form-actions">
+ <button class="btn btn-primary" onclick="saveRule()">保存规则</button>
+ <button class="btn btn-secondary" onclick="resetForm()" id="btnReset" style="display:none;">取消编辑</button>
+ </div>
+ </div>
+
+ <!-- 规则列表 -->
+ <div class="card">
+ <h2>📋 规则列表</h2>
+ <div class="toolbar">
+ <input type="text" id="searchModel" placeholder="搜索机型..." oninput="loadRules()">
+ <input type="text" id="searchFault" placeholder="搜索故障类型..." oninput="loadRules()">
+ </div>
+ <div id="rulesContainer">
+ <div class="empty">加载中...</div>
+ </div>
+ </div>
+ </div>
+
+ <div class="toast" id="toast"></div>
+
+ <script>
+ const API_BASE = 'https://njuosun-miaoxiujiang-d3a96a8c70e.service.tcloudbase.com/api';
+ let editingId = null;
+ let allRules = [];
+
+ function showToast(msg) {
+ const t = document.getElementById('toast');
+ t.textContent = msg;
+ t.classList.add('show');
+ setTimeout(() => t.classList.remove('show'), 2500);
+ }
+
+ function calcTotal() {
+ const part = parseFloat(document.getElementById('fPartPrice').value) || 0;
+ const labor = parseFloat(document.getElementById('fLaborPrice').value) || 0;
+ const totalInput = document.getElementById('fTotal');
+ if (!totalInput.value && (part > 0 || labor > 0)) {
+ totalInput.value = (part + labor).toFixed(2);
+ }
+ }
+
+ async function loadRules() {
+ const model = document.getElementById('searchModel').value.trim();
+ const fault = document.getElementById('searchFault').value.trim();
+ try {
+ const res = await fetch(`${API_BASE}/pricing/rules?drone_model=${encodeURIComponent(model)}&fault_type=${encodeURIComponent(fault)}`);
+ const data = await res.json();
+ if (data.success) {
+ allRules = data.rules;
+ renderRules(data.rules);
+ }
+ } catch (e) {
+ showToast('加载失败');
+ }
+ }
+
+ function renderRules(rules) {
+ const container = document.getElementById('rulesContainer');
+ if (rules.length === 0) {
+ container.innerHTML = '<div class="empty">暂无定价规则</div>';
+ return;
+ }
+
+ container.innerHTML = `
+ <table>
+ <thead>
+ <tr>
+ <th>机型</th>
+ <th>故障类型</th>
+ <th>配件</th>
+ <th>配件费</th>
+ <th>工时费</th>
+ <th>总报价</th>
+ <th style="width: 110px;">操作</th>
+ </tr>
+ </thead>
+ <tbody>
+ ${rules.map(r => `
+ <tr>
+ <td>${r.drone_model}</td>
+ <td>${r.fault_type}</td>
+ <td>${r.part_name || '-'}</td>
+ <td>¥${r.part_price}</td>
+ <td>¥${r.labor_price}</td>
+ <td class="price">¥${r.total_price}</td>
+ <td>
+ <div class="actions">
+ <button class="btn btn-sm btn-secondary" onclick="editRule('${r.id}')">编辑</button>
+ <button class="btn btn-sm btn-danger" onclick="deleteRule('${r.id}')">停用</button>
+ </div>
+ </td>
+ </tr>
+ `).join('')}
+ </tbody>
+ </table>
+ `;
+ }
+
+ async function saveRule() {
+ const payload = {
+ drone_model: document.getElementById('fModel').value.trim(),
+ fault_type: document.getElementById('fFault').value.trim(),
+ part_name: document.getElementById('fPart').value.trim(),
+ part_price: parseFloat(document.getElementById('fPartPrice').value) || 0,
+ labor_price: parseFloat(document.getElementById('fLaborPrice').value) || 0,
+ total_price: parseFloat(document.getElementById('fTotal').value) || 0,
+ notes: document.getElementById('fNotes').value.trim()
+ };
+
+ if (!payload.drone_model || !payload.fault_type || !payload.total_price) {
+ showToast('请填写机型、故障类型和总报价');
+ return;
+ }
+
+ try {
+ let res;
+ if (editingId) {
+ res = await fetch(`${API_BASE}/pricing/rules/${editingId}`, {
+ method: 'PUT',
+ headers: { 'Content-Type': 'application/json' },
+ body: JSON.stringify(payload)
+ });
+ } else {
+ res = await fetch(`${API_BASE}/pricing/rules`, {
+ method: 'POST',
+ headers: { 'Content-Type': 'application/json' },
+ body: JSON.stringify(payload)
+ });
+ }
+ const data = await res.json();
+ if (data.success) {
+ showToast(editingId ? '规则已更新' : '规则已添加');
+ resetForm();
+ loadRules();
+ } else {
+ showToast(data.message || '保存失败');
+ }
+ } catch (e) {
+ showToast('网络错误');
+ }
+ }
+
+ function editRule(id) {
+ const r = allRules.find(x => x.id === id);
+ if (!r) return;
+ editingId = id;
+ document.getElementById('fModel').value = r.drone_model;
+ document.getElementById('fFault').value = r.fault_type;
+ document.getElementById('fPart').value = r.part_name || '';
+ document.getElementById('fPartPrice').value = r.part_price;
+ document.getElementById('fLaborPrice').value = r.labor_price;
+ document.getElementById('fTotal').value = r.total_price;
+ document.getElementById('fNotes').value = r.notes || '';
+ document.getElementById('formTitle').textContent = '✏️ 编辑定价规则 #' + id;
+ document.getElementById('btnReset').style.display = 'inline-block';
+ window.scrollTo({ top: 0, behavior: 'smooth' });
+ }
+
+ function resetForm() {
+ editingId = null;
+ document.getElementById('fModel').value = '';
+ document.getElementById('fFault').value = '';
+ document.getElementById('fPart').value = '';
+ document.getElementById('fPartPrice').value = '';
+ document.getElementById('fLaborPrice').value = '';
+ document.getElementById('fTotal').value = '';
+ document.getElementById('fNotes').value = '';
+ document.getElementById('formTitle').textContent = '➕ 新增定价规则';
+ document.getElementById('btnReset').style.display = 'none';
+ }
+
+ async function deleteRule(id) {
+ if (!confirm('确定停用该定价规则？商户端将无法再引用此规则报价。')) return;
+ try {
+ const res = await fetch(`${API_BASE}/pricing/rules/${id}`, { method: 'DELETE' });
+ const data = await res.json();
+ if (data.success) {
+ showToast('已停用');
+ loadRules();
+ } else {
+ showToast(data.message || '操作失败');
+ }
+ } catch (e) {
+ showToast('网络错误');
+ }
+ }
+
+ loadRules();
+ </script>
+</body>
+</html>

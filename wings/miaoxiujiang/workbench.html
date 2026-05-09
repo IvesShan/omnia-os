@@ -1,0 +1,2507 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+ <meta charset="UTF-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+ <title>喵修匠 - AI维修工作台 v1.0</title>
+<script>
+// 商户配置（内联版本）
+const MERCHANTS_V1 = {
+  'merch_001': {
+    id: 'merch_001',
+    name: '物熵科技',
+    access_code: '3613',
+    contact_name: '吴主任',
+    phone: '15796313613',
+    address: '江苏省苏州市虎丘区滨河路588号赛格三期',
+    business_hours: '周一至周五 09:00-18:00'
+  },
+  'merch_002': {
+    id: 'merch_002',
+    name: '南京物熵',
+    access_code: '8280',
+    contact_name: '张经理',
+    phone: '18912958280',
+    address: '江苏省南京市鼓楼区',
+    business_hours: '周一至周六 09:00-18:00'
+  }
+};
+console.log('[喵修匠 v1.0] 商户配置已加载:', Object.keys(MERCHANTS_V1).length, '个商户');
+</script>
+ <style>
+ /* === 基础重置 === */
+ * { margin: 0; padding: 0; box-sizing: border-box; }
+
+ :root {
+ --bg-primary: #000000;
+ --bg-secondary: #1C1C1E;
+ --bg-tertiary: #2C2C2E;
+ --text-primary: #FFFFFF;
+ --text-secondary: rgba(255,255,255,0.6);
+ --text-tertiary: rgba(255,255,255,0.38);
+ --accent-orange: #FF9500;
+ --accent-blue: #0A84FF;
+ --accent-green: #30D158;
+ --accent-red: #FF453A;
+ --border-subtle: rgba(255,255,255,0.1);
+ }
+
+ body {
+ font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', sans-serif;
+ background: var(--bg-primary);
+ color: var(--text-primary);
+ min-height: 100vh;
+ padding-bottom: 80px;
+ }
+
+ /* === 顶部导航 === */
+ .header {
+ padding: 16px;
+ display: flex;
+ justify-content: space-between;
+ align-items: center;
+ border-bottom: 1px solid var(--border-subtle);
+ }
+
+ .header h1 {
+ font-size: 20px;
+ font-weight: 600;
+ }
+
+ .header .user {
+ font-size: 14px;
+ color: var(--text-secondary);
+ }
+
+ /* === 统计卡片 === */
+ .stats {
+ display: grid;
+ grid-template-columns: repeat(4, 1fr);
+ gap: 12px;
+ padding: 16px;
+ }
+
+ .stat-card {
+ background: var(--bg-secondary);
+ border-radius: 16px;
+ padding: 16px 12px;
+ text-align: center;
+ }
+
+ .stat-card .number {
+ font-size: 28px;
+ font-weight: 700;
+ color: var(--accent-orange);
+ }
+
+ .stat-card .label {
+ font-size: 12px;
+ color: var(--text-secondary);
+ margin-top: 4px;
+ }
+
+ /* === 标签栏 === */
+ .tabs {
+ display: flex;
+ gap: 8px;
+ padding: 0 16px 16px;
+ overflow-x: auto;
+ -webkit-overflow-scrolling: touch;
+ }
+
+ .tab {
+ padding: 8px 16px;
+ border-radius: 20px;
+ background: var(--bg-secondary);
+ border: 1px solid var(--border-subtle);
+ color: var(--text-secondary);
+ font-size: 14px;
+ white-space: nowrap;
+ cursor: pointer;
+ transition: all 0.2s;
+ }
+
+ .tab.active {
+ background: var(--accent-orange);
+ color: #000;
+ border-color: var(--accent-orange);
+ }
+
+ /* === 订单列表 === */
+ .order-list {
+ padding: 0 16px;
+ }
+
+ .order-card {
+ background: var(--bg-secondary);
+ border-radius: 16px;
+ padding: 16px;
+ margin-bottom: 12px;
+ border: 1px solid var(--border-subtle);
+ }
+
+ .order-header {
+ display: flex;
+ justify-content: space-between;
+ align-items: center;
+ margin-bottom: 12px;
+ }
+
+ .order-no {
+ font-size: 16px;
+ font-weight: 600;
+ }
+
+ .order-status {
+ padding: 4px 10px;
+ border-radius: 6px;
+ font-size: 12px;
+ font-weight: 500;
+ }
+
+ .status-pending { background: rgba(255,204,0,0.2); color: #FFCC00; }
+ .status-accepted { background: rgba(10,132,255,0.2); color: var(--accent-blue); }
+ .status-received { background: rgba(10,132,255,0.15); color: var(--accent-blue); }
+ .status-inspected { background: rgba(175,82,222,0.2); color: #AF52DE; }
+ .status-quoted { background: rgba(255,159,10,0.2); color: var(--accent-orange); }
+ .status-repairing { background: rgba(10,132,255,0.15); color: var(--accent-blue); }
+ .status-shipping { background: rgba(48,209,88,0.2); color: var(--accent-green); }
+ .status-assigned { background: rgba(191,90,242,0.15); color: #BF5AF2; }
+ .status-cancelled { background: rgba(120,120,128,0.15); color: #8E8E93; }
+ .status-completed { background: rgba(142,142,147,0.2); color: #8E8E93; }
+
+ .order-info {
+ color: var(--text-secondary);
+ font-size: 14px;
+ line-height: 1.6;
+ }
+
+ .order-info p {
+ margin-bottom: 4px;
+ }
+
+ .order-actions {
+ display: flex;
+ gap: 8px;
+ margin-top: 12px;
+ }
+
+ .btn {
+ flex: 1;
+ padding: 12px;
+ border-radius: 12px;
+ border: none;
+ font-size: 14px;
+ font-weight: 600;
+ cursor: pointer;
+ transition: all 0.2s;
+ }
+
+ .btn-primary {
+ background: var(--accent-orange);
+ color: #000;
+ }
+
+ .btn-secondary {
+ background: var(--bg-tertiary);
+ color: var(--text-primary);
+ }
+
+ .btn:active {
+ transform: scale(0.96);
+ opacity: 0.9;
+ }
+
+ /* === 模态框 === */
+ .modal {
+ position: fixed;
+ top: 0;
+ left: 0;
+ right: 0;
+ bottom: 0;
+ background: rgba(0,0,0,0.8);
+ z-index: 200;
+ display: none;
+ align-items: center;
+ justify-content: center;
+ padding: 20px;
+ }
+
+ .modal.active {
+ display: flex;
+ }
+
+ .modal-content {
+ background: var(--bg-secondary);
+ border-radius: 20px;
+ width: 100%;
+ max-width: 400px;
+ max-height: 80vh;
+ overflow-y: auto;
+ border: 1px solid var(--border-subtle);
+ }
+
+ .modal-header {
+ display: flex;
+ justify-content: space-between;
+ align-items: center;
+ padding: 20px;
+ border-bottom: 1px solid var(--border-subtle);
+ }
+
+ .modal-header h3 {
+ font-size: 18px;
+ }
+
+ .modal-close {
+ background: none;
+ border: none;
+ color: var(--text-secondary);
+ font-size: 24px;
+ cursor: pointer;
+ }
+
+ .modal-body {
+ padding: 20px;
+ }
+
+ .form-group {
+ margin-bottom: 16px;
+ }
+
+ .form-group label {
+ display: block;
+ font-size: 14px;
+ color: var(--text-secondary);
+ margin-bottom: 8px;
+ }
+
+ .form-group input,
+ .form-group textarea,
+ .form-group select {
+ width: 100%;
+ background: var(--bg-tertiary);
+ border: 1px solid var(--border-subtle);
+ border-radius: 12px;
+ padding: 12px 16px;
+ color: var(--text-primary);
+ font-size: 16px;
+ outline: none;
+ }
+
+ .form-group input:focus,
+ .form-group textarea:focus,
+ .form-group select:focus {
+ border-color: var(--accent-blue);
+ }
+
+ .form-group textarea {
+ min-height: 100px;
+ resize: vertical;
+ }
+
+ .quote-item {
+ display: flex;
+ gap: 8px;
+ margin-bottom: 8px;
+ }
+
+ .quote-item input {
+ flex: 2;
+ }
+
+ .quote-item input[type="number"] {
+ flex: 1;
+ }
+
+ .quote-total {
+ margin-top: 16px;
+ padding-top: 16px;
+ border-top: 1px solid var(--border-subtle);
+ text-align: right;
+ font-size: 20px;
+ font-weight: 600;
+ color: var(--accent-orange);
+ }
+
+ .modal-footer {
+ padding: 20px;
+ border-top: 1px solid var(--border-subtle);
+ display: flex;
+ gap: 12px;
+ }
+
+ .modal-footer .btn {
+ flex: 1;
+ }
+
+ /* === 加载状态 === */
+ .loading {
+ text-align: center;
+ padding: 40px;
+ color: var(--text-secondary);
+ }
+
+ .empty {
+ text-align: center;
+ padding: 60px 20px;
+ color: var(--text-secondary);
+ }
+
+ .empty-icon {
+ font-size: 48px;
+ margin-bottom: 16px;
+ }
+
+ /* === AI助手悬浮球 === */
+ .ai-float {
+ position: fixed;
+ bottom: 100px;
+ right: 20px;
+ width: 56px;
+ height: 56px;
+ background: var(--accent-orange);
+ border-radius: 50%;
+ display: flex;
+ align-items: center;
+ justify-content: center;
+ box-shadow: 0 4px 20px rgba(255,149,0,0.4);
+ cursor: pointer;
+ z-index: 100;
+ transition: transform 0.2s;
+ }
+
+ .ai-float:active {
+ transform: scale(0.9);
+ }
+
+ .ai-float svg {
+ width: 28px;
+ height: 28px;
+ fill: #000;
+ }
+
+ /* === 底部导航 === */
+ .bottom-nav {
+ position: fixed;
+ bottom: 0;
+ left: 0;
+ right: 0;
+ background: rgba(0,0,0,0.95);
+ backdrop-filter: blur(20px);
+ border-top: 1px solid var(--border-subtle);
+ display: flex;
+ justify-content: space-around;
+ padding: 8px 0 calc(8px + env(safe-area-inset-bottom, 0px));
+ z-index: 99;
+ }
+
+ .nav-item {
+ display: flex;
+ flex-direction: column;
+ align-items: center;
+ gap: 4px;
+ padding: 4px 16px;
+ color: var(--text-secondary);
+ font-size: 11px;
+ cursor: pointer;
+ transition: color 0.2s;
+ }
+
+ .nav-item.active {
+ color: var(--accent-orange);
+ }
+
+ .nav-item svg {
+ width: 24px;
+ height: 24px;
+ fill: currentColor;
+ }
+
+ /* === AI聊天窗口 === */
+ .ai-chat {
+ position: fixed;
+ bottom: 100px;
+ right: 20px;
+ width: calc(100vw - 40px);
+ max-width: 360px;
+ background: var(--bg-secondary);
+ border-radius: 20px;
+ box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+ z-index: 101;
+ display: none;
+ flex-direction: column;
+ max-height: 500px;
+ border: 1px solid var(--border-subtle);
+ }
+
+ .ai-chat.active {
+ display: flex;
+ }
+
+ .ai-header {
+ display: flex;
+ justify-content: space-between;
+ align-items: center;
+ padding: 16px;
+ border-bottom: 1px solid var(--border-subtle);
+ }
+
+ .ai-header h3 {
+ font-size: 16px;
+ display: flex;
+ align-items: center;
+ gap: 8px;
+ }
+
+ .ai-close {
+ background: none;
+ border: none;
+ color: var(--text-secondary);
+ font-size: 24px;
+ cursor: pointer;
+ }
+
+ .ai-messages {
+ flex: 1;
+ overflow-y: auto;
+ padding: 16px;
+ display: flex;
+ flex-direction: column;
+ gap: 12px;
+ }
+
+ .ai-message {
+ display: flex;
+ gap: 8px;
+ }
+
+ .ai-message.user {
+ flex-direction: row-reverse;
+ }
+
+ .ai-avatar {
+ width: 32px;
+ height: 32px;
+ border-radius: 50%;
+ background: var(--accent-orange);
+ display: flex;
+ align-items: center;
+ justify-content: center;
+ font-size: 16px;
+ flex-shrink: 0;
+ }
+
+ .ai-bubble {
+ background: var(--bg-tertiary);
+ padding: 12px 16px;
+ border-radius: 18px;
+ font-size: 14px;
+ line-height: 1.5;
+ max-width: 80%;
+ }
+
+ .ai-message.user .ai-bubble {
+ background: var(--accent-orange);
+ color: #000;
+ }
+
+ .ai-input-area {
+ padding: 12px 16px;
+ border-top: 1px solid var(--border-subtle);
+ display: flex;
+ gap: 8px;
+ }
+
+ .ai-input {
+ flex: 1;
+ background: var(--bg-tertiary);
+ border: none;
+ border-radius: 20px;
+ padding: 10px 16px;
+ color: var(--text-primary);
+ font-size: 14px;
+ outline: none;
+ }
+
+ .ai-input::placeholder {
+ color: var(--text-tertiary);
+ }
+
+ .ai-send {
+ width: 40px;
+ height: 40px;
+ border-radius: 50%;
+ background: var(--accent-orange);
+ border: none;
+ color: #000;
+ cursor: pointer;
+ display: flex;
+ align-items: center;
+ justify-content: center;
+ }
+
+ /* === 快捷指令 === */
+ .ai-shortcuts {
+ display: flex;
+ gap: 8px;
+ padding: 0 16px 12px;
+ overflow-x: auto;
+ }
+
+ .ai-shortcut {
+ padding: 6px 12px;
+ background: var(--bg-tertiary);
+ border: 1px solid var(--border-subtle);
+ border-radius: 16px;
+ font-size: 12px;
+ color: var(--text-secondary);
+ white-space: nowrap;
+ cursor: pointer;
+ }
+
+ /* === Toast提示 === */
+ .toast {
+ position: fixed;
+ top: 50%;
+ left: 50%;
+ transform: translate(-50%, -50%);
+ background: var(--bg-secondary);
+ color: var(--text-primary);
+ padding: 16px 24px;
+ border-radius: 12px;
+ font-size: 16px;
+ z-index: 300;
+ display: none;
+ border: 1px solid var(--border-subtle);
+ box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+ }
+
+ .toast.active {
+ display: block;
+ animation: fadeIn 0.3s;
+ }
+
+ @keyframes fadeIn {
+ from { opacity: 0; transform: translate(-50%, -40%); }
+ to { opacity: 1; transform: translate(-50%, -50%); }
+ }
+ </style>
+</head>
+<body>
+ <!-- 顶部 -->
+ <div class="header">
+ <h1><svg style="width:22px;height:22px;vertical-align:middle;margin-right:6px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>喵修匠工作台</h1>
+ <select id="merchantSwitch" onchange="switchMerchant(this.value)" style="background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 4px 8px; font-size: 13px; outline: none; cursor: pointer;">
+ <option value="merch_001">物熵科技</option>
+ <option value="merch_002">南京物熵</option>
+</select>
+<span class="user" id="merchantNameDisplay" onclick="openMerchantModal()" style="cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-secondary);">加载中...<span style="font-size: 12px; opacity: 0.6;">▾</span></span>
+ </div>
+
+ <!-- 统计 -->
+ <div class="stats">
+ <div class="stat-card">
+ <div class="number" id="stat-pending">0</div>
+ <div class="label">待接单</div>
+ </div>
+ <div class="stat-card">
+ <div class="number" id="stat-inspect">0</div>
+ <div class="label">待检测</div>
+ </div>
+ <div class="stat-card">
+ <div class="number" id="stat-repair">0</div>
+ <div class="label">维修中</div>
+ </div>
+ <div class="stat-card">
+ <div class="number" id="stat-today">0</div>
+ <div class="label">今日完成</div>
+ </div>
+ </div>
+
+ <!-- 标签 -->
+ <div class="tabs">
+ <div class="tab active" data-filter="all">全部</div>
+ <div class="tab" data-filter="pending">可抢单</div>
+ <div class="tab" data-filter="assigned">已分配</div>
+ <div class="tab" data-filter="accepted">待收货</div>
+ <div class="tab" data-filter="received">待检测</div>
+ <div class="tab" data-filter="merchant_received">已收货</div>
+ <div class="tab" data-filter="inspected">待报价</div>
+ <div class="tab" data-filter="repairing">维修中</div>
+ <div class="tab" data-filter="completed">已完成</div>
+ </div>
+
+ <!-- 订单列表 -->
+ <div class="order-list" id="orderList">
+ <div class="loading">加载中...</div>
+ </div>
+
+ <!-- 接单模态框 -->
+ <div class="modal" id="acceptModal">
+ <div class="modal-content">
+ <div class="modal-header">
+ <h3><svg style="width:20px;height:20px;vertical-align:middle;margin-right:6px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>确认接单</h3>
+ <button class="modal-close" onclick="closeModals()">×</button>
+ </div>
+ <div class="modal-body">
+ <p style="color: var(--text-secondary); margin-bottom: 16px;">订单号:<span id="acceptOrderNo"></span></p>
+ <p>确认接收此订单?接单后请及时联系客户确认寄件事宜。</p>
+ </div>
+ <div class="modal-footer">
+ <button class="btn btn-secondary" onclick="closeModals()">取消</button>
+ <button class="btn btn-primary" onclick="confirmAccept()">确认接单</button>
+ </div>
+ </div>
+ </div>
+
+ <!-- 确认收货模态框 -->
+ <div class="modal" id="receiveModal">
+ <div class="modal-content">
+ <div class="modal-header">
+ <h3><svg style="width:20px;height:20px;vertical-align:middle;margin-right:6px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>确认收货</h3>
+ <button class="modal-close" onclick="closeModals()">×</button>
+ </div>
+ <div class="modal-body">
+ <p style="color: var(--text-secondary); margin-bottom: 16px;">订单号:<span id="receiveOrderNo"></span></p>
+
+ <div id="receiveExpressForm" style="display: none;">
+ <div class="form-group">
+ <label>客户选择的快递公司</label>
+ <input type="text" id="customerExpressCompany" readonly style="background: var(--bg-tertiary); opacity: 0.7;">
+ </div>
+ <div class="form-group">
+ <label>客户填写的快递单号</label>
+ <input type="text" id="customerExpressNumber" readonly style="background: var(--bg-tertiary); opacity: 0.7; font-family: monospace;">
+ </div>
+ <div style="background: rgba(255,149,0,0.1); border: 1px solid var(--accent-orange); border-radius: 12px; padding: 12px; margin-bottom: 16px;">
+ <div style="font-size: 14px; color: var(--accent-orange); margin-bottom: 8px;"><svg style="width:16px;height:16px;vertical-align:middle;margin-right:4px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>请核对收到的快递单号</div>
+ <div style="font-size: 12px; color: var(--text-secondary);">为避免收错包裹,请输入您实际收到的快递单号进行验证</div>
+ </div>
+ <div class="form-group">
+ <label>实际收到的快递单号</label>
+ <input type="text" id="receivedExpressNumber" placeholder="请输入快递单号" style="font-family: monospace;">
+ <div id="expressMismatchWarning" style="display: none; color: var(--accent-red); font-size: 12px; margin-top: 8px; padding: 8px; background: rgba(255,69,58,0.1); border-radius: 6px;">
+ 单号不匹配!请确认是否为客户寄出的包裹
+ </div>
+ </div>
+ </div>
+
+ <div id="receiveShopForm" style="display: none;">
+ <div class="form-group">
+ <label>客户预约到店时间</label>
+ <input type="text" id="customerAppointmentTime" readonly style="background: var(--bg-tertiary); opacity: 0.7;">
+ </div>
+ <div class="form-group">
+ <label>客户手机号验证（后4位）</label>
+ <input type="text" id="verifyPhone" placeholder="输入客户手机号后4位确认身份" maxlength="4">
+ <div id="phoneMismatchWarning" style="display:none; color: var(--accent-red); font-size: 12px; margin-top: 4px;">手机号不匹配，请核实</div>
+ </div>
+ <div style="background: rgba(48,209,88,0.1); border: 1px solid var(--accent-green); border-radius: 12px; padding: 12px; margin-bottom: 16px;">
+ <div style="font-size: 14px; color: var(--accent-green); margin-bottom: 8px;"><svg style="width:16px;height:16px;vertical-align:middle;margin-right:4px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9a2 2 0 0 1 2-2h.93a2 2 0 0 0 1.66-.9l.82-1.2a2 2 0 0 1 3.18 0l.82 1.2a2 2 0 0 0 1.66.9H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><path d="M6 9v10"/><path d="M18 9v10"/><path d="M12 9v10"/></svg>到店维修</div>
+ <div style="font-size: 12px; color: var(--text-secondary);">客户已到店,请确认客户身份后开始检测</div>
+ </div>
+ 
+ </div>
+ </div>
+ <div class="modal-footer">
+ <button class="btn btn-secondary" onclick="closeModals()">取消</button>
+ <button class="btn btn-primary" onclick="confirmReceive()">确认收货</button>
+ </div>
+ </div>
+ </div>
+
+ <!-- 检测模态框 -->
+ <div class="modal" id="inspectModal">
+ <div class="modal-content">
+ <div class="modal-header">
+ <h3><svg style="width:20px;height:20px;vertical-align:middle;margin-right:6px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>故障检测</h3>
+ <button class="modal-close" onclick="closeModals()">×</button>
+ </div>
+ <div class="modal-body">
+ <p style="color: var(--text-secondary); margin-bottom: 16px;">订单号：<span id="inspectOrderNo"></span></p>
+ <div class="form-group">
+ <label>外观检测结果</label>
+ <textarea id="externalDamage" placeholder="描述可见损坏情况，如：云台侧盖损坏、镜头破裂..."></textarea>
+ </div>
+ <div class="form-group">
+ <label>详细检测（拆机后）</label>
+ <textarea id="internalDamage" placeholder="描述内部损坏情况..."></textarea>
+ </div>
+ <div class="form-group" style="margin-bottom: 10px;">
+ <label style="font-size: 13px; color: var(--text-secondary);">搜索维修项目 / 配件</label>
+ <input type="text" id="inspectSearchInput" class="form-input" placeholder="输入关键词，如：云台、电机、主板..." oninput="searchInspectRules()" style="padding: 10px 12px; font-size: 14px; width: 100%;">
+ </div>
+
+ <div id="inspectSearchResults" style="max-height: 160px; overflow-y: auto; margin-bottom: 14px; border: 1px solid var(--border-subtle); border-radius: 8px; display: none; background: var(--bg-tertiary);">
+ <!-- 搜索结果动态插入 -->
+ </div>
+
+ <div style="font-size: 13px; font-weight: 500; margin-bottom: 6px;">已选检测项目</div>
+ <div id="inspectSelectedItems" style="margin-bottom: 14px; min-height: 48px;">
+ <div style="color: var(--text-tertiary); font-size: 13px; text-align: center; padding: 12px; border: 1px dashed var(--border-subtle); border-radius: 8px;">请点击上方搜索结果添加检测项目</div>
+ </div>
+
+ <div class="quote-total" style="font-size: 18px;">
+ 预估报价:¥<span id="inspectTotal">0.00</span>
+ </div>
+ </div>
+ <div class="modal-footer">
+ <button class="btn btn-secondary" onclick="closeModals()">取消</button>
+ <button class="btn btn-primary" onclick="confirmInspect()">提交检测并报价</button>
+ </div>
+ </div>
+ </div>
+
+ <!-- 报价模态框 -->
+ <div class="modal" id="quoteModal">
+ <div class="modal-content" style="max-width: 520px;">
+ <div class="modal-header">
+ <h3><svg style="width:20px;height:20px;vertical-align:middle;margin-right:6px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 18V6"/></svg>平台统一定价报价</h3>
+ <button class="modal-close" onclick="closeModals()">×</button>
+ </div>
+ <div class="modal-body">
+ <p style="color: var(--text-secondary); margin-bottom: 4px; font-size: 13px;">订单号:<span id="quoteOrderNo"></span></p>
+ <p style="color: var(--text-secondary); margin-bottom: 16px; font-size: 13px;">机型:<span id="quoteDroneModel" style="color: var(--text-primary); font-weight: 500;">-</span></p>
+
+ <div class="form-group" style="margin-bottom: 10px;">
+ <label style="font-size: 13px; color: var(--text-secondary);">搜索维修项目 / 配件</label>
+ <input type="text" id="quoteSearchInput" class="form-input" placeholder="输入关键词,如:云台、电机、主板..." oninput="searchPricingRules()" style="padding: 10px 12px; font-size: 14px;">
+ </div>
+
+ <div id="quoteSearchResults" style="max-height: 160px; overflow-y: auto; margin-bottom: 14px; border: 1px solid var(--border-subtle); border-radius: 8px; display: none; background: var(--bg-tertiary);">
+ <!-- 搜索结果动态插入 -->
+ </div>
+
+ <div style="font-size: 13px; font-weight: 500; margin-bottom: 6px;">已选报价项目</div>
+ <div id="quoteSelectedItems" style="margin-bottom: 14px; min-height: 48px;">
+ <div style="color: var(--text-tertiary); font-size: 13px; text-align: center; padding: 12px; border: 1px dashed var(--border-subtle); border-radius: 8px;">请点击上方搜索结果添加报价项目</div>
+ </div>
+
+ <div class="quote-total" style="font-size: 18px;">
+ 合计:¥<span id="quoteTotal">0.00</span>
+ </div>
+ </div>
+ <div class="modal-footer">
+ <button class="btn btn-secondary" onclick="closeModals()">取消</button>
+ <button class="btn btn-primary" onclick="confirmQuote()">生成报价单</button>
+ </div>
+ </div>
+ </div>
+
+ <!-- 发货模态框 -->
+ <div class="modal" id="shipModal">
+ <div class="modal-content">
+ <div class="modal-header">
+ <h3><svg style="width:20px;height:20px;vertical-align:middle;margin-right:6px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>确认发货/取货</h3>
+ <button class="modal-close" onclick="closeModals()">×</button>
+ </div>
+ <div class="modal-body">
+ <p style="color: var(--text-secondary); margin-bottom: 16px;">订单号：<span id="shipOrderNo"></span></p>
+ <div class="form-group">
+ <label>发货方式</label>
+ <div style="display:flex; gap:10px;">
+ <button type="button" id="shipModeExpress" onclick="selectShipMode('express')" style="flex:1; padding:10px; border:2px solid var(--accent-blue); background:var(--bg-tertiary); color:var(--text-primary); border-radius:8px; cursor:pointer; font-weight:600;">快递寄回</button>
+ <button type="button" id="shipModeShop" onclick="selectShipMode('shop')" style="flex:1; padding:10px; border:2px solid var(--border-subtle); background:var(--bg-tertiary); color:var(--text-primary); border-radius:8px; cursor:pointer;">客户自取</button>
+ </div>
+ </div>
+ <div id="shipExpressForm">
+ <div class="form-group">
+ <label>快递公司</label>
+ <select id="shipCarrier">
+ <option value="">请选择快递公司</option>
+ <option value="顺丰速运">顺丰速运</option>
+ <option value="京东物流">京东物流</option>
+ <option value="中通快递">中通快递</option>
+ <option value="圆通速递">圆通速递</option>
+ <option value="韵达速递">韵达速递</option>
+ </select>
+ </div>
+ <div class="form-group">
+ <label>快递单号</label>
+ <input type="text" id="shipTrackingNo" placeholder="请输入快递单号">
+ </div>
+ </div>
+ </div>
+ <div class="modal-footer">
+ <button class="btn btn-secondary" onclick="closeModals()">取消</button>
+ <button class="btn btn-primary" onclick="confirmShip()">确认</button>
+ </div>
+ </div>
+ </div>
+
+ <!-- 商户资料模态框 -->
+ <div class="modal" id="merchantModal">
+ <div class="modal-content" style="max-width: 460px;">
+ <div class="modal-header">
+ <h3><svg style="width:20px;height:20px;vertical-align:middle;margin-right:6px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9a2 2 0 0 1 2-2h.93a2 2 0 0 0 1.66-.9l.82-1.2a2 2 0 0 1 3.18 0l.82 1.2a2 2 0 0 0 1.66.9H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><path d="M6 9v10"/><path d="M18 9v10"/><path d="M12 9v10"/></svg>商户资料</h3>
+ <button class="modal-close" onclick="closeModals()">×</button>
+ </div>
+ <div class="modal-body">
+ <div class="form-group">
+ <label>商户名称</label>
+ <input type="text" id="mName" placeholder="商户名称">
+ </div>
+ <div class="form-group">
+ <label>联系人</label>
+ <input type="text" id="mContact" placeholder="联系人">
+ </div>
+ <div class="form-group">
+ <label>联系电话</label>
+ <input type="tel" id="mPhone" placeholder="联系电话">
+ </div>
+ <div class="form-group">
+ <label>详细地址</label>
+ <textarea id="mAddress" placeholder="详细地址" style="min-height: 60px;"></textarea>
+ </div>
+ <div class="form-group">
+ <label>营业时间</label>
+ <input type="text" id="mHours" placeholder="如:周一至周五 09:00-18:00">
+ </div>
+ </div>
+ <div class="modal-footer">
+ <button class="btn btn-secondary" onclick="closeModals()">取消</button>
+ <button class="btn btn-primary" onclick="saveMerchantInfo()">保存修改</button>
+ </div>
+ </div>
+ </div>
+
+ <!-- 订单详情模态框 -->
+ <div class="modal" id="detailModal">
+ <div class="modal-content" style="max-width: 580px; max-height: 88vh;">
+ <div class="modal-header">
+ <h3>工单详情</h3>
+ <button class="modal-close" onclick="closeModals()">×</button>
+ </div>
+ <div class="modal-body" id="detailBody" style="padding: 16px 20px;">
+ <div class="loading">加载中...</div>
+ </div>
+ <div class="modal-footer" id="detailFooter" style="display: none;">
+ </div>
+ </div>
+ </div>
+
+ <!-- AI助手悬浮球 -->
+ <div class="ai-float" onclick="toggleAI()">
+ <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/></svg>
+ </div>
+
+ <!-- AI聊天窗口 -->
+ <div class="ai-chat" id="aiChat">
+ <div class="ai-header">
+ <h3><svg style="width:20px;height:20px;vertical-align:middle;margin-right:6px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8.01" y2="16"/><line x1="16" y1="16" x2="16.01" y2="16"/></svg>AI维修助手</h3>
+ <button class="ai-close" onclick="toggleAI()">×</button>
+ </div>
+ <div class="ai-messages" id="aiMessages">
+ <div class="ai-message">
+ <div class="ai-avatar"><svg style="width:16px;height:16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8.01" y2="16"/><line x1="16" y1="16" x2="16.01" y2="16"/></svg></div>
+ <div class="ai-bubble">你好!我是你的维修助手。<br><br>可以说:<br>• "检测 Mini 3 Pro 云台抖动"<br>• "开始检测 WR20260408123456"<br>• "生成报价 WR20260408123456"<br>• "查库存 云台电机"<br>• "今日数据简报"</div>
+ </div>
+ </div>
+ <div class="ai-shortcuts">
+ <div class="ai-shortcut" onclick="sendAI('检测 Mini 3 Pro 云台抖动')">AI诊断</div>
+ <div class="ai-shortcut" onclick="sendAI('开始检测')">开始检测</div>
+ <div class="ai-shortcut" onclick="sendAI('生成报价')">生成报价</div>
+ <div class="ai-shortcut" onclick="sendAI('确认发货')">确认发货</div>
+ </div>
+ <div class="ai-input-area">
+ <button id="aiVoiceBtn" onclick="startVoiceRecognition()" style="background:none;border:none;color:var(--text-secondary);font-size:18px;padding:0 8px;cursor:pointer;transition:color .2s;"><svg style="width:20px;height:20px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg></button>
+ <input type="text" class="ai-input" id="aiInput" placeholder="说点什么..." onkeypress="if(event.key==='Enter')sendAI()" style="flex:1;">
+ <button class="ai-send" onclick="sendAI()"><svg style="width:16px;height:16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="12" x2="2" y2="12"/><polyline points="9 5 2 12 9 19"/></svg></button>
+ </div>
+ </div>
+
+ <!-- 底部导航 -->
+ <div class="bottom-nav">
+ <div class="nav-item active">
+ <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+ <span>首页</span>
+ </div>
+ <div class="nav-item">
+ <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
+ <span>工单</span>
+ </div>
+ <div class="nav-item">
+ <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+ <span>库存</span>
+ </div>
+ <div class="nav-item">
+ <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L5.08 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.58 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+ <span>设置</span>
+ </div>
+ </div>
+
+ <!-- Toast提示 -->
+ <div class="toast" id="toast"></div>
+
+ <script>
+ // API配置
+ const API_BASE = (window.location.protocol === 'file:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? 'https://njuosun-miaoxiujiang-d3a96a8c70e.service.tcloudbase.com/api' : 'https://njuosun-miaoxiujiang-d3a96a8c70e.service.tcloudbase.com/api';
+ // 喵修匠 v1.0 - 商户配置
+let currentMerchant = null;
+
+// 从URL参数读取并验证商户
+const urlParams = new URLSearchParams(window.location.search);
+const urlMerchantId = urlParams.get('m');
+const urlAccessCode = urlParams.get('k');
+
+if (urlMerchantId && MERCHANTS_V1[urlMerchantId] && urlAccessCode === MERCHANTS_V1[urlMerchantId].access_code) {
+  currentMerchant = MERCHANTS_V1[urlMerchantId];
+  console.log('[喵修匠 v1.0] 商户认证成功:', currentMerchant.name);
+  console.log('[喵修匠 v1.0] access_code:', currentMerchant.access_code);
+} else {
+  currentMerchant = MERCHANTS_V1['merch_001'];
+}
+
+
+ // 带认证的请求封装
+ async function fetchWithMerchant(url, options = {}) {
+ // 使用 URL 参数或全局 currentMerchant
+ const urlParams = new URLSearchParams(window.location.search);
+ const merchantId = (currentMerchant && currentMerchant.id) || urlParams.get('m');
+ const accessCode = (currentMerchant && currentMerchant.access_code) || urlParams.get('k');
+ if (!merchantId || !accessCode) {
+ throw new Error('缺少商户认证信息');
+ }
+ const isGet = !options.method || options.method === 'GET';
+ if (isGet) {
+ const sep = url.includes('?') ? '&' : '?';
+ url = `${url}${sep}merchant_id=${encodeURIComponent(merchantId)}&access_code=${encodeURIComponent(accessCode)}`;
+ return fetch(url, options);
+ } else {
+ // POST 请求：直接添加认证参数
+ const data = JSON.parse(options.body || '{}');
+ data.merchant_id = merchantId;
+ data.access_code = accessCode;
+ options.body = JSON.stringify(data);
+ console.log('[fetchWithMerchant] 请求:', url, options.body);
+ return fetch(url, options);
+ }
+ }
+
+ // 商户锁定初始化
+ async function initMerchantLock() {
+ const accessCode = currentMerchant.access_code;
+ if (!currentMerchant.id || !accessCode) {
+ showError('缺少商户认证信息，请检查链接是否完整');
+ return;
+ }
+ // 尝试匹配商户列表中的信息
+ try {
+ const res = await fetch(`${API_BASE}/merchants`);
+ const data = await res.json();
+ if (data.success && data.merchants) {
+ const m = data.merchants.find(x => x.id === currentMerchant.id);
+ if (m) {
+ // 保留 access_code，避免被覆盖
+ currentMerchant = { ...m, access_code: currentMerchant.access_code || accessCode, id: m.id || currentMerchant.id };
+ const display = document.getElementById('merchantNameDisplay');
+ if (display) display.innerHTML = `${currentMerchant.name}<span style="font-size: 12px; opacity: 0.6;">▾</span>`;
+ }
+ }
+ } catch (e) {
+ console.error('[initMerchantLock] 获取商户列表失败:', e);
+ }
+ }
+
+ // 状态映射
+ const STATUS_MAP = {
+ 'pending': { text: '待接单', class: 'status-pending' },
+ 'accepted': { text: '待收货', class: 'status-accepted' },
+ 'received': { text: '待检测', class: 'status-received' },
+ 'detected': { text: '已检测', class: 'status-inspected' },
+ 'inspected': { text: '待报价', class: 'status-inspected' },
+ 'quoted': { text: '待确认', class: 'status-quoted' },
+ 'confirmed': { text: '待维修', class: 'status-quoted' },
+ 'repairing': { text: '维修中', class: 'status-repairing' },
+ 'repaired': { text: '待发货', class: 'status-shipping' },
+ 'shipping': { text: '待发货', class: 'status-shipping' },
+ 'delivered': { text: '待客户收货', class: 'status-shipping' },
+ 'assigned': { text: '已分配', class: 'status-assigned' },
+ 'diagnosed': { text: '已诊断', class: 'status-inspected' },
+ 'merchant_received': { text: '已收货', class: 'status-received' },
+ 'customer_arrived': { text: '已到店', class: 'status-received' },
+ 'cancelled': { text: '已取消', class: 'status-cancelled' },
+ 'completed': { text: '已完成', class: 'status-completed' }
+ };
+
+ let allOrders = [];
+ let currentFilter = 'all';
+ let currentOrderNo = null;
+ let currentDeliveryType = null;
+ let currentCustomerPhone = '';
+ let currentExpressCompany = '';
+ let currentExpressNumber = '';
+ let merchantList = [];
+
+ // 加载订单
+ async function loadOrders() {
+ try {
+ const res = await fetchWithMerchant(`${API_BASE}/merchant/orders`);
+ const data = await res.json();
+
+ if (data.success && data.orders) {
+ allOrders = data.orders;
+ updateStats();
+ renderOrders();
+ } else {
+ showError(data.message || '加载失败');
+ }
+ } catch (e) {
+ showError('网络错误:' + e.message);
+ }
+ }
+
+ // 更新统计
+ function updateStats() {
+ const stats = {
+ pending: allOrders.filter(o => o.status === 'pending').length,
+ assigned: allOrders.filter(o => o.status === 'assigned').length,
+ inspect: allOrders.filter(o => ['received', 'customer_arrived'].includes(o.status)).length,
+ repair: allOrders.filter(o => ['repairing', 'confirmed'].includes(o.status)).length,
+ today: allOrders.filter(o => {
+ const today = new Date().toISOString().slice(0,10);
+ return o.updated_at && o.updated_at.startsWith(today) && o.status === 'completed';
+ }).length
+ };
+
+ document.getElementById('stat-pending').textContent = stats.pending;
+ document.getElementById('stat-inspect').textContent = stats.inspect;
+ document.getElementById('stat-repair').textContent = stats.repair;
+ document.getElementById('stat-today').textContent = stats.today;
+ }
+
+ // 渲染订单
+ function renderOrders() {
+ const list = document.getElementById('orderList');
+ // pending 和 all 是全局池;其他状态只显示当前商户的订单
+ let orders = allOrders.filter(o => {
+ if (currentFilter === 'all') return true;
+ if (currentFilter === 'pending') return o.status === 'pending';
+ if (currentFilter === 'assigned') return o.status === 'assigned';
+ if (currentFilter === 'accepted') return o.status === 'accepted';
+ if (currentFilter === 'received') return ['received', 'customer_arrived'].includes(o.status);
+ if (currentFilter === 'merchant_received') return o.status === 'merchant_received';
+ if (currentFilter === 'inspected') return ['inspected', 'detected'].includes(o.status);
+ if (currentFilter === 'repairing') return ['confirmed', 'repairing'].includes(o.status);
+ if (currentFilter === 'completed') return o.status === 'completed';
+ if (o.status !== currentFilter) return false;
+ // 已分配订单只显示给对应商户或系统管理员
+ return !o.merchant_id || o.merchant_id === currentMerchant.id;
+ });
+
+ if (orders.length === 0) {
+ list.innerHTML = `
+ <div class="empty">
+ <div class="empty-icon"><svg style="width:48px;height:48px;color:var(--text-tertiary);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg></div>
+ <p>暂无${currentFilter === 'all' ? '' : STATUS_MAP[currentFilter]?.text || ''}订单</p>
+ </div>
+ `;
+ return;
+ }
+
+ list.innerHTML = orders.map(order => {
+ const status = STATUS_MAP[order.status] || { text: order.status, class: '' };
+ const merchantTag = order.merchant_name
+   ? `<span style="font-size:11px;padding:2px 6px;border-radius:4px;background:${order.merchant_id === currentMerchant.id ? 'rgba(48,209,88,0.15)' : 'rgba(255,149,0,0.15)'};color:${order.merchant_id === currentMerchant.id ? 'var(--accent-green)' : 'var(--accent-orange)'};margin-left:8px;">${order.merchant_name}</span>`
+   : '';
+ return `
+ <div class="order-card">
+ <div class="order-header">
+ <span class="order-no">${order.order_no}</span>
+ <span class="order-status ${status.class}">${status.text}${merchantTag}</span>
+ </div>
+ <div class="order-info">
+ <p><svg style="width:14px;height:14px;vertical-align:middle;margin-right:4px;color:var(--text-secondary);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>${order.customer_name || order.customer_phone || '未留名客户'} · <svg style="width:14px;height:14px;vertical-align:middle;margin-right:4px;color:var(--text-secondary);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>${order.customer_phone || '-'}</p>
+ <p><svg style="width:14px;height:14px;vertical-align:middle;margin-right:4px;color:var(--text-secondary);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="4" ry="4"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/></svg>${order.drone_model || '未知机型'} · <svg style="width:14px;height:14px;vertical-align:middle;margin-right:4px;color:var(--text-secondary);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>${order.source_channel || '未知来源'}</p>
+ <p><svg style="width:14px;height:14px;vertical-align:middle;margin-right:4px;color:var(--text-secondary);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>${order.problem_description?.substring(0, 50) || '无故障描述'}...</p>
+ </div>
+ <div class="order-actions">
+ ${getActionButtons(order)}
+ </div>
+ </div>
+ `;
+ }).join('');
+ }
+
+ // 获取操作按钮
+function getActionButtons(order) {
+ const actions = {
+ 'pending': '<button class="btn btn-primary" onclick="openAcceptModal(\'' + order.order_no + '\')">接单</button>',
+ 'assigned': '<button class="btn btn-primary" onclick="openReceiveModal(\'' + order.order_no + '\')">' + (order.repair_mode === 'shop' ? '确认到店' : '确认收货') + '</button>',
+ 'accepted': '<button class="btn btn-primary" onclick="openReceiveModal(\'' + order.order_no + '\')">' + (order.repair_mode === 'shop' ? '确认到店' : '确认收货') + '</button>',
+ 'merchant_received': '<button class="btn btn-primary" onclick="openInspectModal(\'' + order.order_no + '\')">开始检测</button>',
+ 'customer_arrived': '<button class="btn btn-primary" onclick="openInspectModal(\'' + order.order_no + '\')">开始检测</button>',
+ 'received': '<button class="btn btn-primary" onclick="openInspectModal(\'' + order.order_no + '\')">开始检测</button>',
+ 'detected': '<button class="btn btn-primary" onclick="openQuoteModal(\'' + order.order_no + '\')">生成报价</button>',
+ 'inspected': '<button class="btn btn-primary" onclick="openQuoteModal(\'' + order.order_no + '\')">生成报价</button>',
+ 'quoted': '<button class="btn btn-secondary" onclick="viewDetail(\'' + order.order_no + '\')">查看详情</button>',
+ 'confirmed': '<button class="btn btn-primary" onclick="startRepair(\'' + order.order_no + '\')">开始维修</button>',
+ 'repairing': '<button class="btn btn-primary" onclick="completeRepair(\'' + order.order_no + '\')">完成维修</button>',
+ 'repaired': '<button class="btn btn-primary" onclick="openShipModal(\'' + order.order_no + '\')">确认发货</button>',
+ 'shipping': '<button class="btn btn-primary" onclick="openShipModal(\'' + order.order_no + '\')">确认发货</button>',
+ 'completed': '<button class="btn btn-secondary" onclick="viewDetail(\'' + order.order_no + '\')">查看详情</button>',
+ 'cancelled': '<button class="btn btn-secondary" onclick="viewDetail(\'' + order.order_no + '\')">查看详情</button>',
+ 'delivered': '<button class="btn btn-secondary" onclick="viewDetail(\'' + order.order_no + '\')">查看详情</button>',
+ };
+
+ let primary = actions[order.status] || '<button class="btn btn-secondary" onclick="viewDetail(\'' + order.order_no + '\')">详情</button>';
+ 
+ // 对于没有主按钮的状态，只显示详情
+ if (['quoted','completed','cancelled','delivered'].includes(order.status)) {
+ return primary;
+ }
+
+ // 尾款锁定：repaired/shipping 状态且尾款未付时，发货按钮变灰
+ if ((order.status === 'repaired' || order.status === 'shipping') && !order.final_paid) {
+ const pendingFinal = Math.max(0, (order.quote_amount || 0) - (order.deposit_amount || 0));
+ if (pendingFinal > 0) {
+ primary = '<button class="btn btn-primary" style="opacity:0.5;cursor:not-allowed;" disabled>等待尾款</button>';
+ }
+ }
+
+ const secondary = '<button class="btn btn-secondary" onclick="viewDetail(\'' + order.order_no + '\')">详情</button>';
+ return primary + secondary;
+ }
+
+ // 显示错误
+ function showError(msg) {
+ document.getElementById('orderList').innerHTML = `
+ <div class="empty">
+ <div class="empty-icon"><svg style="width:48px;height:48px;color:var(--text-tertiary);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></div>
+ <p>${msg}</p>
+ <button class="btn btn-primary" style="margin-top: 16px;" onclick="loadOrders()">重试</button>
+ </div>
+ `;
+ }
+
+ // 显示提示
+ function showToast(msg) {
+ const toast = document.getElementById('toast');
+ toast.textContent = msg;
+ toast.classList.add('active');
+ setTimeout(() => toast.classList.remove('active'), 2000);
+ }
+
+ // 关闭所有模态框
+ function closeModals() {
+ document.querySelectorAll('.modal').forEach(m => m.classList.remove('active'));
+ currentOrderNo = null;
+ }
+
+ // ===== 接单功能 =====
+ function openAcceptModal(orderNo) {
+ currentOrderNo = orderNo;
+ document.getElementById('acceptOrderNo').textContent = orderNo;
+ document.getElementById('acceptModal').classList.add('active');
+ }
+
+ async function confirmAccept() {
+ if (!currentOrderNo) return;
+ const m = currentMerchant || { id: 'merch_001', name: '物熵科技', access_code: '3613' };
+
+ try {
+ const res = await fetchWithMerchant(`${API_BASE}/order/accept`, {
+ method: 'POST',
+ headers: { 'Content-Type': 'application/json' },
+ body: JSON.stringify({
+ order_no: currentOrderNo,
+ merchant_id: m.id,
+ merchant_name: m.name,
+ access_code: m.access_code
+ })
+ });
+
+ const data = await res.json();
+ if (data.success) {
+ showToast('接单成功');
+ closeModals();
+ // 切换到已分配标签
+ currentFilter = 'assigned';
+ // 更新标签高亮
+ document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+ document.querySelector('.tab[data-filter="assigned"]')?.classList.add('active');
+ loadOrders();
+ } else {
+ showToast(data.message || '接单失败');
+ }
+ } catch (e) {
+ console.error('[confirmAccept] 错误详情:', e);
+ showToast('网络错误: ' + e.message);
+ }
+ }
+
+ // ===== 确认收货功能 =====
+ function openReceiveModal(orderNo) {
+ currentOrderNo = orderNo;
+ const order = allOrders.find(o => o.order_no === orderNo);
+ if (!order) return;
+
+ console.log("[DEBUG] order.repair_mode:", order.repair_mode);
+  console.log("[DEBUG] order:", JSON.stringify(order, null, 2));
+  currentDeliveryType = order.repair_mode || 'express';
+ currentCustomerPhone = order.customer_phone || '';
+ currentExpressCompany = order.customer_carrier || '';
+ currentExpressNumber = order.customer_tracking_no || '';
+
+ document.getElementById('receiveOrderNo').textContent = orderNo;
+
+ const modalTitle = document.querySelector('#receiveModal .modal-header h3');
+ const confirmBtn = document.querySelector('#receiveModal .modal-footer .btn-primary');
+ if (modalTitle) modalTitle.innerHTML = currentDeliveryType === 'shop' ? '<svg style="width:20px;height:20px;vertical-align:middle;margin-right:6px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>客户到店确认' : '<svg style="width:20px;height:20px;vertical-align:middle;margin-right:6px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>确认收货';
+ if (confirmBtn) confirmBtn.textContent = currentDeliveryType === 'shop' ? '确认到店' : '确认收货';
+
+ const expressForm = document.getElementById('receiveExpressForm');
+ const shopForm = document.getElementById('receiveShopForm');
+
+ if (currentDeliveryType === 'express') {
+ expressForm.style.display = 'block';
+ shopForm.style.display = 'none';
+ document.getElementById('customerExpressCompany').value = currentExpressCompany || '-';
+ document.getElementById('customerExpressNumber').value = currentExpressNumber || '-';
+ document.getElementById('receivedExpressNumber').value = '';
+ document.getElementById('expressMismatchWarning').style.display = 'none';
+ } else {
+ expressForm.style.display = 'none';
+ shopForm.style.display = 'block';
+ document.getElementById('customerAppointmentTime').value = order.appointment_time
+ ? new Date(order.appointment_time).toLocaleString('zh-CN')
+ : '-';
+ document.getElementById('verifyPhone').value = '';
+ document.getElementById('phoneMismatchWarning').style.display = 'none';
+ }
+
+ document.getElementById('receiveModal').classList.add('active');
+ }
+
+ async function confirmReceive() {
+ if (!currentOrderNo) return;
+
+ if (currentDeliveryType === 'express') {
+ const receivedNumber = document.getElementById('receivedExpressNumber').value.trim().toUpperCase();
+ const customerNumber = currentExpressNumber.toUpperCase();
+
+ if (!receivedNumber) {
+ showToast('请输入收到的快递单号');
+ return;
+ }
+
+ if (receivedNumber !== customerNumber) {
+ document.getElementById('expressMismatchWarning').style.display = 'block';
+ if (!confirm('快递单号不匹配!\n客户填写:' + customerNumber + '\n您收到:' + receivedNumber + '\n\n是否确认继续?')) {
+ return;
+ }
+ }
+
+ try {
+ const res = await fetchWithMerchant(`${API_BASE}/logistics/verify-store-sign`, {
+ method: 'POST',
+ headers: { 'Content-Type': 'application/json' },
+ body: JSON.stringify({
+ order_no: currentOrderNo,
+ received_express_number: receivedNumber
+ })
+ });
+
+ const data = await res.json();
+ if (data.success) {
+ showToast('确认收货成功');
+ closeModals();
+ loadOrders();
+ } else {
+ showToast(data.message || '操作失败');
+ }
+ } catch (e) {
+ showToast('网络错误');
+ }
+ } else {
+ // 到店模式：商户直接确认客户已到店
+ const phoneLast4 = document.getElementById('verifyPhone').value.trim();
+ 
+ try {
+ const res = await fetchWithMerchant(`${API_BASE}/logistics/verify-store-sign`, {
+ method: 'POST',
+ headers: { 'Content-Type': 'application/json' },
+ body: JSON.stringify({
+ order_no: currentOrderNo,
+ phone_last4: phoneLast4
+ })
+ });
+
+ const data = await res.json();
+ if (data.success) {
+ showToast('客户已到店，开始检测');
+ closeModals();
+ loadOrders();
+ } else {
+ showToast(data.error || data.message || '操作失败');
+ }
+ } catch (e) {
+ showToast('网络错误');
+ }
+ }
+ }
+
+ // ===== 检测功能（对接定价规则） =====
+ let currentInspectRules = [];
+ let selectedInspectItems = [];
+ let currentInspectModel = '';
+
+ async function openInspectModal(orderNo) {
+ currentOrderNo = orderNo;
+ selectedInspectItems = [];
+ currentInspectRules = [];
+ currentInspectModel = '';
+
+ document.getElementById('inspectOrderNo').textContent = orderNo;
+ document.getElementById('externalDamage').value = '';
+ document.getElementById('internalDamage').value = '';
+ document.getElementById('inspectSearchInput').value = '';
+ document.getElementById('inspectSearchResults').style.display = 'none';
+ renderInspectSelectedItems();
+ updateInspectTotal();
+
+ const order = allOrders.find(o => o.order_no === orderNo);
+ if (order && order.drone_model) {
+ currentInspectModel = order.drone_model;
+ const searchInput = document.getElementById('inspectSearchInput');
+ searchInput.placeholder = '正在加载定价规则...';
+ try {
+ const res = await fetchWithMerchant(`${API_BASE}/pricing/rules?drone_model=${encodeURIComponent(currentInspectModel)}`);
+ const data = await res.json();
+ if (data.success && data.rules && data.rules.length > 0) {
+ currentInspectRules = data.rules;
+ searchInput.placeholder = '输入关键词，如：云台、电机、主板...';
+ } else {
+ searchInput.placeholder = '该机型暂无定价规则';
+ const box = document.getElementById('inspectSearchResults');
+ box.innerHTML = '<div style="padding:20px 12px;text-align:center;color:var(--text-secondary);font-size:13px;line-height:1.8;">📋 该机型暂无定价规则<br><span style="font-size:12px;opacity:0.7;">请联系管理员添加维修项目及配件</span></div>';
+ box.style.display = 'block';
+ }
+ } catch (e) {
+ document.getElementById('inspectSearchInput').placeholder = '加载定价规则失败';
+ }
+ } else {
+ const searchInput = document.getElementById('inspectSearchInput');
+ searchInput.placeholder = '订单未指定机型，无法加载定价规则';
+ const box = document.getElementById('inspectSearchResults');
+ box.innerHTML = '<div style="padding:20px 12px;text-align:center;color:var(--text-secondary);font-size:13px;line-height:1.8;">⚠️ 订单未指定机型<br><span style="font-size:12px;opacity:0.7;">请先在客户订单中填写机型信息</span></div>';
+ box.style.display = 'block';
+ }
+ document.getElementById('inspectModal').classList.add('active');
+ }
+
+ function searchInspectRules() {
+ const keyword = document.getElementById('inspectSearchInput').value.trim().toLowerCase();
+ const box = document.getElementById('inspectSearchResults');
+ if (!keyword) {
+ renderInspectSearchResults(currentInspectRules);
+ return;
+ }
+ const filtered = currentInspectRules.filter(r =>
+ (r.fault_type && r.fault_type.toLowerCase().includes(keyword)) ||
+ (r.part_name && r.part_name.toLowerCase().includes(keyword)) ||
+ (r.notes && r.notes.toLowerCase().includes(keyword))
+ );
+ renderInspectSearchResults(filtered);
+ }
+
+ function renderInspectSearchResults(rules) {
+ const box = document.getElementById('inspectSearchResults');
+ if (!rules || rules.length === 0) {
+ const keyword = document.getElementById('inspectSearchInput').value.trim();
+ if (currentInspectRules.length === 0) {
+ box.innerHTML = '<div style="padding:20px 12px;text-align:center;color:var(--text-secondary);font-size:13px;line-height:1.8;">📋 该机型暂无定价规则<br><span style="font-size:12px;opacity:0.7;">请联系管理员添加维修项目及配件</span></div>';
+ } else {
+ box.innerHTML = '<div style="padding:20px 12px;text-align:center;color:var(--text-secondary);font-size:13px;">🔍 未找到匹配的维修项目<br><span style="font-size:12px;opacity:0.7;">请尝试其他关键词搜索</span></div>';
+ }
+ box.style.display = 'block';
+ return;
+ }
+ box.innerHTML = rules.map(rule => `
+ <div onclick="addInspectItem('${rule.id}')" style="padding: 10px 12px; border-bottom: 1px solid var(--border-subtle); cursor: pointer; transition: background 0.15s;"
+ onmouseover="this.style.background='var(--bg-secondary)'" onmouseout="this.style.background='transparent'"
+ title="${rule.notes || ''}">
+ <div style="display: flex; justify-content: space-between; align-items: center;">
+ <div>
+ <div style="font-weight: 500; font-size: 14px;">${rule.fault_type}${rule.part_name ? ' · ' + rule.part_name : ''}</div>
+ <div style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">配件¥${rule.part_price} + 工时¥${rule.labor_price}</div>
+ </div>
+ <div style="font-weight: 600; color: var(--accent-orange);">¥${rule.total_price}</div>
+ </div>
+ </div>
+ `).join('');
+ box.style.display = 'block';
+ }
+
+ function addInspectItem(ruleId) {
+ const rule = currentInspectRules.find(r => r.id === ruleId);
+ if (!rule) return;
+ const existing = selectedInspectItems.find(s => s.rule_id === ruleId);
+ if (existing) {
+ existing.quantity += 1;
+ } else {
+ selectedInspectItems.push({
+ rule_id: ruleId,
+ quantity: 1,
+ rule: rule,
+ type: 'required' // 默认必修
+ });
+ }
+ renderInspectSelectedItems();
+ updateInspectTotal();
+ }
+
+ function removeInspectItem(index) {
+ selectedInspectItems.splice(index, 1);
+ renderInspectSelectedItems();
+ updateInspectTotal();
+ }
+
+ function setInspectItemType(index, type) {
+ selectedInspectItems[index].type = type;
+ updateInspectTotal();
+ }
+
+ function renderInspectSelectedItems() {
+ const container = document.getElementById('inspectSelectedItems');
+ if (selectedInspectItems.length === 0) {
+ container.innerHTML = `
+ <div style="color: var(--text-tertiary); font-size: 13px; text-align: center; padding: 12px; border: 1px dashed var(--border-subtle); border-radius: 8px;">
+ 请点击上方搜索结果添加检测项目
+ </div>
+ `;
+ return;
+ }
+ container.innerHTML = selectedInspectItems.map((item, idx) => `
+ <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; background: var(--bg-tertiary); border: 1px solid var(--border-subtle); border-radius: 8px; margin-bottom: 8px;">
+ <div style="flex: 1; min-width: 0;">
+ <div style="font-weight: 500; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${item.rule.fault_type}${item.rule.part_name ? ' · ' + item.rule.part_name : ''}</div>
+ <div style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">配件¥${item.rule.part_price} + 工时¥${item.rule.labor_price} × ${item.quantity}</div>
+ </div>
+ <div style="display: flex; align-items: center; gap: 8px; margin-left: 8px;">
+ <select onchange="setInspectItemType(${idx}, this.value)" style="background: var(--bg-secondary); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 4px 6px; color: var(--text-primary); font-size: 12px; outline: none;">
+ <option value="required" ${item.type === 'required' ? 'selected' : ''}>必修</option>
+ <option value="optional" ${item.type === 'optional' ? 'selected' : ''}>选修</option>
+ </select>
+ <div style="font-weight: 600; color: var(--accent-orange); white-space: nowrap;">¥${(item.rule.total_price * item.quantity).toFixed(2)}</div>
+ <button onclick="removeInspectItem(${idx})" style="background: none; border: none; color: var(--accent-red); font-size: 18px; cursor: pointer; line-height: 1;">×</button>
+ </div>
+ </div>
+ `).join('');
+ }
+
+ function updateInspectTotal() {
+ const total = selectedInspectItems.reduce((sum, item) => sum + (item.rule.total_price * item.quantity), 0);
+ document.getElementById('inspectTotal').textContent = total.toFixed(2);
+ }
+
+ async function confirmInspect() {
+ if (!currentOrderNo) return;
+ const external = document.getElementById('externalDamage').value.trim();
+ const internal = document.getElementById('internalDamage').value.trim();
+
+ const required_parts = [];
+ const optional_parts = [];
+ selectedInspectItems.forEach(item => {
+ const obj = {
+ name: item.rule.fault_type + (item.rule.part_name ? ' · ' + item.rule.part_name : ''),
+ part_price: item.rule.part_price,
+ labor_price: item.rule.labor_price,
+ total_price: item.rule.total_price,
+ quantity: item.quantity
+ };
+ if (item.type === 'required') required_parts.push(obj);
+ else optional_parts.push(obj);
+ });
+
+ if (!external && !internal && !required_parts.length && !optional_parts.length) {
+ showToast('请填写检测结果或维修项目');
+ return;
+ }
+
+ try {
+ const res = await fetchWithMerchant(`${API_BASE}/order/detect`, {
+ method: 'POST',
+ headers: { 'Content-Type': 'application/json' },
+ body: JSON.stringify({
+ order_no: currentOrderNo,
+ external_damage: external,
+ internal_damage: internal,
+ required_parts: required_parts,
+ optional_parts: optional_parts
+ })
+ });
+
+ const data = await res.json();
+ if (data.success) {
+ showToast('检测及报价完成');
+ closeModals();
+ loadOrders();
+ } else {
+ showToast(data.message || '提交失败');
+ }
+ } catch (e) {
+ showToast('网络错误');
+ }
+ }
+
+ // ===== 报价功能(平台统一定价) =====
+ let currentPricingRules = [];
+ let selectedQuoteRules = [];
+
+ async function openQuoteModal(orderNo) {
+ currentOrderNo = orderNo;
+ selectedQuoteRules = [];
+ currentPricingRules = [];
+
+ const order = allOrders.find(o => o.order_no === orderNo);
+ const droneModel = order ? order.drone_model : '-';
+
+ document.getElementById('quoteOrderNo').textContent = orderNo;
+ document.getElementById('quoteDroneModel').textContent = droneModel;
+ document.getElementById('quoteSearchInput').value = '';
+ document.getElementById('quoteSearchResults').style.display = 'none';
+ document.getElementById('quoteTotal').textContent = '0.00';
+ renderSelectedQuoteRules();
+ document.getElementById('quoteModal').classList.add('active');
+
+ // 预加载该机型定价规则
+ const searchInput = document.getElementById('quoteSearchInput');
+ if (droneModel && droneModel !== '未知机型' && droneModel !== '-') {
+ searchInput.placeholder = '正在加载报价规则...';
+ try {
+ const res = await fetchWithMerchant(`${API_BASE}/pricing/rules?drone_model=${encodeURIComponent(droneModel)}`);
+ const data = await res.json();
+ if (data.success && data.rules && data.rules.length > 0) {
+ currentPricingRules = data.rules;
+ searchInput.placeholder = '输入关键词，如：云台、电机、主板...';
+ renderPricingRuleResults(currentPricingRules);
+ } else {
+ searchInput.placeholder = '该机型暂无报价规则';
+ const box = document.getElementById('quoteSearchResults');
+ box.innerHTML = '<div style="padding:20px 12px;text-align:center;color:var(--text-secondary);font-size:13px;line-height:1.8;">📋 该机型暂无报价规则<br><span style="font-size:12px;opacity:0.7;">请先在检测流程中添加维修项目</span></div>';
+ box.style.display = 'block';
+ }
+ } catch (e) {
+ searchInput.placeholder = '加载报价规则失败';
+ }
+ } else {
+ searchInput.placeholder = '订单未指定机型';
+ const box = document.getElementById('quoteSearchResults');
+ box.innerHTML = '<div style="padding:20px 12px;text-align:center;color:var(--text-secondary);font-size:13px;line-height:1.8;">⚠️ 订单未指定机型<br><span style="font-size:12px;opacity:0.7;">请先在客户订单中填写机型信息</span></div>';
+ box.style.display = 'block';
+ }
+ }
+
+ function renderPricingRuleResults(rules) {
+ const box = document.getElementById('quoteSearchResults');
+ if (!rules || rules.length === 0) {
+ const keyword = document.getElementById('quoteSearchInput').value.trim();
+ if (currentPricingRules.length === 0) {
+ box.innerHTML = '<div style="padding:20px 12px;text-align:center;color:var(--text-secondary);font-size:13px;line-height:1.8;">📋 该机型暂无报价规则<br><span style="font-size:12px;opacity:0.7;">请先在检测流程中添加维修项目</span></div>';
+ } else {
+ box.innerHTML = '<div style="padding:20px 12px;text-align:center;color:var(--text-secondary);font-size:13px;">🔍 未找到匹配的报价项目<br><span style="font-size:12px;opacity:0.7;">请尝试其他关键词搜索</span></div>';
+ }
+ box.style.display = 'block';
+ return;
+ }
+
+ box.innerHTML = rules.map(rule => `
+ <div onclick="addQuoteRule('${rule.id}')" style="padding: 10px 12px; border-bottom: 1px solid var(--border-subtle); cursor: pointer; transition: background 0.15s;"
+ onmouseover="this.style.background='var(--bg-secondary)'" onmouseout="this.style.background='transparent'"
+ title="${rule.notes || ''}">
+ <div style="display: flex; justify-content: space-between; align-items: center;">
+ <div>
+ <div style="font-weight: 500; font-size: 14px;">${rule.fault_type}${rule.part_name ? ' · ' + rule.part_name : ''}</div>
+ <div style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">配件¥${rule.part_price} + 工时¥${rule.labor_price}</div>
+ </div>
+ <div style="font-weight: 600; color: var(--accent-orange);">¥${rule.total_price}</div>
+ </div>
+ </div>
+ `).join('');
+ box.style.display = 'block';
+ }
+
+ function searchPricingRules() {
+ const keyword = document.getElementById('quoteSearchInput').value.trim().toLowerCase();
+ if (!keyword) {
+ renderPricingRuleResults(currentPricingRules);
+ return;
+ }
+ const filtered = currentPricingRules.filter(r =>
+ r.fault_type.toLowerCase().includes(keyword) ||
+ (r.part_name && r.part_name.toLowerCase().includes(keyword)) ||
+ (r.notes && r.notes.toLowerCase().includes(keyword))
+ );
+ renderPricingRuleResults(filtered);
+ }
+
+ function addQuoteRule(ruleId) {
+ const rule = currentPricingRules.find(r => r.id === ruleId);
+ if (!rule) return;
+
+ const existing = selectedQuoteRules.find(s => s.rule_id === ruleId);
+ if (existing) {
+ existing.quantity += 1;
+ } else {
+ selectedQuoteRules.push({ rule_id: ruleId, quantity: 1, rule: rule });
+ }
+ renderSelectedQuoteRules();
+ calcQuoteTotal();
+ }
+
+ function removeQuoteRule(index) {
+ selectedQuoteRules.splice(index, 1);
+ renderSelectedQuoteRules();
+ calcQuoteTotal();
+ }
+
+ function renderSelectedQuoteRules() {
+ const container = document.getElementById('quoteSelectedItems');
+ if (selectedQuoteRules.length === 0) {
+ container.innerHTML = `
+ <div style="color: var(--text-tertiary); font-size: 13px; text-align: center; padding: 12px; border: 1px dashed var(--border-subtle); border-radius: 8px;">
+ 请点击上方搜索结果添加报价项目
+ </div>
+ `;
+ return;
+ }
+
+ container.innerHTML = selectedQuoteRules.map((item, idx) => `
+ <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; background: var(--bg-tertiary); border: 1px solid var(--border-subtle); border-radius: 8px; margin-bottom: 8px;">
+ <div style="flex: 1;">
+ <div style="font-weight: 500; font-size: 14px;">${item.rule.fault_type}${item.rule.part_name ? ' · ' + item.rule.part_name : ''}</div>
+ <div style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">配件¥${item.rule.part_price} + 工时¥${item.rule.labor_price} × ${item.quantity}</div>
+ </div>
+ <div style="display: flex; align-items: center; gap: 12px;">
+ <div style="font-weight: 600; color: var(--accent-orange);">¥${(item.rule.total_price * item.quantity).toFixed(2)}</div>
+ <button onclick="removeQuoteRule(${idx})" style="background: none; border: none; color: var(--accent-red); font-size: 18px; cursor: pointer; line-height: 1;">×</button>
+ </div>
+ </div>
+ `).join('');
+ }
+
+ function calcQuoteTotal() {
+ const total = selectedQuoteRules.reduce((sum, item) => sum + (item.rule.total_price * item.quantity), 0);
+ document.getElementById('quoteTotal').textContent = total.toFixed(2);
+ }
+
+ async function confirmQuote() {
+ if (!currentOrderNo) return;
+
+ if (selectedQuoteRules.length === 0) {
+ showToast('请添加报价项目');
+ return;
+ }
+
+ // 从 currentPricingRules 中找到选中项并计算总价
+ let partsCost = 0;
+ let laborCost = 0;
+ let total = 0;
+ const descriptions = [];
+
+ selectedQuoteRules.forEach(s => {
+ const rule = currentPricingRules.find(r => r.id === s.rule_id);
+ if (rule) {
+ const qty = s.quantity || 1;
+ partsCost += (rule.part_price || 0) * qty;
+ laborCost += (rule.labor_price || 0) * qty;
+ total += (rule.total_price || 0) * qty;
+ descriptions.push(`${rule.fault_type || rule.part_name || '维修项目'} x${qty}`);
+ }
+ });
+
+ try {
+ const res = await fetchWithMerchant(`${API_BASE}/order/quote`, {
+ method: 'POST',
+ headers: { 'Content-Type': 'application/json' },
+ body: JSON.stringify({
+ order_no: currentOrderNo,
+ labor_cost: laborCost,
+ parts_cost: partsCost,
+ total: total,
+ description: descriptions.join(' + '),
+ warranty_days: 90
+ })
+ });
+
+ const data = await res.json();
+ if (data.success) {
+ showToast('平台报价已生成');
+ closeModals();
+ loadOrders();
+ } else {
+ showToast(data.message || '生成失败');
+ }
+ } catch (e) {
+ showToast('网络错误');
+ }
+ }
+
+ // ===== 发货功能 =====
+ let currentShipMode = 'express';
+ function openShipModal(orderNo) {
+ currentOrderNo = orderNo;
+ document.getElementById('shipOrderNo').textContent = orderNo;
+ document.getElementById('shipTrackingNo').value = '';
+ document.getElementById('shipCarrier').value = '';
+ selectShipMode('express');
+ document.getElementById('shipModal').classList.add('active');
+ }
+
+ function selectShipMode(mode) {
+ currentShipMode = mode;
+ document.getElementById('shipModeExpress').style.borderColor = mode === 'express' ? 'var(--accent-blue)' : 'var(--border-subtle)';
+ document.getElementById('shipModeExpress').style.fontWeight = mode === 'express' ? '600' : '400';
+ document.getElementById('shipModeShop').style.borderColor = mode === 'shop' ? 'var(--accent-blue)' : 'var(--border-subtle)';
+ document.getElementById('shipModeShop').style.fontWeight = mode === 'shop' ? '600' : '400';
+ document.getElementById('shipExpressForm').style.display = mode === 'express' ? 'block' : 'none';
+ }
+
+ async function confirmShip() {
+ if (!currentOrderNo) return;
+
+ const mode = currentShipMode;
+ const carrier = document.getElementById('shipCarrier').value;
+ const trackingNo = document.getElementById('shipTrackingNo').value.trim();
+
+ if (mode === 'express') {
+ if (!carrier) { showToast('请选择快递公司'); return; }
+ if (!trackingNo) { showToast('请输入快递单号'); return; }
+ }
+
+ const payload = { order_no: currentOrderNo, ship_mode: mode };
+ if (mode === 'express') {
+ payload.carrier = carrier;
+ payload.tracking_no = trackingNo;
+ }
+
+ try {
+ const res = await fetchWithMerchant(`${API_BASE}/order/ship`, {
+ method: 'POST',
+ headers: { 'Content-Type': 'application/json' },
+ body: JSON.stringify(payload)
+ });
+
+ const data = await res.json();
+ if (data.success) {
+ showToast(mode === 'express' ? '发货成功' : '已通知客户取货');
+ closeModals();
+ loadOrders();
+ } else {
+ showToast(data.message || '操作失败');
+ }
+ } catch (e) {
+ showToast('网络错误');
+ }
+ }
+
+ // ===== 维修状态 =====
+ async function confirmOfflinePay(orderNo, paymentType, amount) {
+ if (!confirm(`确认已收到${paymentType === 'deposit' ? '定金' : '尾款'} ¥${amount}?`)) return;
+ try {
+ const res = await fetchWithMerchant(`${API_BASE}/pay/confirm-offline`, {
+ method: 'POST',
+ headers: { 'Content-Type': 'application/json' },
+ body: JSON.stringify({ order_no: orderNo, payment_type: paymentType, amount: amount })
+ });
+ const data = await res.json();
+ if (data.success) {
+ showToast(`${paymentType === 'deposit' ? '定金' : '尾款'}确认成功`);
+ loadOrders();
+ } else {
+ showToast(data.message || '确认失败');
+ }
+ } catch (e) {
+ showToast('网络错误');
+ }
+ }
+
+ async function startRepair(orderNo) {
+ if (!confirm('确认开始维修?')) return;
+
+ try {
+ const res = await fetchWithMerchant(`${API_BASE}/order/repair`, {
+ method: 'POST',
+ headers: { 'Content-Type': 'application/json' },
+ body: JSON.stringify({ order_no: orderNo, action: 'start' })
+ });
+
+ const data = await res.json();
+ if (data.success) {
+ showToast('开始维修');
+ loadOrders();
+ } else if (data.require_payment) {
+ showToast(data.message);
+ } else {
+ showToast(data.message || '操作失败');
+ }
+ } catch (e) {
+ showToast('网络错误');
+ }
+ }
+
+ async function completeRepair(orderNo) {
+ if (!confirm('确认维修完成?')) return;
+
+ try {
+ const res = await fetchWithMerchant(`${API_BASE}/order/repair`, {
+ method: 'POST',
+ headers: { 'Content-Type': 'application/json' },
+ body: JSON.stringify({ order_no: orderNo, action: 'complete' })
+ });
+
+ const data = await res.json();
+ if (data.success) {
+ showToast('维修完成');
+ loadOrders();
+ } else {
+ showToast(data.message || '操作失败');
+ }
+ } catch (e) {
+ showToast('网络错误');
+ }
+ }
+
+ function formatDate(d) {
+ if (!d) return '-';
+ const date = new Date(d);
+ return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')} ${String(date.getHours()).padStart(2,'0')}:${String(date.getMinutes()).padStart(2,'0')}`;
+ }
+ function fmtMoney(n){ return n ? '¥' + Number(n).toFixed(2) : '¥0.00'; }
+
+ async function generateAiReport(orderNo) {
+ const order = allOrders.find(o => o.order_no === orderNo);
+ if (!order) return;
+ showToast('AI 正在生成检测报告，请稍候…');
+ try {
+ const res = await fetchWithMerchant(`${API_BASE}/order/${orderNo}/ai_diagnose_and_save`, { method: 'POST' });
+ const data = await res.json();
+ if (data.success) {
+ showToast('检测报告已生成');
+ // refresh local cached orders then re-render detail
+ await loadOrders();
+ viewDetail(orderNo);
+ } else {
+ showToast(data.message || '生成失败');
+ }
+ } catch (e) {
+ showToast('网络错误');
+ }
+ }
+
+ // ===== 详情查看 =====
+ async function viewDetail(orderNo) {
+ const localOrder = allOrders.find(o => o.order_no === orderNo);
+ if (!localOrder) return;
+ document.getElementById('detailBody').innerHTML = '<div class="loading">加载详情中...</div>';
+ document.getElementById('detailFooter').style.display = 'none';
+ document.getElementById('detailModal').classList.add('active');
+
+ try {
+ const res = await fetchWithMerchant(`${API_BASE}/order/detail?order_no=${orderNo}`);
+ const data = await res.json();
+ if (!data.success) { showToast(data.message || '加载失败'); closeModals(); return; }
+ const order = data.order;
+ const status = STATUS_MAP[order.status] || { text: order.status, class: '' };
+
+ let html = '';
+
+ // 头部
+ html += `
+ <div style="text-align:center; margin-bottom:16px;">
+ <div style="font-family:monospace; font-size:22px; font-weight:700; color:var(--accent-orange);">${order.order_no}</div>
+ <div style="margin-top:8px;">
+ <span style="display:inline-block; padding:4px 12px; border-radius:8px; font-size:13px; font-weight:500; background:${status.class ? 'var(--accent-' + (status.class.includes('green')?'green':status.class.includes('red')?'red':status.class.includes('orange')?'orange':'blue') + ')' : 'var(--bg-tertiary)'}20; color:${status.class ? 'var(--accent-' + (status.class.includes('green')?'green':status.class.includes('red')?'red':status.class.includes('orange')?'orange':'blue') + ')' : 'var(--text-primary)'};">${status.text}</span>
+ </div>
+ <div style="font-size:12px; color:var(--text-tertiary); margin-top:6px;">创建时间:${formatDate(order.created_at)}</div>
+ </div>`;
+
+ // 客户信息
+html += `
+ <div style="background:var(--bg-tertiary); border-radius:12px; padding:14px; margin-bottom:12px; border:1px solid var(--border-subtle);">
+ <div style="font-weight:600; margin-bottom:10px; font-size:14px;">客户信息</div>
+ <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:13px; color:var(--text-secondary);">
+ <div>姓名:${order.customer_name || order.customer_phone || '-'}</div>
+ <div>手机:<a href="tel:${order.customer_phone}" style="color:var(--accent-blue); text-decoration:none;">${order.customer_phone || '-'}</a></div>
+ <div>送修方式:${order.repair_mode === 'shop' ? '到店维修' : '快递寄修'}</div>
+ </div>
+ </div>`;
+
+ // 设备信息
+ html += `
+ <div style="background:var(--bg-tertiary); border-radius:12px; padding:14px; margin-bottom:12px; border:1px solid var(--border-subtle);">
+ <div style="font-weight:600; margin-bottom:10px; font-size:14px;">设备与故障</div>
+ <div style="font-size:13px; color:var(--text-secondary); line-height:1.7;">
+ <div>机型:${order.drone_model || '-'}</div>
+ <div style="margin-top:6px;">故障描述:${order.problem_description || '-'}</div>
+ </div>
+ </div>`;
+
+ // AI 初诊
+ if (order.ai_diagnosis) {
+ const d = order.ai_diagnosis;
+ const causesHtml = Array.isArray(d.causes) ? d.causes.join('<br>') : (d.possible_causes || d.causes || '-');
+ let partsHtml = '';
+ if (Array.isArray(d.parts_list)) {
+ partsHtml = d.parts_list.map(p => p.name).join('、');
+ } else if (d.recommended_parts) {
+ partsHtml = typeof d.recommended_parts === 'string' ? d.recommended_parts : (Array.isArray(d.recommended_parts) ? d.recommended_parts.join('、') : '');
+ } else if (Array.isArray(d.parts)) {
+ partsHtml = typeof d.parts[0] === 'string' ? d.parts.join('、') : d.parts.map(p => p.name || p).join('、');
+ }
+ const dataBadge = d.data_driven ? `<span style="display:inline-block; background:rgba(48,209,88,0.15); color:var(--accent-green); padding:1px 6px; border-radius:4px; font-size:11px; margin-left:6px;">数据驱动</span>` : '';
+ html += `
+ <div style="background:rgba(10,132,255,0.08); border-radius:12px; padding:14px; margin-bottom:12px; border:1px solid rgba(10,132,255,0.25);">
+ <div style="font-weight:600; margin-bottom:10px; font-size:14px; color:var(--accent-blue);">AI 初诊报告${dataBadge}</div>
+ <div style="font-size:13px; color:var(--text-secondary); line-height:1.7;">
+ ${causesHtml ? `<div>可能原因:${causesHtml}</div>` : ''}
+ ${partsHtml ? `<div>建议配件:${partsHtml}</div>` : ''}
+ ${(d.total_price || order.estimated_price) ? `<div style="margin-top:6px; color:var(--accent-orange);">预估费用:${fmtMoney(d.total_price || order.estimated_price)}</div>` : ''}
+ ${d.data_driven && d.history_samples ? `<div style="margin-top:4px; font-size:12px; color:var(--text-tertiary);">基于 ${d.history_samples} 单历史维修案例与平台定价规则生成</div>` : ''}
+ </div>
+ </div>`;
+ } else if (['received','inspecting','inspected','quoted','repairing'].includes(order.status)) {
+ html += `
+ <div style="background:rgba(10,132,255,0.05); border-radius:12px; padding:14px; margin-bottom:12px; border:1px dashed rgba(10,132,255,0.35); text-align:center;">
+ <div style="font-size:13px; color:var(--text-secondary); margin-bottom:8px;">尚未生成 AI 检测报告</div>
+ <button class="btn btn-primary" onclick="generateAiReport('${order.order_no}')" style="font-size:12px; padding:6px 12px;">AI 一键生成检测报告</button>
+ </div>`;
+ }
+
+ // 商家检测
+ if (order.detection_result) {
+ const det = order.detection_result;
+ const faultDesc = det.fault_description || '';
+ const repairPlan = det.repair_plan || '';
+ const requiredParts = Array.isArray(det.required_parts) ? det.required_parts : [];
+ const optionalParts = Array.isArray(det.optional_parts) ? det.optional_parts : [];
+
+ const requiredHtml = requiredParts.length
+ ? requiredParts.map(p => `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--accent-green);"></span><span>${p}</span><span style="font-size:11px;color:var(--text-tertiary);background:var(--bg-secondary);padding:1px 6px;border-radius:4px;">必修</span></div>`).join('')
+ : '<div style="font-size:13px;color:var(--text-tertiary);">暂无必修项目</div>';
+
+ const optionalHtml = optionalParts.length
+ ? optionalParts.map(p => `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--accent-blue);"></span><span>${p}</span><span style="font-size:11px;color:var(--accent-blue);background:rgba(10,132,255,0.1);padding:1px 6px;border-radius:4px;">选修</span></div>`).join('')
+ : '<div style="font-size:13px;color:var(--text-tertiary);">暂无选修项目</div>';
+
+ html += `
+ <div style="background:var(--bg-tertiary); border-radius:12px; padding:14px; margin-bottom:12px; border:1px solid var(--border-subtle);">
+ <div style="font-weight:600; margin-bottom:10px; font-size:14px;">商家检测报告</div>
+ <div style="font-size:13px; color:var(--text-secondary); line-height:1.7; margin-bottom:10px;">
+ ${faultDesc ? `<div><strong>故障描述：</strong>${faultDesc}</div>` : ''}
+ ${repairPlan ? `<div><strong>维修方案：</strong>${repairPlan}</div>` : ''}
+ </div>
+ <div style="margin-bottom:10px;">
+ <div style="font-size:12px; color:var(--text-tertiary); margin-bottom:6px;">建议维修项目（必修）</div>
+ ${requiredHtml}
+ </div>
+ <div style="margin-bottom:10px;">
+ <div style="font-size:12px; color:var(--text-tertiary); margin-bottom:6px;">可选维修项目（选修）</div>
+ ${optionalHtml}
+ </div>
+ </div>`;
+ }
+
+ // 报价单
+ if (order.quote_data) {
+ const q = order.quote_data;
+ const items = q.items || [];
+ html += `
+ <div style="background:var(--bg-tertiary); border-radius:12px; padding:14px; margin-bottom:12px; border:1px solid var(--border-subtle);">
+ <div style="font-weight:600; margin-bottom:10px; font-size:14px;">报价单</div>
+ <div style="font-size:13px;">`;
+ if (items.length) {
+ html += `<div style="display:grid; grid-template-columns:1fr auto auto; gap:8px 12px; margin-bottom:10px;">`;
+ items.forEach(it => {
+ html += `<div style="color:var(--text-secondary);">${it.name}</div><div style="color:var(--text-tertiary);">x${it.qty||1}</div><div style="text-align:right; color:var(--text-primary);">${fmtMoney(it.price*(it.qty||1))}</div>`;
+ });
+ html += `</div>`;
+ }
+ html += `
+ <div style="border-top:1px solid var(--border-subtle); padding-top:10px; text-align:right; font-weight:600; color:var(--accent-orange);">合计:${fmtMoney(q.total || order.quote_amount)}</div>
+ </div>
+ </div>`;
+ }
+
+ // 物流信息
+ let logisticsHtml = '';
+ if (order.customer_tracking_no) {
+ logisticsHtml += `<div style="flex:1; min-width:140px; background:var(--bg-primary); border-radius:8px; padding:10px; border:1px solid var(--border-subtle);">
+ <div style="font-size:12px; color:var(--text-tertiary); margin-bottom:4px;">客户寄件</div>
+ <div style="font-size:13px; font-weight:500;">${order.customer_carrier || '-'}</div>
+ <div style="font-family:monospace; font-size:13px; color:var(--text-secondary); margin-top:4px;">${order.customer_tracking_no}</div>
+ </div>`;
+ }
+ if (order.merchant_tracking_no) {
+ logisticsHtml += `<div style="flex:1; min-width:140px; background:var(--bg-primary); border-radius:8px; padding:10px; border:1px solid var(--border-subtle);">
+ <div style="font-size:12px; color:var(--text-tertiary); margin-bottom:4px;">商家返件</div>
+ <div style="font-size:13px; font-weight:500;">${order.merchant_carrier || '-'}</div>
+ <div style="font-family:monospace; font-size:13px; color:var(--text-secondary); margin-top:4px;">${order.merchant_tracking_no}</div>
+ </div>`;
+ }
+ if (logisticsHtml) {
+ html += `
+ <div style="background:var(--bg-tertiary); border-radius:12px; padding:14px; margin-bottom:12px; border:1px solid var(--border-subtle);">
+ <div style="font-weight:600; margin-bottom:10px; font-size:14px;">物流信息</div>
+ <div style="display:flex; gap:10px; flex-wrap:wrap;">${logisticsHtml}</div>
+ </div>`;
+ }
+
+ // 进度时间轴
+ if (order.step_logs && order.step_logs.length) {
+ html += `
+ <div style="background:var(--bg-tertiary); border-radius:12px; padding:14px; margin-bottom:12px; border:1px solid var(--border-subtle);">
+ <div style="font-weight:600; margin-bottom:10px; font-size:14px;">进度记录</div>
+ <div style="font-size:13px;">`;
+ order.step_logs.slice().reverse().forEach((log, idx) => {
+ const isLast = idx === order.step_logs.length - 1;
+ html += `
+ <div style="display:flex; gap:10px; position:relative; ${!isLast?'padding-bottom:14px;':''}">
+ ${!isLast?'<div style="position:absolute; left:5px; top:10px; bottom:0; width:2px; background:var(--border-subtle);"></div>':''}
+ <div style="width:12px; height:12px; border-radius:50%; background:var(--accent-blue); flex-shrink:0; margin-top:3px; z-index:1;"></div>
+ <div style="flex:1;">
+ <div style="color:var(--text-primary); font-weight:500;">${log.action || log.step}</div>
+ <div style="color:var(--text-tertiary); font-size:12px; margin-top:2px;">${formatDate(log.created_at)} ${log.operator ? '· ' + log.operator : ''}</div>
+ </div>
+ </div>`;
+ });
+ html += `</div></div>`;
+ }
+
+ // 维修日志
+ if (order.repair_logs && order.repair_logs.length) {
+ html += `
+ <div style="background:var(--bg-tertiary); border-radius:12px; padding:14px; margin-bottom:12px; border:1px solid var(--border-subtle);">
+ <div style="font-weight:600; margin-bottom:10px; font-size:14px;">维修记录</div>
+ <div style="font-size:13px; color:var(--text-secondary); line-height:1.7;">`;
+ order.repair_logs.forEach(log => {
+ html += `<div style="margin-bottom:8px; padding-bottom:8px; border-bottom:1px solid var(--border-subtle);">
+ <div style="color:var(--text-primary); font-weight:500;">${log.action}</div>
+ <div>技师:${log.technician || '-'} · 时间:${formatDate(log.timestamp)}</div>
+ ${log.parts_used ? `<div>使用配件:${log.parts_used}</div>` : ''}
+ ${log.notes ? `<div>备注:${log.notes}</div>` : ''}
+ </div>`;
+ });
+ html += `</div></div>`;
+ }
+
+ // 支付信息卡片
+ if (order.quote_amount && order.quote_amount > 0) {
+ const pendingFinal = Math.max(0, (order.quote_amount || 0) - (order.deposit_amount || 0));
+ html += `
+ <div style="background:var(--bg-tertiary); border-radius:12px; padding:14px; margin-bottom:12px; border:1px solid var(--border-subtle);">
+ <div style="font-weight:600; margin-bottom:10px; font-size:14px;">费用与支付</div>
+ <div style="display:grid; grid-template-columns:1fr auto; gap:8px 12px; font-size:13px;">
+ <div style="color:var(--text-secondary);">维修报价</div><div>¥${order.quote_amount}</div>
+ <div style="color:var(--text-secondary);">定金</div><div style="color:${order.deposit_paid ? 'var(--accent-green)' : 'var(--accent-orange)'}">${order.deposit_paid ? '已付' : '待付'} ¥${order.deposit_amount || 0}</div>
+ <div style="color:var(--text-secondary);">尾款</div><div style="color:${order.final_paid ? 'var(--accent-green)' : 'var(--accent-orange)'}">${order.final_paid ? '已付' : '待付'} ¥${pendingFinal}</div>
+ </div>
+ </div>`;
+ }
+
+ document.getElementById('detailBody').innerHTML = html;
+
+ // 底部操作按钮
+ let footerHtml = '';
+ const isMyOrder = !order.merchant_id || order.merchant_id === currentMerchant.id;
+ const pendingFinal = Math.max(0, (order.quote_amount || 0) - (order.deposit_amount || 0));
+
+ const actions = {
+   pending: { primary: `<button class="btn btn-primary" onclick="closeModals(); openAcceptModal('${order.order_no}')">接单</button>`, secondary: '' },
+   assigned: { primary: `<button class="btn btn-primary" onclick="closeModals(); openReceiveModal('${order.order_no}')">确认收货</button>`, secondary: '' },
+   accepted: { primary: `<button class="btn btn-primary" onclick="closeModals(); openReceiveModal('${order.order_no}')">确认收货</button>`, secondary: '' },
+   received: { primary: `<button class="btn btn-primary" onclick="closeModals(); openInspectModal('${order.order_no}')">提交检测</button>`, secondary: '' },
+   detected: { primary: `<button class="btn btn-primary" onclick="closeModals(); openQuoteModal('${order.order_no}', '${(order.drone_model || '').replace(/'/g, "\\'")}')">生成报价</button>`, secondary: '' },
+   inspected: { primary: `<button class="btn btn-primary" onclick="closeModals(); openQuoteModal('${order.order_no}', '${(order.drone_model || '').replace(/'/g, "\\'")}')">生成报价</button>`, secondary: '' },
+   quoted: { primary: `<span style="color:var(--text-secondary); font-size:13px;">已报价，等待客户确认</span>`, secondary: '' },
+   confirmed: { primary: isMyOrder ? (order.deposit_paid ? `<button class="btn btn-primary" onclick="closeModals(); startRepair('${order.order_no}')">开始维修</button>` : `<button class="btn btn-primary" style="opacity:0.5;cursor:not-allowed;" disabled>等待定金</button>`) : '', secondary: isMyOrder && !order.deposit_paid ? `<button class="btn btn-secondary" onclick="closeModals(); confirmOfflinePay('${order.order_no}', 'deposit', ${order.deposit_amount || 0})">确认线下定金</button>` : '' },
+   repairing: { primary: `<button class="btn btn-primary" onclick="closeModals(); completeRepair('${order.order_no}')">维修完成</button>`, secondary: '' },
+   repaired: { primary: (pendingFinal > 0 && !order.final_paid
+ ? `<button class="btn btn-primary" style="opacity:0.5;cursor:not-allowed;" disabled>等待尾款</button>`
+ : `<button class="btn btn-primary" onclick="closeModals(); openShipModal('${order.order_no}')">发货</button>`), secondary: '' },
+   shipping: { primary: (pendingFinal > 0 && !order.final_paid
+ ? `<button class="btn btn-primary" style="opacity:0.5;cursor:not-allowed;" disabled>等待尾款</button>`
+ : `<button class="btn btn-primary" onclick="closeModals(); openShipModal('${order.order_no}')">发货</button>`), secondary: '' },
+   delivered: { primary: '', secondary: isMyOrder && pendingFinal > 0 && !order.final_paid ? `<button class="btn btn-secondary" onclick="closeModals(); confirmOfflinePay('${order.order_no}', 'final', ${pendingFinal})">确认线下尾款</button>` : '' },
+   completed: { primary: '', secondary: '' }
+ };
+ const act = actions[order.status];
+ if (act && (act.primary || act.secondary)) {
+   footerHtml += `<button class="btn btn-secondary" onclick="closeModals()">关闭</button>`;
+   if (act.secondary) footerHtml += act.secondary;
+   if (act.primary) footerHtml += act.primary;
+ } else {
+   footerHtml += `<button class="btn btn-secondary" onclick="closeModals()" style="flex:1;">关闭</button>`;
+ }
+ document.getElementById('detailFooter').innerHTML = footerHtml;
+ document.getElementById('detailFooter').style.display = 'flex';
+
+ } catch (e) {
+ showToast('加载详情失败');
+ closeModals();
+ }
+ }
+
+ // ===== 商户资料 =====
+ async function loadMerchantList() {
+ try {
+ const res = await fetchWithMerchant(`${API_BASE}/merchants`);
+ const data = await res.json();
+ if (data.success && data.merchants) {
+ merchantList = data.merchants;
+ const select = document.getElementById('merchantSwitch');
+ if (select) {
+ select.innerHTML = merchantList.map(m => `<option value="${m.id}">${m.name}</option>`).join('');
+ select.value = currentMerchant.id;
+ }
+ }
+ } catch (e) {}
+ }
+
+ function switchMerchant(merchantId) {
+ const m = merchantList.find(x => x.id === merchantId);
+ if (m) {
+ currentMerchant = m;
+ const display = document.getElementById('merchantNameDisplay');
+ if (display) display.innerHTML = `${m.name}<span style="font-size: 12px; opacity: 0.6;">▾</span>`;
+ renderOrders();
+ updateStats();
+ showToast(`已切换至 ${m.name}`);
+ }
+ }
+
+ async function loadMerchantInfo() {
+ try {
+ const res = await fetchWithMerchant(`${API_BASE}/merchant/info`);
+ const data = await res.json();
+ if (data.success && data.merchant) {
+ if (!merchantList.length || !merchantList.find(m => m.id === currentMerchant.id)) {
+ currentMerchant = data.merchant;
+ const select = document.getElementById('merchantSwitch');
+ if (select) select.value = currentMerchant.id;
+ }
+ const display = document.getElementById('merchantNameDisplay');
+ if (display) display.innerHTML = `${currentMerchant.name}<span style="font-size: 12px; opacity: 0.6;">▾</span>`;
+ }
+ } catch (e) {}
+ }
+
+ function openMerchantModal() {
+ const m = currentMerchant || {};
+ document.getElementById('mName').value = m.name || '';
+ document.getElementById('mContact').value = m.contact_name || '';
+ document.getElementById('mPhone').value = m.phone || '';
+ document.getElementById('mAddress').value = m.address || '';
+ document.getElementById('mHours').value = m.business_hours || '';
+ document.getElementById('merchantModal').classList.add('active');
+ }
+
+ async function saveMerchantInfo() {
+ const payload = {
+ name: document.getElementById('mName').value.trim(),
+ contact_name: document.getElementById('mContact').value.trim(),
+ phone: document.getElementById('mPhone').value.trim(),
+ address: document.getElementById('mAddress').value.trim(),
+ business_hours: document.getElementById('mHours').value.trim()
+ };
+ if (!payload.name) {
+ showToast('商户名称不能为空');
+ return;
+ }
+ try {
+ const res = await fetchWithMerchant(`${API_BASE}/merchant/info`, {
+ method: 'PUT',
+ headers: { 'Content-Type': 'application/json' },
+ body: JSON.stringify(payload)
+ });
+ const data = await res.json();
+ if (data.success) {
+ showToast('商户资料已更新');
+ closeModals();
+ loadMerchantInfo();
+ } else {
+ showToast(data.message || '保存失败');
+ }
+ } catch (e) {
+ showToast('网络错误');
+ }
+ }
+
+ // ===== AI助手 =====
+ function toggleAI() {
+ document.getElementById('aiChat').classList.toggle('active');
+ }
+
+ let aiListening = false;
+ function startVoiceRecognition() {
+ if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+ showToast('您的浏览器不支持语音识别');
+ return;
+ }
+ if (aiListening) return;
+ const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+ const recognition = new SpeechRecognition();
+ recognition.lang = 'zh-CN';
+ recognition.continuous = false;
+ recognition.interimResults = false;
+ recognition.onstart = () => {
+ aiListening = true;
+ const btn = document.getElementById('aiVoiceBtn');
+ if (btn) btn.style.color = '#ff453a';
+ showToast('正在聆听...');
+ };
+ recognition.onend = () => {
+ aiListening = false;
+ const btn = document.getElementById('aiVoiceBtn');
+ if (btn) btn.style.color = '';
+ };
+ recognition.onresult = (event) => {
+ const transcript = event.results[0][0].transcript;
+ document.getElementById('aiInput').value = transcript;
+ sendAI(transcript);
+ };
+ recognition.onerror = () => {
+ aiListening = false;
+ showToast('语音识别失败,请重试');
+ };
+ recognition.start();
+ }
+
+ function addAIMessage(html, isUser = false) {
+ const messages = document.getElementById('aiMessages');
+ messages.innerHTML += `
+ <div class="ai-message ${isUser ? 'user' : ''}">
+ ${isUser ? '' : '<div class="ai-avatar"><svg style="width:16px;height:16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8.01" y2="16"/><line x1="16" y1="16" x2="16.01" y2="16"/></svg></div>'}
+ <div class="ai-bubble">${html}</div>
+ </div>
+ `;
+ messages.scrollTop = messages.scrollHeight;
+ }
+
+ async function handleAICommand(message) {
+ const m = message.trim();
+ const lower = m.toLowerCase();
+
+ // 1. 智能诊断意图
+ if (/^(诊断|检测|分析|帮看看|报价|估价|价格).*?/.test(m)) {
+ const droneMatch = m.match(/(mini\s*3\s*pro|mini\s*3|mini\s*2|mini\s*4\s*pro|air\s*2s|air\s*2|air\s*3|mavic\s*2|mavic\s*3|avata|fpv|mini)[\w\s]*/i);
+ const drone = droneMatch ? droneMatch[0].replace(/\s+/g, ' ').trim() : null;
+ if (!drone) {
+ return '请告诉我具体机型,例如:"检测 Mini 3 Pro 云台抖动"';
+ }
+ const problem = m.replace(/^(诊断|检测|分析|帮看看|报价|估价|价格)\s*/i, '').replace(drone, '').trim() || '故障待确认';
+ addAIMessage(`正在对 <b>${drone}</b> 进行AI诊断...`);
+ try {
+ const res = await fetchWithMerchant(`${API_BASE}/ai/diagnose`, {
+ method: 'POST',
+ headers: { 'Content-Type': 'application/json' },
+ body: JSON.stringify({ model: drone, problem: problem })
+ });
+ const data = await res.json();
+ if (!data.success) return '诊断接口异常,请稍后重试';
+ const d = data.diagnosis;
+ const dataBadge = d.data_driven ? '<span style="display:inline-block;background:rgba(48,209,88,0.15);color:var(--accent-green);padding:1px 6px;border-radius:4px;font-size:11px;margin-left:6px;">数据驱动</span>' : '';
+ let html = `<div style="font-weight:600;margin-bottom:8px;">AI 诊断报告${dataBadge}</div>`;
+ html += `<div style="font-size:13px;color:var(--text-secondary);line-height:1.6;">`;
+ html += `<div><b>机型:</b>${drone}</div>`;
+ html += `<div><b>故障:</b>${problem}</div>`;
+ if (d.causes && d.causes.length) html += `<div><b>可能原因:</b>${d.causes.join('<br>')}</div>`;
+ if (d.check_points && d.check_points.length) html += `<div><b>检测要点:</b>${d.check_points.map(c => '• ' + c).join('<br>')}</div>`;
+ if (d.parts_list && d.parts_list.length) {
+ html += `<div><b>建议配件:</b>${d.parts_list.map(p => p.name).join('、')}</div>`;
+ }
+ html += `<div style="margin-top:6px;color:var(--accent-orange);font-weight:600;">预估费用:¥${d.total_price || 0}</div>`;
+ html += `</div>`;
+ if (d.data_driven && d.history_samples) {
+ html += `<div style="margin-top:6px;font-size:11px;color:var(--text-tertiary);">基于 ${d.history_samples} 单历史维修案例与平台定价规则生成</div>`;
+ }
+ // 快捷操作
+ html += `<div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">`;
+ html += `<button onclick="aiQuickCreateOrder('${drone}', '${problem.replace(/'/g, "\\'")}', ${d.total_price || 0})" style="padding:6px 10px;background:var(--accent-orange);border:none;border-radius:6px;color:#000;font-size:12px;font-weight:500;cursor:pointer;">创建工单</button>`;
+ html += `<button onclick="aiQuickQuote('${drone.replace(/'/g, "\\'")}', '${problem.replace(/'/g, "\\'")}')" style="padding:6px 10px;background:var(--accent-blue);border:none;border-radius:6px;color:#fff;font-size:12px;font-weight:500;cursor:pointer;">查看定价</button>`;
+ html += `</div>`;
+ addAIMessage(html);
+ return null; // 已直接渲染
+ } catch (e) {
+ return '网络异常,诊断失败';
+ }
+ }
+
+ // 2. 订单操作意图(开始检测 / 生成报价 / 确认发货 / 接单)
+ const actionMap = {
+ '接单': { status: 'pending', action: o => `openAcceptModal('${o.order_no}')` },
+ '收货': { status: ['assigned', 'accepted'], action: o => `openReceiveModal('${o.order_no}')` },
+ '确认收货': { status: ['assigned', 'accepted'], action: o => `openReceiveModal('${o.order_no}')` },
+ '检测': { status: ['received', 'detected'], action: o => `openInspectModal('${o.order_no}')` },
+ '开始检测': { status: ['received', 'detected'], action: o => `openInspectModal('${o.order_no}')` },
+ '报价': { status: ['detected', 'inspected'], action: o => `openQuoteModal('${o.order_no}', '${(o.drone_model || '').replace(/'/g, "\\'")}')` },
+ '生成报价': { status: ['detected', 'inspected'], action: o => `openQuoteModal('${o.order_no}', '${(o.drone_model || '').replace(/'/g, "\\'")}')` },
+ '维修': { status: 'confirmed', action: o => `startRepair('${o.order_no}')` },
+ '开始维修': { status: 'confirmed', action: o => `startRepair('${o.order_no}')` },
+ '完成': { status: 'repairing', action: o => `completeRepair('${o.order_no}')` },
+ '维修完成': { status: 'repairing', action: o => `completeRepair('${o.order_no}')` },
+ '发货': { status: ['repaired', 'shipping'], action: o => `openShipModal('${o.order_no}')` },
+ '确认发货': { status: ['repaired', 'shipping'], action: o => `openShipModal('${o.order_no}')` }
+ };
+
+ for (const [actionName, cfg] of Object.entries(actionMap)) {
+ if (m.includes(actionName)) {
+ // 尝试提取订单号
+ const orderNoMatch = m.match(/WR\d{14}/i);
+ let targetOrders = [];
+ if (orderNoMatch) {
+ const o = allOrders.find(x => x.order_no === orderNoMatch[0]);
+ if (o) targetOrders.push(o);
+ } else {
+ const statuses = Array.isArray(cfg.status) ? cfg.status : [cfg.status];
+ targetOrders = allOrders.filter(o => statuses.includes(o.status));
+ }
+ if (targetOrders.length === 0) {
+ return `没有找到可「${actionName}」的订单。${orderNoMatch ? '请检查订单号是否正确。' : '当前没有处于该状态的订单。'}`;
+ }
+ if (targetOrders.length === 1) {
+ const o = targetOrders[0];
+ // 直接执行
+ setTimeout(() => {
+ toggleAI();
+ closeModals();
+ eval(cfg.action(o));
+ }, 300);
+ return `已为您打开订单 <b>${o.order_no}</b> 的「${actionName}」界面。`;
+ }
+ // 多个匹配,列出列表
+ let html = `找到 ${targetOrders.length} 个可「${actionName}」的订单,请点击操作:`;
+ html += `<div style="margin-top:8px;display:flex;flex-direction:column;gap:6px;">`;
+ targetOrders.slice(0, 5).forEach(o => {
+ html += `<div style="background:var(--bg-tertiary);padding:8px 10px;border-radius:8px;display:flex;justify-content:space-between;align-items:center;">`;
+ html += `<div style="font-size:12px;"><div style="font-family:monospace;">${o.order_no}</div><div style="color:var(--text-tertiary);">${o.drone_model || '-'} · ${o.customer_name || '-'}</div></div>`;
+ html += `<button onclick="toggleAI();closeModals();${cfg.action(o)}" style="padding:5px 10px;background:var(--accent-blue);border:none;border-radius:6px;color:#fff;font-size:12px;cursor:pointer;">${actionName}</button>`;
+ html += `</div>`;
+ });
+ html += `</div>`;
+ addAIMessage(html);
+ return null;
+ }
+ }
+
+ // 3. 库存查询意图
+ if (/^(查库存|库存|有多少|还剩|查询配件)/.test(m)) {
+ const keyword = m.replace(/^(查库存|库存|有多少|还剩|查询配件)\s*/, '').trim();
+ if (!keyword) return '请告诉我要查什么配件,例如:"查库存 云台电机"';
+ try {
+ const res = await fetchWithMerchant(`${API_BASE}/inventory/list?search=${encodeURIComponent(keyword)}`);
+ const data = await res.json();
+ if (data.success && data.items && data.items.length) {
+ let html = `<div style="font-weight:600;margin-bottom:8px;">「${keyword}」库存查询结果</div>`;
+ html += `<div style="display:flex;flex-direction:column;gap:6px;">`;
+ data.items.slice(0, 5).forEach(item => {
+ html += `<div style="background:var(--bg-tertiary);padding:8px 10px;border-radius:8px;font-size:13px;">`;
+ html += `<div style="display:flex;justify-content:space-between;"><span>${item.name}</span><span style="color:${item.stock > 0 ? 'var(--accent-green)' : 'var(--accent-red)'};">${item.stock}个</span></div>`;
+ html += `<div style="color:var(--text-tertiary);font-size:11px;">${item.part_number || ''} · ${item.drone_model || '通用'}</div>`;
+ html += `</div>`;
+ });
+ html += `</div>`;
+ addAIMessage(html);
+ return null;
+ } else {
+ return `没有找到与「${keyword}」相关的库存记录。`;
+ }
+ } catch (e) {
+ return '库存查询失败,请稍后重试';
+ }
+ }
+
+ // 4. 数据统计意图
+ if (/^(今日|今天|本周|这周|本月|这个月|统计|查询).*(单|收入|完成|报价|维修)/.test(m) || /^(有多少|几笔).*(单|订单)/.test(m)) {
+ const todayStr = new Date().toISOString().slice(0, 10);
+ const todayPending = allOrders.filter(o => o.status === 'pending' && o.created_at && o.created_at.startsWith(todayStr)).length;
+ const todayRepairing = allOrders.filter(o => o.status === 'repairing' && o.updated_at && o.updated_at.startsWith(todayStr)).length;
+ const todayCompleted = allOrders.filter(o => o.status === 'completed' && o.updated_at && o.updated_at.startsWith(todayStr)).length;
+ const totalPending = allOrders.filter(o => o.status === 'pending').length;
+ const totalRepairing = allOrders.filter(o => o.status === 'repairing').length;
+ const totalQuoted = allOrders.filter(o => o.status === 'quoted').length;
+ let html = `<div style="font-weight:600;margin-bottom:8px;">数据简报</div>`;
+ html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px;">`;
+ html += `<div style="background:var(--bg-tertiary);padding:8px;border-radius:8px;text-align:center;"><div style="font-size:18px;font-weight:700;color:var(--accent-orange);">${totalPending}</div><div style="color:var(--text-tertiary);font-size:11px;">待接单</div></div>`;
+ html += `<div style="background:var(--bg-tertiary);padding:8px;border-radius:8px;text-align:center;"><div style="font-size:18px;font-weight:700;color:var(--accent-blue);">${totalRepairing}</div><div style="color:var(--text-tertiary);font-size:11px;">维修中</div></div>`;
+ html += `<div style="background:var(--bg-tertiary);padding:8px;border-radius:8px;text-align:center;"><div style="font-size:18px;font-weight:700;color:var(--accent-green);">${todayCompleted}</div><div style="color:var(--text-tertiary);font-size:11px;">今日完成</div></div>`;
+ html += `<div style="background:var(--bg-tertiary);padding:8px;border-radius:8px;text-align:center;"><div style="font-size:18px;font-weight:700;color:var(--accent-orange);">${totalQuoted}</div><div style="color:var(--text-tertiary);font-size:11px;">待确认报价</div></div>`;
+ html += `</div>`;
+ addAIMessage(html);
+ return null;
+ }
+
+ // 5. 新建工单意图
+ if (/^(新建|创建|新增).*(工单|订单)/.test(m)) {
+ return `请直接打开页面底部「工单」标签并点击新建,或者在客户下单页面创建。`;
+ }
+
+ return `收到「${m}」。<br><br>你可以尝试对我说:<br>• "检测 Mini 3 Pro 云台抖动"<br>• "开始检测 WR20260408123456"<br>• "查库存 云台电机"<br>• "今日数据简报"`;
+ }
+
+ function aiQuickCreateOrder(drone, problem, price) {
+ toggleAI();
+ showToast('请在工单列表中手动创建,后续将支持AI一键建单');
+ }
+
+ async function aiQuickQuote(drone, problem) {
+ try {
+ const res = await fetchWithMerchant(`${API_BASE}/ai/diagnose`, {
+ method: 'POST',
+ headers: { 'Content-Type': 'application/json' },
+ body: JSON.stringify({ model: drone, problem: problem })
+ });
+ const data = await res.json();
+ if (data.success && data.diagnosis && data.diagnosis.parts_list && data.diagnosis.parts_list.length) {
+ let html = `<div style="font-weight:600;margin-bottom:8px;">「${drone}」定价明细</div>`;
+ html += `<div style="display:flex;flex-direction:column;gap:6px;">`;
+ data.diagnosis.parts_list.forEach(p => {
+ html += `<div style="background:var(--bg-tertiary);padding:8px 10px;border-radius:8px;display:flex;justify-content:space-between;font-size:13px;">`;
+ html += `<span>${p.name}</span>`;
+ html += `<span style="color:var(--text-secondary);">配件 ¥${p.price || 0} + 人工 ¥${p.labor || 0} = <span style="color:var(--accent-orange);font-weight:600;">¥${p.total || ((p.price||0)+(p.labor||0))}</span></span>`;
+ html += `</div>`;
+ });
+ html += `</div>`;
+ html += `<div style="margin-top:8px;text-align:right;font-weight:600;color:var(--accent-orange);">合计:¥${data.diagnosis.total_price || 0}</div>`;
+ addAIMessage(html);
+ } else {
+ addAIMessage('未查询到该机型+故障的定价规则');
+ }
+ } catch (e) {
+ addAIMessage('定价查询失败');
+ }
+ }
+
+ async function sendAI(text) {
+ const input = document.getElementById('aiInput');
+ const message = text || input.value.trim();
+ if (!message) return;
+
+ addAIMessage(`<div>${message}</div>`, true);
+ input.value = '';
+
+ const reply = await handleAICommand(message);
+ if (reply) {
+ addAIMessage(reply);
+ }
+ }
+
+ // 标签切换
+ document.querySelectorAll('.tab').forEach(tab => {
+ tab.addEventListener('click', function() {
+ document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+ this.classList.add('active');
+ currentFilter = this.dataset.filter;
+ renderOrders();
+ });
+ });
+
+ // 初始化
+ loadMerchantInfo();
+ loadMerchantList();
+ loadOrders();
+ </script>
+</body>
+</html>

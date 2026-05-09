@@ -1,0 +1,19 @@
+{
+  "name": "miaoxiujiang",
+  "version": "1.0.0",
+  "description": "喵修匠无人机维修系统",
+  "envId": "njuosun-miaoxiujiang-d3a96a8c70e",
+  "framework": {
+    "name": "static",
+    "plugins": {
+      "client": {
+        "use": "@cloudbase/framework-plugin-website",
+        "inputs": {
+          "buildCommand": "echo 'No build needed'",
+          "outputPath": "./",
+          "ignore": ["*.log", ".git", "node_modules", "*.md"]
+        }
+      }
+    }
+  }
+}

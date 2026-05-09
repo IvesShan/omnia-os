@@ -1,0 +1,646 @@
+{
+  "视觉前盖板": {
+    "cost": 35,
+    "sale": null,
+    "purchase": 35,
+    "model": "Mavic 2",
+    "stock": 1
+  },
+  "IMU模块": {
+    "cost": 45,
+    "sale": null,
+    "purchase": 45,
+    "model": "spark",
+    "stock": 0
+  },
+  "遥控器主板": {
+    "cost": 188,
+    "sale": null,
+    "purchase": 188,
+    "model": "N1遥控器",
+    "stock": 0
+  },
+  "遥控器电池": {
+    "cost": 48,
+    "sale": null,
+    "purchase": 48,
+    "model": "Insprie",
+    "stock": 1
+  },
+  "下视觉模块": {
+    "cost": "#DIV/0!",
+    "sale": null,
+    "purchase": null,
+    "model": "Air2",
+    "stock": 0
+  },
+  "机身左侧盖": {
+    "cost": 18,
+    "sale": null,
+    "purchase": 18,
+    "model": "mini3p",
+    "stock": 1
+  },
+  "后视觉模块": {
+    "cost": "#DIV/0!",
+    "sale": null,
+    "purchase": null,
+    "model": "Air2",
+    "stock": 0
+  },
+  "电调板": {
+    "cost": 65,
+    "sale": null,
+    "purchase": 65,
+    "model": "Mavic 2",
+    "stock": 0
+  },
+  "机身右侧盖": {
+    "cost": 18,
+    "sale": null,
+    "purchase": 18,
+    "model": "mini3p",
+    "stock": 1
+  },
+  "前机臂转轴": {
+    "cost": 95.5454545454545,
+    "sale": null,
+    "purchase": 119,
+    "model": "mini5",
+    "stock": 3
+  },
+  "后机臂转轴": {
+    "cost": 95.5454545454545,
+    "sale": null,
+    "purchase": 119,
+    "model": "Mavic 2",
+    "stock": 3
+  },
+  "机身底壳": {
+    "cost": "#DIV/0!",
+    "sale": null,
+    "purchase": null,
+    "model": "mini2se",
+    "stock": 0
+  },
+  "右后机臂": {
+    "cost": "#DIV/0!",
+    "sale": null,
+    "purchase": null,
+    "model": "Air3",
+    "stock": 0
+  },
+  "核心板": {
+    "cost": 70,
+    "sale": null,
+    "purchase": 80,
+    "model": "mini2se",
+    "stock": 2
+  },
+  "机身上壳": {
+    "cost": 130,
+    "sale": null,
+    "purchase": 130,
+    "model": "精灵4rtk",
+    "stock": 0
+  },
+  "机身中框": {
+    "cost": 300,
+    "sale": null,
+    "purchase": 300,
+    "model": "精灵4rtk",
+    "stock": 0
+  },
+  "镜头芯": {
+    "cost": 360,
+    "sale": null,
+    "purchase": 360,
+    "model": "Air3",
+    "stock": 0
+  },
+  "云台信号线": {
+    "cost": 115,
+    "sale": null,
+    "purchase": 230,
+    "model": "Mavic 3p",
+    "stock": 1
+  },
+  "左前机臂": {
+    "cost": 116,
+    "sale": null,
+    "purchase": 116,
+    "model": "道通evo2",
+    "stock": 0
+  },
+  "电池": {
+    "cost": 9,
+    "sale": null,
+    "purchase": 18,
+    "model": "KF101",
+    "stock": 0
+  },
+  "云台P轴电机": {
+    "cost": "#DIV/0!",
+    "sale": null,
+    "purchase": null,
+    "model": "mini2se",
+    "stock": 0
+  },
+  "左后机臂": {
+    "cost": "#DIV/0!",
+    "sale": null,
+    "purchase": null,
+    "model": "Air2",
+    "stock": 0
+  },
+  "前机臂转轴盖板": {
+    "cost": "#DIV/0!",
+    "sale": null,
+    "purchase": null,
+    "model": "mini2se",
+    "stock": 0
+  },
+  "后机臂转轴盖板": {
+    "cost": 20,
+    "sale": null,
+    "purchase": 20,
+    "model": "Air3",
+    "stock": 0
+  },
+  "左前脚架": {
+    "cost": "#DIV/0!",
+    "sale": null,
+    "purchase": null,
+    "model": "Matrice4E",
+    "stock": 0
+  },
+  "右前脚架": {
+    "cost": 25,
+    "sale": null,
+    "purchase": 25,
+    "model": "道通evo2",
+    "stock": 1
+  },
+  "左后脚架": {
+    "cost": "#DIV/0!",
+    "sale": null,
+    "purchase": null,
+    "model": "mini2se",
+    "stock": 0
+  },
+  "右后脚架": {
+    "cost": 40,
+    "sale": null,
+    "purchase": 40,
+    "model": "Matrice4E",
+    "stock": 0
+  },
+  "左前脚架盖": {
+    "cost": "#DIV/0!",
+    "sale": null,
+    "purchase": null,
+    "model": "mini2se",
+    "stock": 0
+  },
+  "右前脚架盖": {
+    "cost": "#DIV/0!",
+    "sale": null,
+    "purchase": null,
+    "model": "mini2se",
+    "stock": 0
+  },
+  "左后脚架盖": {
+    "cost": "#DIV/0!",
+    "sale": null,
+    "purchase": null,
+    "model": "mini2se",
+    "stock": 0
+  },
+  "右后脚架盖": {
+    "cost": "#DIV/0!",
+    "sale": null,
+    "purchase": null,
+    "model": "mini2se",
+    "stock": 0
+  },
+  "桨叶": {
+    "cost": 95.5454545454545,
+    "sale": null,
+    "purchase": 119,
+    "model": "M350 RTK",
+    "stock": 3
+  },
+  "前视觉模块": {
+    "cost": 124.5,
+    "sale": null,
+    "purchase": 119,
+    "model": "Air2s",
+    "stock": 0
+  },
+  "云台总成": {
+    "cost": 260,
+    "sale": null,
+    "purchase": 260,
+    "model": "ACE2",
+    "stock": 0
+  },
+  "云台R轴电机": {
+    "cost": "#DIV/0!",
+    "sale": null,
+    "purchase": null,
+    "model": "mini2se",
+    "stock": 0
+  },
+  "前视觉盖": {
+    "cost": 20,
+    "sale": null,
+    "purchase": 20,
+    "model": "Air2",
+    "stock": 0
+  },
+  "云台上支架": {
+    "cost": 95.5454545454545,
+    "sale": null,
+    "purchase": 119,
+    "model": "Avata2",
+    "stock": 3
+  },
+  "云台驱动板": {
+    "cost": "#DIV/0!",
+    "sale": null,
+    "purchase": null,
+    "model": "mini2se",
+    "stock": 0
+  },
+  "云台驱动排线": {
+    "cost": "#DIV/0!",
+    "sale": null,
+    "purchase": null,
+    "model": "mini2se",
+    "stock": 0
+  },
+  "电调模块": {
+    "cost": "#DIV/0!",
+    "sale": null,
+    "purchase": null,
+    "model": "mini2se",
+    "stock": 0
+  },
+  "右前机臂": {
+    "cost": 600,
+    "sale": null,
+    "purchase": 600,
+    "model": "Matrice4E",
+    "stock": 0
+  },
+  "前视觉带排线": {
+    "cost": 68,
+    "sale": null,
+    "purchase": 68,
+    "model": "mini3p",
+    "stock": 1
+  },
+  "云台轴臂总成": {
+    "cost": 130,
+    "sale": null,
+    "purchase": 130,
+    "model": "mini2",
+    "stock": 0
+  },
+  "云台下支架": {
+    "cost": 95.5454545454545,
+    "sale": null,
+    "purchase": 119,
+    "model": "mini2",
+    "stock": 3
+  },
+  "云台P轴": {
+    "cost": "#DIV/0!",
+    "sale": null,
+    "purchase": null,
+    "model": "mini2se",
+    "stock": 0
+  },
+  "云台R轴": {
+    "cost": "#DIV/0!",
+    "sale": null,
+    "purchase": null,
+    "model": "mini2se",
+    "stock": 0
+  },
+  "云台Y轴": {
+    "cost": "#DIV/0!",
+    "sale": null,
+    "purchase": null,
+    "model": "mini2se",
+    "stock": 0
+  },
+  "云台Y轴电机": {
+    "cost": "#DIV/0!",
+    "sale": null,
+    "purchase": null,
+    "model": "mini2se",
+    "stock": 0
+  },
+  "云台护线盖": {
+    "cost": "#DIV/0!",
+    "sale": null,
+    "purchase": null,
+    "model": "mini2se",
+    "stock": 0
+  },
+  "云台装饰盖": {
+    "cost": "#DIV/0!",
+    "sale": null,
+    "purchase": null,
+    "model": "mini2se",
+    "stock": 0
+  },
+  "云台上盖板": {
+    "cost": "#DIV/0!",
+    "sale": null,
+    "purchase": null,
+    "model": "mini2se",
+    "stock": 0
+  },
+  "云台下盖板": {
+    "cost": "#DIV/0!",
+    "sale": null,
+    "purchase": null,
+    "model": "mini2se",
+    "stock": 0
+  },
+  "三合一排线": {
+    "cost": "#DIV/0!",
+    "sale": null,
+    "purchase": null,
+    "model": "mini2se",
+    "stock": 0
+  },
+  "电池外壳": {
+    "cost": "#DIV/0!",
+    "sale": null,
+    "purchase": null,
+    "model": "mini2se",
+    "stock": 0
+  },
+  "电池底壳": {
+    "cost": "#DIV/0!",
+    "sale": null,
+    "purchase": null,
+    "model": "mini2se",
+    "stock": 0
+  },
+  "电芯": {
+    "cost": "#DIV/0!",
+    "sale": null,
+    "purchase": null,
+    "model": "mini2se",
+    "stock": 0
+  },
+  "机臂电机": {
+    "cost": 95.5454545454545,
+    "sale": null,
+    "purchase": 119,
+    "model": "Mavic 3",
+    "stock": 3
+  },
+  "减震板": {
+    "cost": 95.5454545454545,
+    "sale": null,
+    "purchase": 119,
+    "model": "Avata2",
+    "stock": 3
+  },
+  "云台保护罩": {
+    "cost": 24.9,
+    "sale": null,
+    "purchase": 24.9,
+    "model": "Mavic pro",
+    "stock": 0
+  },
+  "云台主板": {
+    "cost": 188,
+    "sale": null,
+    "purchase": 188,
+    "model": "Mavic 2",
+    "stock": 0
+  },
+  "IMU排线": {
+    "cost": 20,
+    "sale": null,
+    "purchase": 20,
+    "model": "mini3p",
+    "stock": 0
+  },
+  "GPS主板": {
+    "cost": 95.5454545454545,
+    "sale": null,
+    "purchase": 119,
+    "model": "精灵4rtk",
+    "stock": 3
+  },
+  "GPS 排线": {
+    "cost": 95.5454545454545,
+    "sale": null,
+    "purchase": 119,
+    "model": "Mavic 2",
+    "stock": 3
+  },
+  "下支架装饰盖": {
+    "cost": 18,
+    "sale": null,
+    "purchase": 18,
+    "model": "Air2s",
+    "stock": 1
+  },
+  "相机后盖": {
+    "cost": 25,
+    "sale": null,
+    "purchase": 75,
+    "model": "mini3p",
+    "stock": 3
+  },
+  "限位配重器": {
+    "cost": 35,
+    "sale": null,
+    "purchase": 35,
+    "model": "mini3",
+    "stock": 0
+  },
+  "镜头装饰盖": {
+    "cost": 16,
+    "sale": null,
+    "purchase": 16,
+    "model": "Air2s",
+    "stock": 1
+  },
+  "相机框垫片": {
+    "cost": 10,
+    "sale": null,
+    "purchase": 10,
+    "model": "Air2s",
+    "stock": 1
+  },
+  "相机框": {
+    "cost": 88,
+    "sale": null,
+    "purchase": 88,
+    "model": "Mavic 2",
+    "stock": 0
+  },
+  "Y电机＋Y支架+R电机": {
+    "cost": 79,
+    "sale": null,
+    "purchase": 79,
+    "model": "mini4p",
+    "stock": 0
+  },
+  "指南针": {
+    "cost": 30,
+    "sale": null,
+    "purchase": 30,
+    "model": "Mavic pro",
+    "stock": 0
+  },
+  "云台总成（含镜头）": {
+    "cost": 60,
+    "sale": null,
+    "purchase": 300,
+    "model": "mini2",
+    "stock": 5
+  },
+  "内联座": {
+    "cost": 26,
+    "sale": null,
+    "purchase": 26,
+    "model": "mini",
+    "stock": 1
+  },
+  "遥控器数据线（安卓）": {
+    "cost": 7.8,
+    "sale": null,
+    "purchase": 7.8,
+    "model": "Mavic pro",
+    "stock": 0
+  },
+  "减震球": {
+    "cost": 8,
+    "sale": null,
+    "purchase": 8,
+    "model": "mini4p",
+    "stock": 0
+  },
+  "5.8G射频芯片": {
+    "cost": 5,
+    "sale": null,
+    "purchase": 5,
+    "model": "通用",
+    "stock": 19
+  },
+  "收纳包": {
+    "cost": 20,
+    "sale": null,
+    "purchase": 20,
+    "model": "mini3",
+    "stock": 0
+  },
+  "信号线底座": {
+    "cost": 33,
+    "sale": null,
+    "purchase": 33,
+    "model": "mini2",
+    "stock": 1
+  },
+  "热成像红外镜头": {
+    "cost": 600,
+    "sale": null,
+    "purchase": 600,
+    "model": "Mavic 3T",
+    "stock": 0
+  },
+  "单机": {
+    "cost": 270,
+    "sale": null,
+    "purchase": 270,
+    "model": "N1遥控器",
+    "stock": 1
+  },
+  "左后转轴": {
+    "cost": 95.5454545454545,
+    "sale": null,
+    "purchase": 119,
+    "model": "Air3s",
+    "stock": 3
+  },
+  "电池灯板": {
+    "cost": 15,
+    "sale": null,
+    "purchase": 15,
+    "model": "Mavic 2",
+    "stock": 0
+  },
+  "电池主板": {
+    "cost": 100,
+    "sale": null,
+    "purchase": 100,
+    "model": "Mavic 2",
+    "stock": 0
+  },
+  "电路板": {
+    "cost": 6.843,
+    "sale": null,
+    "purchase": 68.43,
+    "model": "mini",
+    "stock": 9
+  },
+  "云台相机排线": {
+    "cost": 77.5,
+    "sale": null,
+    "purchase": 155,
+    "model": "ZINO",
+    "stock": 1
+  },
+  "散热风扇": {
+    "cost": 16,
+    "sale": null,
+    "purchase": 16,
+    "model": "spark",
+    "stock": 0
+  },
+  "电池保护板": {
+    "cost": 95.5454545454545,
+    "sale": null,
+    "purchase": 119,
+    "model": "Air2",
+    "stock": 3
+  },
+  "转接板": {
+    "cost": 95.5454545454545,
+    "sale": null,
+    "purchase": 119,
+    "model": "Air3",
+    "stock": 3
+  },
+  "灯罩脚垫": {
+    "cost": 95.5454545454545,
+    "sale": null,
+    "purchase": 119,
+    "model": "spark",
+    "stock": 3
+  },
+  "RTK 天线": {
+    "cost": 95.5454545454545,
+    "sale": null,
+    "purchase": 119,
+    "model": "M350 RTK",
+    "stock": 3
+  },
+  "天线罩": {
+    "cost": 95.5454545454545,
+    "sale": null,
+    "purchase": 119,
+    "model": "M350 RTK",
+    "stock": 3
+  }
+}

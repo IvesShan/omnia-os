@@ -1,0 +1,3031 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+ <meta charset="UTF-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+ <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+ <meta http-equiv="Pragma" content="no-cache">
+ <meta http-equiv="Expires" content="0">
+ <title>喵修匠 - AI维修助手</title>
+ <script>window.CHAT_VERSION = 'v1.0 (20260417)';</script>
+ <style>
+ /* ===== 设计系统 CSS Variables ===== */
+ :root {
+ --bg-primary: #000000;
+ --bg-secondary: #1C1C1E;
+ --bg-tertiary: #2C2C2E;
+ --bg-elevated: rgba(28, 28, 30, 0.95);
+
+ --text-primary: #FFFFFF;
+ --text-secondary: rgba(255,255,255,0.6);
+ --text-tertiary: rgba(255,255,255,0.38);
+
+ --accent-orange: #FF9500;
+ --accent-blue: #0A84FF;
+ --accent-green: #30D158;
+ --accent-red: #FF453A;
+
+ --border-subtle: rgba(255,255,255,0.1);
+
+ --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', sans-serif;
+
+ --text-xs: 12px;
+ --text-sm: 14px;
+ --text-base: 16px;
+ --text-lg: 18px;
+ --text-xl: 20px;
+
+ --font-medium: 500;
+ --font-semibold: 600;
+ --font-bold: 700;
+
+ --space-1: 4px;
+ --space-2: 8px;
+ --space-3: 12px;
+ --space-4: 16px;
+ --space-5: 20px;
+ --space-6: 24px;
+
+ --radius-sm: 6px;
+ --radius-md: 10px;
+ --radius-lg: 12px;
+ --radius-xl: 16px;
+ --radius-full: 9999px;
+ }
+
+ * { margin: 0; padding: 0; box-sizing: border-box; }
+
+ body {
+ font-family: var(--font-sans);
+ background: var(--bg-primary);
+ color: var(--text-primary);
+ line-height: 1.5;
+ height: 100vh;
+ display: flex;
+ flex-direction: column;
+ }
+
+ /* ===== 顶部导航 ===== */
+ .header {
+ display: flex;
+ align-items: center;
+ justify-content: space-between;
+ padding: var(--space-4);
+ border-bottom: 1px solid var(--border-subtle);
+ background: var(--bg-primary);
+ }
+
+ .header-left {
+ display: flex;
+ align-items: center;
+ gap: var(--space-3);
+ }
+
+ .header h1 {
+ font-size: var(--text-lg);
+ font-weight: var(--font-semibold);
+ }
+
+ .header-icon {
+ width: 32px;
+ height: 32px;
+ background: linear-gradient(135deg, var(--accent-orange), #FFB340);
+ border-radius: var(--radius-md);
+ display: flex;
+ align-items: center;
+ justify-content: center;
+ }
+
+ .header-icon svg {
+ width: 20px;
+ height: 20px;
+ color: #000;
+ }
+
+ .menu-btn {
+ background: none;
+ border: none;
+ color: var(--text-secondary);
+ cursor: pointer;
+ padding: var(--space-2);
+ position: relative;
+ }
+
+ /* ===== 消息区域 ===== */
+ .chat-container {
+ flex: 1;
+ overflow-y: auto;
+ padding: var(--space-4);
+ display: flex;
+ flex-direction: column;
+ gap: var(--space-4);
+ }
+
+ .welcome-screen {
+ display: flex;
+ flex-direction: column;
+ align-items: center;
+ justify-content: center;
+ height: 100%;
+ text-align: center;
+ padding: var(--space-6);
+ }
+
+ .welcome-icon {
+ width: 64px;
+ height: 64px;
+ background: linear-gradient(135deg, var(--accent-orange), #FFB340);
+ border-radius: var(--radius-xl);
+ display: flex;
+ align-items: center;
+ justify-content: center;
+ margin-bottom: var(--space-5);
+ }
+
+ .welcome-icon svg {
+ width: 32px;
+ height: 32px;
+ color: #000;
+ }
+
+ .welcome-title {
+ font-size: var(--text-xl);
+ font-weight: var(--font-bold);
+ margin-bottom: var(--space-3);
+ }
+
+ .welcome-subtitle {
+ color: var(--text-secondary);
+ font-size: var(--text-base);
+ margin-bottom: var(--space-6);
+ max-width: 300px;
+ }
+
+ .suggestion-chips {
+ display: flex;
+ flex-wrap: wrap;
+ gap: var(--space-2);
+ justify-content: center;
+ max-width: 340px;
+ }
+
+ .chip {
+ background: var(--bg-secondary);
+ border: 1px solid var(--border-subtle);
+ color: var(--text-secondary);
+ padding: var(--space-2) var(--space-4);
+ border-radius: var(--radius-full);
+ font-size: var(--text-sm);
+ cursor: pointer;
+ transition: all 0.2s;
+ }
+
+ .chip:hover {
+ background: var(--bg-tertiary);
+ border-color: rgba(255,255,255,0.2);
+ color: var(--text-primary);
+ }
+
+ /* ===== 消息气泡 ===== */
+ .message {
+ display: flex;
+ gap: var(--space-3);
+ max-width: 90%;
+ }
+
+ .message.user {
+ align-self: flex-end;
+ flex-direction: row-reverse;
+ }
+
+ .message.ai {
+ align-self: flex-start;
+ }
+
+ .message-avatar {
+ width: 28px;
+ height: 28px;
+ border-radius: var(--radius-full);
+ display: flex;
+ align-items: center;
+ justify-content: center;
+ flex-shrink: 0;
+ }
+
+ .message.user .message-avatar {
+ background: var(--accent-blue);
+ }
+
+ .message.ai .message-avatar {
+ background: linear-gradient(135deg, var(--accent-orange), #FFB340);
+ }
+
+ .message-avatar svg {
+ width: 16px;
+ height: 16px;
+ color: #000;
+ }
+
+ .message-content {
+ padding: var(--space-3) var(--space-4);
+ border-radius: var(--radius-lg);
+ font-size: var(--text-base);
+ line-height: 1.6;
+ }
+
+ .message.user .message-content {
+ background: var(--accent-blue);
+ color: #fff;
+ border-bottom-right-radius: var(--space-1);
+ }
+
+ .message.ai .message-content {
+ background: var(--bg-secondary);
+ color: var(--text-primary);
+ border: 1px solid var(--border-subtle);
+ border-bottom-left-radius: var(--space-1);
+ }
+
+ /* ===== 诊断报告卡片 ===== */
+ .diagnosis-card {
+ background: var(--bg-tertiary);
+ border-radius: var(--radius-lg);
+ padding: var(--space-4);
+ margin: var(--space-2) 0;
+ border: 1px solid var(--border-subtle);
+ }
+
+ .diagnosis-card-header {
+ display: flex;
+ align-items: center;
+ gap: var(--space-2);
+ margin-bottom: var(--space-3);
+ color: var(--accent-orange);
+ font-weight: var(--font-semibold);
+ }
+
+ .diagnosis-card-header svg {
+ width: 24px;
+ height: 24px;
+ }
+
+ .diagnosis-section {
+ margin-bottom: var(--space-3);
+ }
+
+ .diagnosis-section:last-child {
+ margin-bottom: 0;
+ }
+
+ .diagnosis-section-title {
+ font-size: var(--text-sm);
+ color: var(--text-secondary);
+ margin-bottom: var(--space-2);
+ font-weight: var(--font-medium);
+ }
+
+ .diagnosis-section-content {
+ font-size: var(--text-base);
+ line-height: 1.6;
+ }
+
+ .diagnosis-parts {
+ display: flex;
+ flex-wrap: wrap;
+ gap: var(--space-2);
+ }
+
+ .diagnosis-part-tag {
+ background: rgba(255, 149, 0, 0.15);
+ color: var(--accent-orange);
+ padding: 4px 12px;
+ border-radius: var(--radius-full);
+ font-size: var(--text-sm);
+ }
+
+ .diagnosis-cost {
+ background: var(--bg-secondary);
+ padding: var(--space-3);
+ border-radius: var(--radius-md);
+ display: flex;
+ justify-content: space-between;
+ align-items: center;
+ }
+
+ .diagnosis-cost-label {
+ color: var(--text-secondary);
+ font-size: var(--text-sm);
+ }
+
+ .diagnosis-cost-value {
+ color: var(--accent-orange);
+ font-size: var(--text-xl);
+ font-weight: var(--font-bold);
+ }
+
+ .diagnosis-actions {
+ display: flex;
+ gap: var(--space-2);
+ margin-top: var(--space-3);
+ }
+
+ .diagnosis-btn {
+ flex: 1;
+ padding: var(--space-3);
+ border: none;
+ border-radius: var(--radius-md);
+ font-weight: var(--font-semibold);
+ cursor: pointer;
+ font-size: var(--text-base);
+ }
+
+ .diagnosis-btn-primary {
+ background: var(--accent-orange);
+ color: #000;
+ }
+
+ .diagnosis-btn-secondary {
+ background: var(--bg-secondary);
+ color: var(--text-primary);
+ border: 1px solid var(--border-subtle);
+ }
+
+ /* ===== 订单卡片 ===== */
+ .order-card {
+ background: var(--bg-tertiary);
+ border-radius: var(--radius-lg);
+ padding: var(--space-4);
+ margin: var(--space-2) 0;
+ border: 1px solid var(--border-subtle);
+ }
+
+ .order-card-header {
+ display: flex;
+ justify-content: space-between;
+ align-items: center;
+ margin-bottom: var(--space-3);
+ }
+
+ .order-id {
+ font-size: var(--text-xs);
+ color: var(--text-secondary);
+ font-family: monospace;
+ }
+
+ .order-status {
+ padding: 2px 8px;
+ border-radius: var(--radius-sm);
+ font-size: var(--text-xs);
+ font-weight: var(--font-medium);
+ }
+
+ .order-status-pending {
+ background: rgba(255,204,0,0.15);
+ color: var(--accent-orange);
+ }
+
+ .order-info-row {
+ display: flex;
+ align-items: center;
+ gap: var(--space-2);
+ margin-bottom: var(--space-2);
+ font-size: var(--text-sm);
+ }
+
+ .order-info-row svg {
+ width: 16px;
+ height: 16px;
+ color: var(--text-secondary);
+ }
+
+ .order-btn {
+ width: 100%;
+ margin-top: var(--space-3);
+ padding: var(--space-3);
+ background: var(--accent-orange);
+ color: #000;
+ border: none;
+ border-radius: var(--radius-md);
+ font-weight: var(--font-semibold);
+ cursor: pointer;
+ }
+
+ /* ===== 底部输入区 ===== */
+ .input-area {
+ padding: var(--space-4);
+ border-top: 1px solid var(--border-subtle);
+ background: var(--bg-primary);
+ }
+
+ .input-wrapper {
+ display: flex;
+ align-items: flex-end;
+ gap: var(--space-2);
+ background: var(--bg-secondary);
+ border-radius: var(--radius-xl);
+ padding: var(--space-2) var(--space-3);
+ border: 1px solid var(--border-subtle);
+ }
+
+ .input-wrapper:focus-within {
+ border-color: var(--accent-orange);
+ }
+
+ .chat-input {
+ flex: 1;
+ background: transparent;
+ border: none;
+ color: var(--text-primary);
+ font-size: var(--text-base);
+ font-family: inherit;
+ resize: none;
+ max-height: 120px;
+ min-height: 24px;
+ outline: none;
+ padding: var(--space-2);
+ }
+
+ .chat-input::placeholder {
+ color: var(--text-tertiary);
+ }
+
+ .input-btn {
+ width: 32px;
+ height: 32px;
+ border-radius: var(--radius-full);
+ border: none;
+ display: flex;
+ align-items: center;
+ justify-content: center;
+ cursor: pointer;
+ transition: all 0.2s;
+ }
+
+ .voice-btn {
+ background: var(--bg-tertiary);
+ color: var(--text-secondary);
+ }
+
+ .voice-btn:hover {
+ background: var(--accent-orange);
+ color: #000;
+ }
+
+ .send-btn {
+ background: var(--accent-orange);
+ color: #000;
+ }
+
+ .send-btn:disabled {
+ background: var(--bg-tertiary);
+ color: var(--text-tertiary);
+ cursor: not-allowed;
+ }
+
+ .input-hint {
+ text-align: center;
+ font-size: var(--text-xs);
+ color: var(--text-tertiary);
+ margin-top: var(--space-2);
+ }
+
+ /* ===== 加载动画 ===== */
+ .typing-indicator {
+ display: flex;
+ gap: var(--space-1);
+ padding: var(--space-3) var(--space-4);
+ }
+
+ .typing-dot {
+ width: 8px;
+ height: 8px;
+ background: var(--text-secondary);
+ border-radius: var(--radius-full);
+ animation: typing 1.4s infinite;
+ }
+
+ .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+ .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+ @keyframes typing {
+ 0%, 60%, 100% { transform: translateY(0); }
+ 30% { transform: translateY(-10px); }
+ }
+
+ /* ===== 快捷操作 ===== */
+ .quick-actions {
+ display: flex;
+ gap: var(--space-2);
+ padding: 0 var(--space-4) var(--space-3);
+ overflow-x: auto;
+ -webkit-overflow-scrolling: touch;
+ }
+
+ .quick-action-btn {
+ display: flex;
+ align-items: center;
+ gap: var(--space-2);
+ padding: var(--space-2) var(--space-3);
+ background: var(--bg-secondary);
+ border: 1px solid var(--border-subtle);
+ border-radius: var(--radius-md);
+ color: var(--text-secondary);
+ font-size: var(--text-sm);
+ white-space: nowrap;
+ cursor: pointer;
+ transition: all 0.2s;
+ }
+
+ .quick-action-btn:hover {
+ background: var(--bg-tertiary);
+ color: var(--text-primary);
+ border-color: rgba(255,255,255,0.2);
+ }
+
+ .quick-action-btn svg {
+ width: 16px;
+ height: 16px;
+ }
+
+ /* ===== Toast ===== */
+ .toast {
+ position: fixed;
+ bottom: 100px;
+ left: 50%;
+ transform: translateX(-50%);
+ background: var(--bg-secondary);
+ color: var(--text-primary);
+ padding: var(--space-3) var(--space-5);
+ border-radius: var(--radius-lg);
+ font-size: var(--text-sm);
+ border: 1px solid var(--border-subtle);
+ display: none;
+ }
+
+ .toast.show {
+ display: block;
+ animation: fadeIn 0.3s;
+ }
+
+ @keyframes fadeIn {
+ from { opacity: 0; transform: translateX(-50%) translateY(10px); }
+ to { opacity: 1; transform: translateX(-50%) translateY(0); }
+ }
+
+ /* ===== 送修方式选择弹窗 ===== */
+ .modal-overlay {
+ position: fixed;
+ top: 0;
+ left: 0;
+ right: 0;
+ bottom: 0;
+ background: rgba(0,0,0,0.8);
+ display: none;
+ align-items: center;
+ justify-content: center;
+ z-index: 1000;
+ padding: var(--space-4);
+ }
+
+ .modal-overlay.show {
+ display: flex;
+ }
+
+ .modal-content {
+ background: var(--bg-secondary);
+ border-radius: var(--radius-xl);
+ width: 100%;
+ max-width: 400px;
+ max-height: 80vh;
+ overflow-y: auto;
+ border: 1px solid var(--border-subtle);
+ }
+
+ .modal-header {
+ padding: var(--space-4);
+ border-bottom: 1px solid var(--border-subtle);
+ text-align: center;
+ }
+
+ .modal-title {
+ font-size: var(--text-lg);
+ font-weight: var(--font-semibold);
+ }
+
+ .modal-body {
+ padding: var(--space-4);
+ }
+
+ .delivery-options {
+ display: flex;
+ gap: var(--space-3);
+ margin-bottom: var(--space-4);
+ }
+
+ .delivery-option {
+ flex: 1;
+ padding: var(--space-4);
+ background: var(--bg-tertiary);
+ border: 2px solid var(--border-subtle);
+ border-radius: var(--radius-lg);
+ text-align: center;
+ cursor: pointer;
+ transition: all 0.2s;
+ }
+
+ .delivery-option:hover {
+ border-color: var(--accent-orange);
+ }
+
+ .delivery-option.selected {
+ border-color: var(--accent-orange);
+ background: rgba(255,149,0,0.1);
+ }
+
+ .delivery-option-icon {
+ width: 48px;
+ height: 48px;
+ margin: 0 auto var(--space-2);
+ background: var(--bg-secondary);
+ border-radius: var(--radius-full);
+ display: flex;
+ align-items: center;
+ justify-content: center;
+ }
+
+ .delivery-option-icon svg {
+ width: 24px;
+ height: 24px;
+ color: var(--accent-orange);
+ }
+
+ .delivery-option-title {
+ font-weight: var(--font-semibold);
+ margin-bottom: var(--space-1);
+ }
+
+ .delivery-option-desc {
+ font-size: var(--text-xs);
+ color: var(--text-secondary);
+ }
+
+ .delivery-form {
+ display: none;
+ }
+
+ .delivery-form.show {
+ display: block;
+ }
+
+ .form-group {
+ margin-bottom: var(--space-3);
+ }
+
+ .form-label {
+ display: block;
+ font-size: var(--text-sm);
+ color: var(--text-secondary);
+ margin-bottom: var(--space-2);
+ }
+
+ .form-input, .form-select {
+ width: 100%;
+ padding: var(--space-3);
+ background: var(--bg-tertiary);
+ border: 1px solid var(--border-subtle);
+ border-radius: var(--radius-md);
+ color: var(--text-primary);
+ font-size: var(--text-base);
+ font-family: inherit;
+ }
+
+ .form-input:focus, .form-select:focus {
+ outline: none;
+ border-color: var(--accent-orange);
+ }
+
+ .form-input::placeholder {
+ color: var(--text-tertiary);
+ }
+
+ .form-input.error {
+ border-color: var(--accent-red);
+ }
+
+ .error-msg {
+ font-size: var(--text-xs);
+ color: var(--accent-red);
+ margin-top: var(--space-1);
+ }
+
+ .retry-count {
+ font-size: var(--text-xs);
+ color: var(--text-secondary);
+ margin-top: var(--space-1);
+ }
+
+ .shop-address {
+ background: var(--bg-tertiary);
+ padding: var(--space-3);
+ border-radius: var(--radius-md);
+ margin-bottom: var(--space-3);
+ }
+
+ .shop-address-title {
+ font-weight: var(--font-semibold);
+ margin-bottom: var(--space-2);
+ display: flex;
+ align-items: center;
+ gap: var(--space-2);
+ }
+
+ .shop-address-title svg {
+ width: 16px;
+ height: 16px;
+ color: var(--accent-orange);
+ }
+
+ .shop-address-text {
+ font-size: var(--text-sm);
+ color: var(--text-secondary);
+ line-height: 1.6;
+ }
+
+ .modal-footer {
+ padding: var(--space-4);
+ border-top: 1px solid var(--border-subtle);
+ display: flex;
+ gap: var(--space-2);
+ }
+
+ .modal-btn {
+ flex: 1;
+ padding: var(--space-3);
+ border: none;
+ border-radius: var(--radius-md);
+ font-weight: var(--font-semibold);
+ cursor: pointer;
+ font-size: var(--text-base);
+ }
+
+ .modal-btn-primary {
+ background: var(--accent-orange);
+ color: #000;
+ }
+
+ .modal-btn-primary:disabled {
+ background: var(--bg-tertiary);
+ color: var(--text-tertiary);
+ cursor: not-allowed;
+ }
+
+ .modal-btn-secondary {
+ background: var(--bg-tertiary);
+ color: var(--text-primary);
+ border: 1px solid var(--border-subtle);
+ }
+ </style>
+</head>
+<body>
+ <!-- 顶部导航 -->
+ <div class="header">
+ <div class="header-left">
+ <div class="header-icon">
+ <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+ </div>
+ <h1>喵修匠 AI维修助手</h1>
+ </div>
+ <button class="menu-btn" onclick="showMenu()">
+ <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+ <circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/>
+ </svg>
+ <span id="menuBadge" style="display: none; position: absolute; top: 6px; right: 6px; width: 8px; height: 8px; background: var(--accent-red); border-radius: 50%;"></span>
+ </button>
+ </div>
+
+ <!-- 聊天区域 -->
+ <div class="chat-container" id="chatContainer">
+ <!-- 欢迎界面 -->
+ <div class="welcome-screen" id="welcomeScreen">
+ <div class="welcome-icon">
+ <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+ </div>
+ <div class="welcome-title">你好!我是无人机维修助手</div>
+ <div class="welcome-subtitle">告诉我你的无人机机型和故障现象,我会为你生成AI检测报告和维修报价</div>
+ <div class="suggestion-chips">
+ <div class="chip" onclick="quickInput('我的Mini 3 Pro云台不转了')">Mini 3 Pro 云台故障</div>
+ <div class="chip" onclick="quickInput('Air 3 图传信号不稳定')">Air 3 图传问题</div>
+ <div class="chip" onclick="quickInput('Mavic 3 无法起飞')">Mavic 3 飞行异常</div>
+ <div class="chip" onclick="quickInput('WR20260408102532')">查询我的订单</div>
+ </div>
+ </div>
+
+ <!-- 消息会动态插入这里 -->
+ </div>
+
+ <!-- 快捷操作 -->
+ <div class="quick-actions" id="quickActions">
+ <button class="quick-action-btn" onclick="quickInput('我要寄修无人机')">
+ <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+ 快速下单
+ </button>
+ <button class="quick-action-btn" onclick="quickInput('查询订单')">
+ <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+ 订单查询
+ </button>
+ <button class="quick-action-btn" onclick="quickInput('维修价格')">
+ <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+ 维修报价
+ </button>
+ </div>
+
+ <!-- 底部输入区 -->
+ <div class="input-area">
+ <div class="input-wrapper">
+ <textarea class="chat-input" id="chatInput" placeholder="描述你的无人机机型和故障现象..." rows="1"></textarea>
+ <button class="input-btn voice-btn" onclick="startVoice()">
+ <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+ <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
+ <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+ <line x1="12" y1="19" x2="12" y2="22"/>
+ <line x1="8" y1="22" x2="16" y2="22"/>
+ </svg>
+ </button>
+ <button class="input-btn send-btn" id="sendBtn" onclick="sendMessage()">
+ <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+ <line x1="22" y1="2" x2="11" y2="13"/>
+ <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+ </svg>
+ </button>
+ </div>
+ <div class="input-hint">AI 生成的检测报告仅供参考,实际价格以专业工程师检测为准</div>
+ </div>
+
+ <!-- Toast -->
+ <div class="toast" id="toast"></div>
+
+ <!-- 送修方式选择弹窗 -->
+ <div class="modal-overlay" id="deliveryModal">
+ <div class="modal-content">
+ <div class="modal-header">
+ <div class="modal-title">选择送修方式</div>
+ </div>
+ <div class="modal-body">
+ <div class="delivery-options">
+ <div class="delivery-option" id="expressOption" onclick="selectDeliveryType('express')">
+ <div class="delivery-option-icon">
+ <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+ <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
+ <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
+ </svg>
+ </div>
+ <div class="delivery-option-title">快递寄修</div>
+ <div class="delivery-option-desc">全国邮寄</div>
+ </div>
+ <div class="delivery-option" id="shopOption" onclick="selectDeliveryType('shop')">
+ <div class="delivery-option-icon">
+ <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+ <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+ <polyline points="9 22 9 12 15 12 15 22"/>
+ </svg>
+ </div>
+ <div class="delivery-option-title">到店维修</div>
+ <div class="delivery-option-desc">预约到店</div>
+ </div>
+ </div>
+
+ <!-- 快递寄修表单 -->
+ <div class="delivery-form" id="expressForm">
+ <div class="form-group">
+ <label class="form-label">快递公司</label>
+ <select class="form-select" id="expressCompany">
+ <option value="">请选择快递公司</option>
+ <option value="顺丰">顺丰速运</option>
+ <option value="中通">中通快递</option>
+ <option value="圆通">圆通速递</option>
+ <option value="韵达">韵达快递</option>
+ <option value="京东">京东物流</option>
+ </select>
+ </div>
+ <div class="form-group">
+ <label class="form-label">快递单号</label>
+ <input type="text" class="form-input" id="expressNumber" placeholder="请输入快递单号">
+ <div class="error-msg" id="expressError"></div>
+ <div class="retry-count" id="retryCount">剩余修改次数:3</div>
+ </div>
+ </div>
+
+ <!-- 到店维修表单 -->
+ <div class="delivery-form" id="shopForm">
+ <div class="shop-address">
+ <div class="shop-address-title">
+ <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+ <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+ <circle cx="12" cy="10" r="3"/>
+ </svg>
+ 维修点地址
+ </div>
+ <div class="shop-address-text" id="shopAddressText">
+ 加载中...
+ </div>
+ </div>
+ <div class="form-group">
+ <label class="form-label">预计到店时间</label>
+ <input type="datetime-local" class="form-input" id="appointmentTime">
+ </div>
+ </div>
+ </div>
+ <div class="modal-footer">
+ <button class="modal-btn modal-btn-secondary" onclick="closeDeliveryModal()">取消</button>
+ <button class="modal-btn modal-btn-primary" id="confirmDeliveryBtn" onclick="confirmDelivery()" disabled>确认提交</button>
+ </div>
+ </div>
+ </div>
+
+ <!-- 订单列表弹窗 -->
+ <div id="orderListModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.9); z-index: 1000; padding: 20px; overflow-y: auto;">
+ <div style="max-width: 500px; margin: 0 auto; background: var(--bg-secondary); border-radius: 20px; padding: 20px;">
+ <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--border-subtle);">
+ <h2 style="font-size: 20px; font-weight: 600;">我的订单</h2>
+ <button onclick="closeOrderListModal()" style="background: none; border: none; color: var(--text-secondary); font-size: 24px; cursor: pointer;">×</button>
+ </div>
+ <div id="orderListContent">
+ <div style="text-align: center; padding: 40px; color: var(--text-secondary);">
+ 请输入手机号查询订单<br>
+ <input type="tel" id="queryPhoneInput" placeholder="手机号" style="width: 100%; margin-top: 16px; padding: 12px; background: var(--bg-tertiary); border: 1px solid var(--border-subtle); border-radius: 12px; color: var(--text-primary);">
+ <button onclick="loadMyOrders()" style="width: 100%; margin-top: 12px; padding: 12px; background: var(--accent-orange); border: none; border-radius: 12px; color: #000; font-weight: 600; cursor: pointer;">查询</button>
+ </div>
+ </div>
+ </div>
+ </div>
+
+ <!-- 订单详情弹窗 -->
+ <div id="orderDetailModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.85); z-index: 1100; padding: 20px; overflow-y: auto;">
+ <div style="max-width: 480px; margin: 0 auto; background: var(--bg-secondary); border-radius: 20px; overflow: hidden; border: 1px solid var(--border-subtle);">
+ <div style="display: flex; justify-content: space-between; align-items: center; padding: 20px 20px 16px; border-bottom: 1px solid var(--border-subtle); background: var(--bg-tertiary); position: sticky; top: 0; z-index: 10;"
+ id="orderDetailHeader">
+ <h2 style="font-size: 18px; font-weight: 600;">订单详情</h2>
+ <button onclick="closeOrderDetail()" style="background: none; border: none; color: var(--text-secondary); font-size: 24px; cursor: pointer;">×</button>
+ </div>
+ <div id="orderDetailContent" style="padding: 20px;">
+ <!-- 动态内容 -->
+ </div>
+ </div>
+ </div>
+
+ <!-- 通知弹窗 -->
+ <div id="notificationToast" style="display: none; position: fixed; top: 20px; left: 20px; right: 20px; background: var(--accent-orange); color: #000; padding: 16px 20px; border-radius: 12px; z-index: 2000; box-shadow: 0 4px 20px rgba(255,149,0,0.4); animation: slideDown 0.3s;">
+ <div style="display: flex; justify-content: space-between; align-items: center;">
+ <div>
+ <div style="font-weight: 600; margin-bottom: 4px;">🔔 <span id="notifTitle">新消息</span></div>
+ <div id="notifContent" style="font-size: 14px;"></div>
+ </div>
+ <button onclick="handleNotificationClick()" style="background: #000; color: #fff; border: none; padding: 8px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; white-space: nowrap; margin-left: 12px;">查看</button>
+ </div>
+ </div>
+
+ <!-- 个人中心抽屉 -->
+ <div id="userDrawer" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 1500;" onclick="closeUserDrawer(event)">
+ <div style="position: absolute; top: 0; right: 0; bottom: 0; width: 80%; max-width: 340px; background: var(--bg-secondary); border-left: 1px solid var(--border-subtle); display: flex; flex-direction: column;" onclick="event.stopPropagation()">
+ <div style="padding: 24px; border-bottom: 1px solid var(--border-subtle);">
+ <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+ <h2 style="font-size: 20px; font-weight: 600;">个人中心</h2>
+ <button onclick="closeUserDrawer()" style="background: none; border: none; color: var(--text-secondary); font-size: 24px; cursor: pointer;">×</button>
+ </div>
+ <div style="display: flex; align-items: center; gap: 12px;">
+ <div style="width: 48px; height: 48px; border-radius: 50%; background: linear-gradient(135deg, var(--accent-orange), #FFB340); display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 700; color: #000;">
+ <span id="userAvatar">👤</span>
+ </div>
+ <div>
+ <div style="font-weight: 600;" id="userPhoneDisplay">未登录</div>
+ <div style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">喵修匠会员</div>
+ </div>
+ </div>
+ </div>
+
+ <div style="flex: 1; overflow-y: auto; padding: 12px 0;">
+ <div class="menu-item" onclick="openOrderListFromDrawer()">
+ <span style="display: flex; align-items: center; gap: 10px;">
+ <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--accent-orange);"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+ 我的订单
+ </span>
+ <span style="color: var(--text-tertiary);">›</span>
+ </div>
+ <div class="menu-item" onclick="openAddressBook()">
+ <span style="display: flex; align-items: center; gap: 10px;">
+ <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--accent-blue);"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+ 地址簿
+ </span>
+ <span style="color: var(--text-tertiary);">›</span>
+ </div>
+ <div class="menu-item" onclick="clearCache()">
+ <span style="display: flex; align-items: center; gap: 10px;">
+ <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--text-secondary);"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+ 清除缓存
+ </span>
+ <span style="color: var(--text-tertiary);">›</span>
+ </div>
+ <div style="margin: 12px 16px; height: 1px; background: var(--border-subtle);"></div>
+ <div class="menu-item" onclick="showHelp()">
+ <span style="display: flex; align-items: center; gap: 10px;">
+ <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--accent-green);"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+ 帮助与客服
+ </span>
+ <span style="color: var(--text-tertiary);">›</span>
+ </div>
+ </div>
+
+ <div style="padding: 16px; border-top: 1px solid var(--border-subtle);">
+ <button id="logoutBtn" onclick="logout()" style="width: 100%; padding: 14px; background: var(--bg-tertiary); color: var(--accent-red); border: 1px solid var(--border-subtle); border-radius: 12px; font-weight: 600; cursor: pointer; display: none;">退出登录</button>
+ <button id="loginBtn" onclick="promptLoginFromDrawer()" style="width: 100%; padding: 14px; background: var(--accent-orange); color: #000; border: none; border-radius: 12px; font-weight: 600; cursor: pointer; display: none;">登录 / 绑定手机号</button>
+ </div>
+ </div>
+ </div>
+ <style>
+ .menu-item { display: flex; align-items: center; justify-content: space-between; padding: 16px 24px; cursor: pointer; transition: background 0.2s; }
+ .menu-item:hover { background: var(--bg-tertiary); }
+ </style>
+
+ <!-- 地址簿弹窗 -->
+ <div id="addressBookModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.9); z-index: 1600; padding: 20px; overflow-y: auto;">
+ <div style="max-width: 500px; margin: 0 auto; background: var(--bg-secondary); border-radius: 20px; padding: 20px;">
+ <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--border-subtle);">
+ <h2 style="font-size: 20px; font-weight: 600;">地址簿</h2>
+ <button onclick="closeAddressBook()" style="background: none; border: none; color: var(--text-secondary); font-size: 24px; cursor: pointer;">×</button>
+ </div>
+ <div id="addressBookContent">
+ <!-- 动态内容 -->
+ </div>
+ </div>
+ </div>
+
+ <script>
+ const API_BASE = 'https://njuosun-miaoxiujiang-d3a96a8c70e.service.tcloudbase.com/api'; // Fixed for CloudBase
+
+ // 对话状态管理
+ const conversationState = {
+ step: 'welcome',
+ drone: null,
+ problem: null,
+ report: null
+ };
+
+ // 订单状态轮询管理
+ let pollingOrders = {};
+ let currentNotification = null;
+ let currentOrderInfo = null;
+ let deliveryType = null;
+ let expressRetryCount = 3;
+
+ // 加载默认商户信息
+ const DEFAULT_MERCHANT = {
+ name: '物熵科技',
+ contact_name: '吴主任',
+ phone: '15796313613',
+ address: '江苏省苏州市虎丘区滨河路588号赛格三期',
+ business_hours: '周一至周五 09:00-18:00'
+ };
+
+ async function loadMerchantInfo() {
+ try {
+ const res = await fetch(`${API_BASE}/merchant/info`);
+ const data = await res.json();
+ if (data.success && data.merchant) {
+ currentMerchant = data.merchant;
+ } else {
+ currentMerchant = DEFAULT_MERCHANT;
+ }
+ } catch (e) {
+ currentMerchant = DEFAULT_MERCHANT;
+ }
+ }
+ loadMerchantInfo();
+
+ // 快递单号验证规则
+ const expressRules = {
+ '顺丰': /^SF[A-Za-z0-9]{12,15}$/,
+ '中通': /^(7\d{13}|5\d{13})$/,
+ '圆通': /^(YT\d{12,15}|\d{12,15})$/,
+ '韵达': /^[34]\d{13}$/,
+ '京东': /^JD[A-Za-z0-9]{10,15}$/
+ };
+
+ // 设备级匿名ID(为后续微信登录做铺垫)
+ if (!localStorage.getItem('clientId')) {
+ localStorage.setItem('clientId', 'c_' + Math.random().toString(36).substring(2) + Date.now().toString(36));
+ }
+ const CLIENT_ID = localStorage.getItem('clientId');
+
+ // 初始化
+ document.addEventListener('DOMContentLoaded', () => {
+ const input = document.getElementById('chatInput');
+
+ input.addEventListener('input', function() {
+ this.style.height = 'auto';
+ this.style.height = Math.min(120, this.scrollHeight) + 'px';
+ });
+
+ input.addEventListener('keypress', (e) => {
+ if (e.key === 'Enter' && !e.shiftKey) {
+ e.preventDefault();
+ sendMessage();
+ }
+ });
+
+ // 恢复轮询
+ const savedPhone = localStorage.getItem('customerPhone');
+ if (savedPhone) {
+ restorePolling(savedPhone);
+ }
+
+ // 绑定表单事件
+ const expressCompany = document.getElementById('expressCompany');
+ const expressNumber = document.getElementById('expressNumber');
+ const appointmentTime = document.getElementById('appointmentTime');
+
+ if (expressCompany) {
+ expressCompany.addEventListener('change', updateConfirmButton);
+ }
+ if (expressNumber) {
+ expressNumber.addEventListener('input', () => {
+ document.getElementById('expressError').textContent = '';
+ document.getElementById('expressNumber').classList.remove('error');
+ updateConfirmButton();
+ });
+ }
+ if (appointmentTime) {
+ appointmentTime.addEventListener('change', updateConfirmButton);
+ }
+ });
+
+ // ========== 菜单功能 ==========
+ function showMenu() {
+ openUserDrawer();
+ }
+
+ function openUserDrawer() {
+ document.getElementById('menuBadge').style.display = 'none';
+ const drawer = document.getElementById('userDrawer');
+ drawer.style.display = 'block';
+ const savedPhone = localStorage.getItem('customerPhone');
+ if (savedPhone) {
+ document.getElementById('userPhoneDisplay').textContent = maskPhone(savedPhone);
+ document.getElementById('logoutBtn').style.display = 'block';
+ document.getElementById('loginBtn').style.display = 'none';
+ } else {
+ document.getElementById('userPhoneDisplay').textContent = '未登录';
+ document.getElementById('logoutBtn').style.display = 'none';
+ document.getElementById('loginBtn').style.display = 'block';
+ }
+ }
+
+ function closeUserDrawer(e) {
+ if (e && e.target !== document.getElementById('userDrawer')) return;
+ document.getElementById('userDrawer').style.display = 'none';
+ }
+
+ function maskPhone(phone) {
+ if (!phone || phone.length !== 11) return phone;
+ return phone.substring(0, 3) + '****' + phone.substring(7);
+ }
+
+ function promptLoginFromDrawer() {
+ closeUserDrawer();
+ let phone = prompt('请输入您的手机号:');
+ if (phone) {
+ phone = phone.trim().replace(/\s+/g, '');
+ if (/^1[3-9]\d{9}$/.test(phone)) {
+ localStorage.setItem('customerPhone', phone);
+ showToast('手机号已绑定');
+ openUserDrawer();
+ } else {
+ alert('手机号格式不正确');
+ }
+ }
+ }
+
+ function logout() {
+ if (!confirm('确定要退出登录吗?')) return;
+ localStorage.removeItem('customerPhone');
+ localStorage.removeItem('savedAddresses');
+ closeUserDrawer();
+ showToast('已退出登录');
+ location.reload();
+ }
+
+ function clearCache() {
+ if (!confirm('确定清除本地缓存吗?订单和地址信息将被保留。')) return;
+ const phone = localStorage.getItem('customerPhone');
+ localStorage.clear();
+ if (phone) localStorage.setItem('customerPhone', phone);
+ showToast('缓存已清除');
+ }
+
+ function showHelp() {
+ closeUserDrawer();
+ const m = currentMerchant || DEFAULT_MERCHANT;
+ const helpHtml = `
+ <div style="margin: 12px 0; background: var(--bg-tertiary); padding: 16px; border-radius: 12px; border: 1px solid var(--border-subtle);">
+ <div style="font-weight: 600; margin-bottom: 12px;">帮助与客服</div>
+ <div style="font-size: 14px; color: var(--text-secondary); line-height: 1.8;">
+ <div>• 客服电话: <a href="tel:${m.phone}" style="color: var(--accent-blue); text-decoration: none;">${m.phone}</a></div>
+ <div>• 营业时间:${m.business_hours || '周一至周五 09:00-18:00'}</div>
+ <div>• 维修点地址:${m.address}</div>
+ <div>• <a href="https://uri.amap.com/search?keyword=${encodeURIComponent(m.address)}" target="_blank" style="color: var(--accent-green); text-decoration: none;">🗺️ 一键导航到店</a></div>
+ <div>• 如何下单:输入机型和故障描述即可创建工单</div>
+ <div>• 如何查询:输入工单号或从我的订单查看</div>
+ </div>
+ </div>
+ `;
+ addMessage(helpHtml, 'ai');
+ }
+
+ async function openOrderListFromDrawer() {
+ closeUserDrawer();
+ document.getElementById('orderListModal').style.display = 'block';
+ const content = document.getElementById('orderListContent');
+ const savedPhone = localStorage.getItem('customerPhone') || '';
+
+ content.innerHTML = '<div style="text-align: center; padding: 40px;">加载中...</div>';
+
+ let orders = [];
+
+ // 1. 查询 client_id 关联的订单
+ if (CLIENT_ID) {
+ try {
+ const res = await fetch(`${API_BASE}/order/query_by_client?client_id=${CLIENT_ID}`);
+ const data = await res.json();
+ if (data.success && data.orders) {
+ orders = orders.concat(data.orders);
+ }
+ } catch (e) {}
+ }
+
+ // 2. 查询绑定手机号关联的订单并合并去重
+ if (savedPhone) {
+ try {
+ const res = await fetch(`${API_BASE}/order/query?phone=${savedPhone}`);
+ const data = await res.json();
+ if (data.success && data.orders) {
+ const existingNos = new Set(orders.map(o => o.order_no));
+ data.orders.forEach(o => {
+ if (!existingNos.has(o.order_no)) orders.push(o);
+ });
+ }
+ } catch (e) {}
+ }
+
+ // 3. 按创建时间排序(最新的在前)
+ orders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+ if (orders.length > 0) {
+ renderOrderList(orders, true);
+ } else {
+ // 最终 fallback:显示手动查询入口
+ content.innerHTML = `
+ <div style="text-align: center; padding: 40px; color: var(--text-secondary);">
+ <div style="font-size: 14px; margin-bottom: 16px;">未找到该设备上的自动订单记录</div>
+ <div style="font-size: 13px; margin-bottom: 16px; color: var(--text-tertiary);">可输入下单时填写的手机号继续查询</div>
+ <input type="tel" id="queryPhoneInput" placeholder="手机号" value="${savedPhone}" style="width: 100%; padding: 12px; background: var(--bg-tertiary); border: 1px solid var(--border-subtle); border-radius: 12px; color: var(--text-primary); font-size: 16px;">
+ <button onclick="loadMyOrders()" style="width: 100%; margin-top: 12px; padding: 12px; background: var(--accent-orange); border: none; border-radius: 12px; color: #000; font-weight: 600; cursor: pointer;">查询订单</button>
+ </div>
+ `;
+ setTimeout(() => {
+ const input = document.getElementById('queryPhoneInput');
+ if (input) {
+ input.addEventListener('keypress', (e) => {
+ if (e.key === 'Enter') loadMyOrders();
+ });
+ input.focus();
+ if (savedPhone) input.select();
+ }
+ }, 0);
+ }
+ }
+
+ function closeOrderListModal() {
+ document.getElementById('orderListModal').style.display = 'none';
+ }
+
+ // ========== 地址簿 ==========
+ function openAddressBook() {
+ closeUserDrawer();
+ document.getElementById('addressBookModal').style.display = 'block';
+ renderAddressBook();
+ }
+
+ function closeAddressBook() {
+ document.getElementById('addressBookModal').style.display = 'none';
+ }
+
+ function getSavedAddresses() {
+ try {
+ const raw = localStorage.getItem('savedAddresses');
+ return raw ? JSON.parse(raw) : [];
+ } catch (e) { return []; }
+ }
+
+ function saveAddresses(addresses) {
+ localStorage.setItem('savedAddresses', JSON.stringify(addresses));
+ }
+
+ function renderAddressBook() {
+ const container = document.getElementById('addressBookContent');
+ const addresses = getSavedAddresses();
+
+ let html = `
+ <div style="margin-bottom: 16px;">
+ <button onclick="showAddressForm()" style="width: 100%; padding: 12px; background: var(--accent-orange); color: #000; border: none; border-radius: 12px; font-weight: 600; cursor: pointer;">+ 添加新地址</button>
+ </div>
+ `;
+
+ if (addresses.length === 0) {
+ html += `<div style="text-align: center; padding: 40px; color: var(--text-secondary);">暂无保存的地址<br>点击上方按钮添加</div>`;
+ } else {
+ html += addresses.map((addr, idx) => `
+ <div style="background: var(--bg-tertiary); border-radius: 12px; padding: 16px; margin-bottom: 12px; border: 1px solid var(--border-subtle);">
+ <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+ <div style="font-weight: 600;">${addr.name} <span style="color: var(--text-secondary); font-weight: 400;">${addr.phone}</span></div>
+ <div style="display: flex; gap: 8px;">
+ <button onclick="editAddress(${idx})" style="background: none; border: none; color: var(--accent-blue); font-size: 13px; cursor: pointer;">编辑</button>
+ <button onclick="deleteAddress(${idx})" style="background: none; border: none; color: var(--accent-red); font-size: 13px; cursor: pointer;">删除</button>
+ </div>
+ </div>
+ <div style="font-size: 14px; color: var(--text-secondary); line-height: 1.6;">${addr.province}${addr.city}${addr.district}${addr.detail}</div>
+ ${addr.isDefault ? '<div style="margin-top: 8px;"><span style="display: inline-block; padding: 2px 8px; background: rgba(255,149,0,0.15); color: var(--accent-orange); border-radius: 4px; font-size: 12px;">默认地址</span></div>' : ''}
+ </div>
+ `).join('');
+ }
+
+ html += `<div id="addressFormBox" style="display: none; margin-top: 16px;"></div>`;
+ container.innerHTML = html;
+ }
+
+ function showAddressForm(index = -1) {
+ const addresses = getSavedAddresses();
+ const addr = index >= 0 ? addresses[index] : {};
+ const formBox = document.getElementById('addressFormBox');
+ if (!formBox) return;
+
+ formBox.style.display = 'block';
+ formBox.innerHTML = `
+ <div style="background: var(--bg-tertiary); border-radius: 12px; padding: 16px; border: 1px solid var(--border-subtle);">
+ <div style="font-weight: 600; margin-bottom: 12px;">${index >= 0 ? '编辑地址' : '添加新地址'}</div>
+ <div style="display: grid; gap: 12px;">
+ <input type="text" id="addrName" placeholder="收货人姓名" value="${addr.name || ''}" style="padding: 12px; background: var(--bg-secondary); border: 1px solid var(--border-subtle); border-radius: 8px; color: var(--text-primary);">
+ <input type="tel" id="addrPhone" placeholder="手机号" value="${addr.phone || ''}" style="padding: 12px; background: var(--bg-secondary); border: 1px solid var(--border-subtle); border-radius: 8px; color: var(--text-primary);">
+ <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;">
+ <input type="text" id="addrProvince" placeholder="省" value="${addr.province || ''}" style="padding: 12px; background: var(--bg-secondary); border: 1px solid var(--border-subtle); border-radius: 8px; color: var(--text-primary);">
+ <input type="text" id="addrCity" placeholder="市" value="${addr.city || ''}" style="padding: 12px; background: var(--bg-secondary); border: 1px solid var(--border-subtle); border-radius: 8px; color: var(--text-primary);">
+ <input type="text" id="addrDistrict" placeholder="区" value="${addr.district || ''}" style="padding: 12px; background: var(--bg-secondary); border: 1px solid var(--border-subtle); border-radius: 8px; color: var(--text-primary);">
+ </div>
+ <input type="text" id="addrDetail" placeholder="详细地址(街道、门牌号)" value="${addr.detail || ''}" style="padding: 12px; background: var(--bg-secondary); border: 1px solid var(--border-subtle); border-radius: 8px; color: var(--text-primary);">
+ <label style="display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text-secondary);">
+ <input type="checkbox" id="addrDefault" ${addr.isDefault ? 'checked' : ''} style="width: 18px; height: 18px; accent-color: var(--accent-orange);"> 设为默认地址
+ </label>
+ </div>
+ <div style="display: flex; gap: 8px; margin-top: 16px;">
+ <button onclick="saveAddress(${index})" style="flex: 1; padding: 12px; background: var(--accent-orange); color: #000; border: none; border-radius: 8px; font-weight: 600; cursor: pointer;">保存</button>
+ <button onclick="cancelAddressForm()" style="flex: 1; padding: 12px; background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-subtle); border-radius: 8px; cursor: pointer; white-space: nowrap;">取消</button>
+ </div>
+ </div>
+ `;
+ }
+
+ function cancelAddressForm() {
+ const formBox = document.getElementById('addressFormBox');
+ if (formBox) formBox.style.display = 'none';
+ }
+
+ function saveAddress(index = -1) {
+ const name = document.getElementById('addrName').value.trim();
+ const phone = document.getElementById('addrPhone').value.trim();
+ const province = document.getElementById('addrProvince').value.trim();
+ const city = document.getElementById('addrCity').value.trim();
+ const district = document.getElementById('addrDistrict').value.trim();
+ const detail = document.getElementById('addrDetail').value.trim();
+ const isDefault = document.getElementById('addrDefault')?.checked || false;
+
+ if (!name || !phone || !province || !city || !detail) {
+ alert('请填写完整地址信息');
+ return;
+ }
+
+ // 保存客户姓名到 localStorage，用于订单
+ localStorage.setItem('customerName', name);
+ if (!/^1[3-9]\d{9}$/.test(phone)) {
+ alert('手机号格式不正确');
+ return;
+ }
+
+ let addresses = getSavedAddresses();
+ const newAddr = { name, phone, province, city, district, detail, isDefault };
+
+ if (isDefault) {
+ addresses.forEach(a => a.isDefault = false);
+ }
+
+ if (index >= 0) {
+ addresses[index] = newAddr;
+ } else {
+ if (addresses.length === 0) newAddr.isDefault = true;
+ addresses.push(newAddr);
+ }
+
+ saveAddresses(addresses);
+ renderAddressBook();
+ showToast('地址已保存');
+ }
+
+ function editAddress(index) {
+ renderAddressBook();
+ showAddressForm(index);
+ }
+
+ function deleteAddress(index) {
+ if (!confirm('确定删除这个地址吗?')) return;
+ let addresses = getSavedAddresses();
+ addresses.splice(index, 1);
+ saveAddresses(addresses);
+ renderAddressBook();
+ showToast('地址已删除');
+ }
+
+ // ========== 订单列表 ==========
+ async function loadMyOrders() {
+ const phone = document.getElementById('queryPhoneInput').value.trim().replace(/\s+/g, '');
+ if (!phone) {
+ alert('请输入手机号');
+ return;
+ }
+ if (!/^1[3-9]\d{9}$/.test(phone)) {
+ alert('手机号格式不正确');
+ return;
+ }
+
+ localStorage.setItem('customerPhone', phone);
+ const content = document.getElementById('orderListContent');
+ content.innerHTML = '<div style="text-align: center; padding: 40px;">加载中...</div>';
+
+ try {
+ const res = await fetch(`${API_BASE}/order/query?phone=${phone}`);
+ const data = await res.json();
+
+ if (data.success && data.orders && data.orders.length > 0) {
+ renderOrderList(data.orders);
+ } else {
+ content.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--text-secondary);">暂无订单</div>';
+ }
+ } catch (e) {
+ content.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--accent-red);">加载失败</div>';
+ }
+ }
+
+ function renderOrderList(orders, showPhoneSwitch = false) {
+ const content = document.getElementById('orderListContent');
+
+ const statusMap = {
+ 'pending': { text: '待接单', color: '#FF9500' },
+ 'assigned': { text: '已分配维修点', color: '#AF52DE', action: '选择送修方式' },
+ 'accepted': { text: '已接单', color: '#0A84FF' },
+ 'received': { text: '待检测', color: '#5856D6' },
+ 'detected': { text: '检测完成', color: '#AF52DE' },
+ 'inspected': { text: '检测中', color: '#BF5AF2' },
+ 'quoted': { text: '待确认报价', color: '#FF9F0A' },
+ 'confirmed': { text: '待维修', color: '#FF453A' },
+ 'repairing': { text: '维修中', color: '#30D158' },
+ 'repaired': { text: '待发货', color: '#30D158' },
+ 'shipping': { text: '待发货', color: '#30D158' },
+ 'delivered': { text: '待收货', color: '#30D158' },
+ 'completed': { text: '已完成', color: '#30D158' },
+ 'cancelled': { text: '已取消', color: '#8E8E93' }
+ };
+
+ let html = orders.map(order => {
+ const status = statusMap[order.status] || { text: order.status, color: '#8E8E93' };
+ let actionHtml = '';
+ if (order.status === 'assigned') {
+ actionHtml = `
+ <button onclick="event.stopPropagation(); selectDeliveryForOrder('${order.order_no}', '${order.merchant_name || '系统'}')"
+ style="width: 100%; padding: 12px; background: var(--accent-orange); border: none; border-radius: 12px; color: #000; font-weight: 600; cursor: pointer; margin-top: 10px; white-space: nowrap;">
+ 选择送修方式
+ </button>
+ `;
+ } else if (order.status === 'quoted') {
+ if (!order.deposit_paid) {
+ actionHtml = `
+ <div style="display: flex; gap: 8px; margin-top: 10px;" onclick="event.stopPropagation();">
+ <button onclick="payDeposit('${order.order_no}')" style="flex: 1; padding: 12px; background: var(--accent-green); border: none; border-radius: 12px; color: #000; font-weight: 600; cursor: pointer; white-space: nowrap;">✓ 接受并付定金 ¥${order.deposit_amount || 0}</button>
+ <button onclick="confirmQuote('${order.order_no}', false)" style="flex: 1; padding: 12px; background: var(--bg-secondary); border: 1px solid var(--border-subtle); border-radius: 12px; color: var(--accent-red); font-weight: 600; cursor: pointer;">✕ 拒绝</button>
+ </div>
+ `;
+ } else {
+ actionHtml = `
+ <div style="display: flex; gap: 8px; margin-top: 10px;" onclick="event.stopPropagation();">
+ <button onclick="confirmQuote('${order.order_no}', true)" style="flex: 1; padding: 12px; background: var(--accent-green); border: none; border-radius: 12px; color: #000; font-weight: 600; cursor: pointer; white-space: nowrap;">✓ 接受报价</button>
+ <button onclick="confirmQuote('${order.order_no}', false)" style="flex: 1; padding: 12px; background: var(--bg-secondary); border: 1px solid var(--border-subtle); border-radius: 12px; color: var(--accent-red); font-weight: 600; cursor: pointer; white-space: nowrap;">✕ 拒绝报价</button>
+ </div>
+ `;
+ }
+ } else if (['repaired','shipping'].includes(order.status)) {
+ const pendingFinal = Math.max(0, (order.quote_amount || 0) - (order.deposit_amount || 0));
+ if (pendingFinal > 0 && !order.final_paid) {
+ actionHtml = `
+ <div style="margin-top: 10px;" onclick="event.stopPropagation();">
+ <button onclick="payFinal('${order.order_no}')" style="width: 100%; padding: 12px; background: var(--accent-orange); border: none; border-radius: 12px; color: #000; font-weight: 600; cursor: pointer; white-space: nowrap;">支付尾款 ¥${pendingFinal}</button>
+ <div style="text-align: center; font-size: 12px; color: var(--text-secondary); margin-top: 6px;">付清尾款后商家将尽快发货</div>
+ </div>
+ `;
+ } else {
+ actionHtml = `
+ <div style="margin-top: 10px;">
+ <button disabled style="width: 100%; padding: 12px; background: var(--bg-secondary); border: 1px solid var(--border-subtle); border-radius: 12px; color: var(--text-secondary); font-weight: 600; cursor: not-allowed;">等待商家发货</button>
+ </div>
+ `;
+ }
+ } else if (order.status === 'delivered') {
+ const countdown = getAutoConfirmCountdown(order);
+ actionHtml = `
+ <div style="margin-top: 10px;" onclick="event.stopPropagation();">
+ <button onclick="confirmReceiveOrder('${order.order_no}')" style="width: 100%; padding: 12px; background: var(--accent-blue); border: none; border-radius: 12px; color: #fff; font-weight: 600; cursor: pointer;">确认收货</button>
+ ${countdown ? `<div style="text-align: center; font-size: 12px; color: var(--text-secondary); margin-top: 6px;">${countdown}</div>` : ''}
+ </div>
+ `;
+ }
+
+ const hasPrice = ['quoted','confirmed','repairing','repaired','delivered','completed'].includes(order.status);
+ const priceLabel = hasPrice ? `
+ <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border-subtle);">
+ <span style="font-size: 13px; color: var(--text-secondary);">${order.merchant_name ? order.merchant_name + ' · ' : ''}报价</span>
+ <span style="font-weight: 600; color: var(--accent-orange);">¥${order.quote_amount || order.estimated_price || '-'}</span>
+ </div>
+ ` : '';
+
+ return `
+ <div style="background: var(--bg-tertiary); border-radius: 12px; padding: 16px; margin-bottom: 12px; border: 1px solid var(--border-subtle); cursor: pointer; transition: background 0.15s;"
+ onclick="showOrderDetail('${order.order_no}')"
+ onmouseover="this.style.background='var(--bg-secondary)'" onmouseout="this.style.background='var(--bg-tertiary)'">
+ <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+ <span style="font-family: monospace; font-weight: 600;">${order.order_no}</span>
+ <span style="color: ${status.color}; font-size: 14px; font-weight: 500;">${status.text}</span>
+ </div>
+ <div style="color: var(--text-secondary); font-size: 14px; margin-bottom: 4px;">
+ ${order.drone_model} · ${order.problem_description?.substring(0, 20) || '无描述'}...
+ </div>
+ <div style="color: var(--text-tertiary); font-size: 12px;">
+ ${order.created_at?.split('T')[0] || '-'}
+ </div>
+ ${priceLabel}
+ ${actionHtml}
+ </div>
+ `;
+ }).join('');
+
+ if (showPhoneSwitch) {
+ html += `
+ <div style="text-align: center; margin-top: 16px;">
+ <button onclick="event.stopPropagation(); showPhoneSearchFallback()" style="padding: 10px 20px; background: transparent; border: 1px solid var(--border-subtle); border-radius: 8px; color: var(--text-secondary); font-size: 13px; cursor: pointer;">
+ 按手机号查询其他订单
+ </button>
+ </div>
+ `;
+ }
+
+ content.innerHTML = html;
+ }
+
+ function showPhoneSearchFallback() {
+ const content = document.getElementById('orderListContent');
+ const savedPhone = localStorage.getItem('customerPhone') || '';
+ content.innerHTML = `
+ <div style="text-align: center; padding: 24px; color: var(--text-secondary);">
+ <div style="font-size: 13px; margin-bottom: 12px;">输入下单时填写的手机号</div>
+ <input type="tel" id="queryPhoneInput" placeholder="手机号" value="${savedPhone}" style="width: 100%; padding: 12px; background: var(--bg-tertiary); border: 1px solid var(--border-subtle); border-radius: 12px; color: var(--text-primary); font-size: 16px;">
+ <button onclick="loadMyOrders()" style="width: 100%; margin-top: 12px; padding: 12px; background: var(--accent-orange); border: none; border-radius: 12px; color: #000; font-weight: 600; cursor: pointer;">查询</button>
+ </div>
+ `;
+ setTimeout(() => {
+ const input = document.getElementById('queryPhoneInput');
+ if (input) {
+ input.addEventListener('keypress', (e) => { if (e.key === 'Enter') loadMyOrders(); });
+ input.focus();
+ if (savedPhone) input.select();
+ }
+ }, 0);
+ }
+
+ async function showOrderDetail(orderNo) {
+ const modal = document.getElementById('orderDetailModal');
+ const content = document.getElementById('orderDetailContent');
+ const header = document.getElementById('orderDetailHeader');
+ modal.style.display = 'block';
+ header.style.background = 'var(--bg-tertiary)';
+ content.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--text-secondary);">加载中...</div>';
+
+ try {
+ const res = await fetch(`${API_BASE}/order/detail?order_no=${encodeURIComponent(orderNo)}`);
+ const data = await res.json();
+ if (!data.success || !data.order) {
+ content.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--accent-red);">加载失败，订单不存在</div>';
+ return;
+ }
+
+ const order = unwrap(data.order);
+ const statusMap = {
+ 'pending': { text: '待接单', color: '#FF9500' },
+ 'assigned': { text: '已分配维修点', color: '#AF52DE' },
+ 'accepted': { text: '已接单/待收货', color: '#0A84FF' },
+ 'received': { text: '待检测', color: '#5856D6' },
+ 'detected': { text: '检测完成', color: '#AF52DE' },
+ 'inspected': { text: '检测中', color: '#BF5AF2' },
+ 'quoted': { text: '待确认报价', color: '#FF9F0A' },
+ 'confirmed': { text: '待维修', color: '#FF453A' },
+ 'repairing': { text: '维修中', color: '#30D158' },
+ 'repaired': { text: '待发货', color: '#30D158' },
+ 'delivered': { text: '待收货', color: '#30D158' },
+ 'completed': { text: '已完成', color: '#30D158' },
+ 'cancelled': { text: '已取消', color: '#8E8E93' }
+ };
+ const status = statusMap[order.status] || { text: order.status, color: '#8E8E93' };
+
+ // 解析检测报告
+ let detectionHtml = '';
+ let requiredTotal = 0;
+ let optionalTotal = 0;
+ if (order.detection_result) {
+ let d = order.detection_result;
+ if (typeof d === 'string') {
+ try { d = JSON.parse(d); } catch (e) {}
+ }
+ if (typeof d === 'object' && d !== null) {
+ const faultDesc = d.fault_description || d.actual_problem || '';
+ const repairPlan = d.repair_plan || '';
+
+ let requiredParts = [];
+ let optionalParts = [];
+
+ // 优先读取新结构的 required_parts / optional_parts
+ if (Array.isArray(d.required_parts)) {
+ requiredParts = d.required_parts.map(p => typeof p === 'string' ? {name:p, total_price:0} : {name: p.name || String(p), total_price: p.total_price || 0});
+ }
+ if (Array.isArray(d.optional_parts)) {
+ optionalParts = d.optional_parts.map(p => typeof p === 'string' ? {name:p, total_price:0} : {name: p.name || String(p), total_price: p.total_price || 0});
+ }
+
+ // 兼容旧结构：从 parts_list / parts_needed / damage_parts 拆分
+ if (!requiredParts.length && !optionalParts.length) {
+ let partsList = [];
+ if (Array.isArray(d.parts_list)) partsList = d.parts_list;
+ else if (d.parts_needed) partsList = d.parts_needed.split(/[,，、]/).filter(x => x.trim());
+ else if (Array.isArray(d.damage_parts)) partsList = d.damage_parts;
+
+ const aiParts = (order.ai_diagnosis && order.ai_diagnosis.parts_list) || [];
+ const aiPartNames = Array.isArray(aiParts) ? aiParts.map(p => typeof p === 'string' ? p : p.name) : [];
+ partsList.forEach(p => {
+ const pName = typeof p === 'string' ? p : p.name;
+ if (aiPartNames.some(aip => pName.includes(aip) || aip.includes(pName))) {
+ requiredParts.push({name: pName, total_price: 0});
+ } else {
+ optionalParts.push({name: pName, total_price: 0});
+ }
+ });
+ if (!requiredParts.length && !optionalParts.length && partsList.length) {
+ requiredParts = partsList.map(p => typeof p === 'string' ? {name: p, total_price: 0} : {name: p.name, total_price: 0});
+ }
+ }
+
+ requiredTotal = requiredParts.reduce((sum, p) => sum + (p.total_price || 0), 0);
+ optionalTotal = optionalParts.reduce((sum, p) => sum + (p.total_price || 0), 0);
+
+ const requiredHtml = requiredParts.length ? requiredParts.map((p, idx) => `
+ <label style="display:flex; align-items:center; gap:8px; margin-bottom:8px; cursor:default; font-size:13px; color:var(--text-secondary);">
+ <input type="checkbox" checked disabled style="width:16px; height:16px; accent-color:var(--accent-green); flex-shrink:0;">
+ <span style="flex:1;">${p.name}</span>
+ <span style="font-size:12px; color:var(--text-secondary); margin-right:4px;">¥${p.total_price}</span>
+ <span style="font-size:11px; color:var(--text-tertiary); background:var(--bg-secondary); padding:2px 6px; border-radius:4px;">必修</span>
+ </label>
+ `).join('') : '<div style="font-size:13px; color:var(--text-tertiary);">待商家补充</div>';
+
+ const optionalHtml = optionalParts.length ? optionalParts.map((p, idx) => `
+ <label style="display:flex; align-items:center; gap:8px; margin-bottom:8px; cursor:pointer; font-size:13px; color:var(--text-secondary);"
+ onchange="updateMerchantReportTotal()"
+ >
+ <input type="checkbox" class="opt-checkbox" value="${p.name}" data-price="${p.total_price}" checked style="width:16px; height:16px; accent-color:var(--accent-blue); flex-shrink:0;">
+ <span style="flex:1;" class="opt-name">${p.name}</span>
+ <span style="font-size:12px; color:var(--text-secondary); margin-right:4px;">¥${p.total_price}</span>
+ <span style="font-size:11px; color:var(--accent-blue); background:rgba(10,132,255,0.1); padding:2px 6px; border-radius:4px;">选修</span>
+ </label>
+ `).join('') : '<div style="font-size:13px; color:var(--text-tertiary);">无选修项目</div>';
+
+ detectionHtml = `
+ <div class="merchant-report-box" style="background: var(--bg-tertiary); border-radius: 12px; padding: 14px; border: 1px solid var(--border-subtle); margin-bottom: 14px;" data-required-total="${requiredTotal}" data-base-quote="${order.quote_amount || 0}">
+ <div style="font-weight: 600; margin-bottom: 10px; font-size: 14px;">商家检测报告</div>
+ <div style="font-size: 13px; color: var(--text-secondary); line-height: 1.7; margin-bottom: 10px;">
+ ${faultDesc ? '<div><strong>故障描述：</strong>' + faultDesc + '</div>' : ''}
+ ${repairPlan ? '<div><strong>维修方案：</strong>' + repairPlan + '</div>' : ''}
+ </div>
+ <div style="margin-bottom: 10px;">
+ <div style="font-size: 12px; color: var(--text-tertiary); margin-bottom: 6px;">建议维修项目（必修）</div>
+ ${requiredHtml}
+ </div>
+ <div style="margin-bottom: 10px;">
+ <div style="font-size: 12px; color: var(--text-tertiary); margin-bottom: 6px;">可选维修项目（选修）</div>
+ ${optionalHtml}
+ </div>
+ </div>
+ `;
+ } else {
+ detectionHtml = `
+ <div style="background: var(--bg-tertiary); border-radius: 12px; padding: 14px; border: 1px solid var(--border-subtle); margin-bottom: 14px;">
+ <div style="font-weight: 600; margin-bottom: 8px;">商家检测报告</div>
+ <div style="font-size: 13px; color: var(--text-secondary); line-height: 1.7;">${String(d)}</div>
+ </div>
+ `;
+ }
+ } else if (order.ai_diagnosis && order.ai_diagnosis.causes) {
+ detectionHtml = `
+ <div style="background: var(--bg-tertiary); border-radius: 12px; padding: 14px; border: 1px solid var(--border-subtle); margin-bottom: 14px;">
+ <div style="font-weight: 600; margin-bottom: 8px;">AI 初步诊断</div>
+ <div style="font-size: 13px; color: var(--text-secondary); line-height: 1.7;">
+ <div><strong>可能原因：</strong>${(order.ai_diagnosis.causes || []).join('<br>')}</div>
+ <div><strong>建议更换配件：</strong>${(order.ai_diagnosis.parts_list || []).map(p => typeof p === 'string' ? p : p.name).join('、') || '待工程师检测'}</div>
+ </div>
+ </div>
+ `;
+ }
+
+ // 费用明细
+ let costHtml = '';
+ if (order.quote_amount || order.estimated_price) {
+ let partsCost = '-';
+ let laborCost = '-';
+ if (order.quote_data) {
+ try {
+ const qd = (typeof order.quote_data === 'string') ? JSON.parse(order.quote_data) : order.quote_data;
+ partsCost = (qd.parts_cost !== undefined) ? qd.parts_cost : '-';
+ laborCost = (qd.labor_cost !== undefined) ? qd.labor_cost : '-';
+ } catch (e) {}
+ }
+ costHtml = `
+ <div style="background: var(--bg-tertiary); border-radius: 12px; padding: 14px; border: 1px solid var(--border-subtle); margin-bottom: 14px;">
+ <div style="font-weight: 600; margin-bottom: 10px;">费用明细</div>
+ <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px;">
+ <span style="color: var(--text-secondary);">配件费用</span>
+ <span>¥${partsCost}</span>
+ </div>
+ <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px;">
+ <span style="color: var(--text-secondary);">工时费用</span>
+ <span>¥${laborCost}</span>
+ </div>
+ <div style="display: flex; justify-content: space-between; font-size: 15px; font-weight: 600; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border-subtle);">
+ <span>总报价</span>
+ <span id="detail-total-price" style="color: var(--accent-orange);">¥${order.quote_amount || order.estimated_price}</span>
+ </div>
+ </div>
+ `;
+ }
+
+ // 物流信息
+ let logisticsHtml = '';
+ if (order.repair_mode === 'express' && (order.customer_carrier || order.merchant_carrier)) {
+ logisticsHtml = `
+ <div style="background: var(--bg-tertiary); border-radius: 12px; padding: 14px; border: 1px solid var(--border-subtle); margin-bottom: 14px;">
+ <div style="font-weight: 600; margin-bottom: 10px;">物流信息</div>
+ ${order.customer_carrier ? `
+ <div style="font-size: 13px; margin-bottom: 8px;">
+ <div style="color: var(--text-secondary); margin-bottom: 2px;">客户寄出</div>
+ <div>${order.customer_carrier} <span style="font-family: monospace;">${order.customer_tracking_no || ''}</span></div>
+ </div>
+ ` : ''}
+ ${order.merchant_carrier ? `
+ <div style="font-size: 13px;">
+ <div style="color: var(--text-secondary); margin-bottom: 2px;">商家发回</div>
+ <div>${order.merchant_carrier} <span style="font-family: monospace;">${order.merchant_tracking_no || ''}</span></div>
+ </div>
+ ` : ''}
+ </div>
+ `;
+ } else if (order.repair_mode === 'store' && order.appointment_time) {
+ logisticsHtml = `
+ <div style="background: var(--bg-tertiary); border-radius: 12px; padding: 14px; border: 1px solid var(--border-subtle); margin-bottom: 14px;">
+ <div style="font-weight: 600; margin-bottom: 8px;">到店信息</div>
+ <div style="font-size: 13px; color: var(--text-secondary);">预约到店时间：${new Date(order.appointment_time).toLocaleString('zh-CN')}</div>
+ </div>
+ `;
+ }
+
+ // 支付信息
+ let payHtml = '';
+ if (order.quote_amount && order.quote_amount > 0) {
+ const pendingFinal = Math.max(0, (order.quote_amount || 0) - (order.deposit_amount || 0));
+ let deposit = order.deposit_amount || 0;
+ payHtml = `
+ <div style="background: var(--bg-tertiary); border-radius: 12px; padding: 14px; border: 1px solid var(--border-subtle); margin-bottom: 14px;">
+ <div style="font-weight: 600; margin-bottom: 10px;">费用明细</div>
+ <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px;">
+ <span style="color: var(--text-secondary);">维修报价</span>
+ <span id="pay-quote-amount">¥${order.quote_amount}</span>
+ </div>
+ <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px;">
+ <span style="color: var(--text-secondary);">定金</span>
+ <span style="color: ${order.deposit_paid ? 'var(--accent-green)' : 'var(--text-secondary)'};" id="pay-deposit-status">${order.deposit_paid ? '已付' : '待付'} <span id="detail-deposit-amount">¥${deposit}</span></span>
+ </div>
+ <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px;">
+ <span style="color: var(--text-secondary);">尾款</span>
+ <span style="color: ${order.final_paid ? 'var(--accent-green)' : 'var(--text-secondary)'};" id="pay-final-status">${order.final_paid ? '已付' : '待付'} <span id="detail-final-amount">¥${pendingFinal}</span></span>
+ </div>
+ </div>
+ `;
+ }
+
+ // 操作按钮
+ let actionHtml = '';
+ if (order.status === 'assigned') {
+ actionHtml = `<button onclick="closeOrderDetail(); selectDeliveryForOrder('${order.order_no}', '${order.merchant_name || '系统'}')" style="width: 100%; padding: 14px; background: var(--accent-orange); border: none; border-radius: 12px; color: #000; font-weight: 600; cursor: pointer; white-space: nowrap;">选择送修方式</button>`;
+ } else if (order.status === 'quoted') {
+ if (!order.deposit_paid) {
+ actionHtml = `
+ <div>
+ <button onclick="closeOrderDetail(); payDeposit('${order.order_no}')" style="width: 100%; padding: 14px; background: var(--accent-green); border: none; border-radius: 12px; color: #000; font-weight: 600; cursor: pointer; white-space: nowrap;">✓ 接受报价并支付定金 ¥${order.deposit_amount || 0}</button>
+ <div style="text-align: center; font-size: 12px; color: var(--text-secondary); margin-top: 8px;">也可选择线下转账，转账后联系商家确认</div>
+ <button onclick="closeOrderDetail(); confirmQuote('${order.order_no}', false)" style="width: 100%; margin-top: 10px; padding: 12px; background: var(--bg-secondary); border: 1px solid var(--border-subtle); border-radius: 12px; color: var(--accent-red); font-weight: 600; cursor: pointer; white-space: nowrap;">✕ 拒绝报价</button>
+ </div>
+ `;
+ } else {
+ actionHtml = `
+ <div style="display: flex; gap: 10px;">
+ <button onclick="closeOrderDetail(); confirmQuote('${order.order_no}', true)" style="flex: 1; padding: 14px; background: var(--accent-green); border: none; border-radius: 12px; color: #000; font-weight: 600; cursor: pointer; white-space: nowrap;">✓ 接受报价</button>
+ <button onclick="closeOrderDetail(); confirmQuote('${order.order_no}', false)" style="flex: 1; padding: 14px; background: var(--bg-secondary); border: 1px solid var(--border-subtle); border-radius: 12px; color: var(--accent-red); font-weight: 600; cursor: pointer; white-space: nowrap;">✕ 拒绝报价</button>
+ </div>
+ `;
+ }
+ } else if (['repaired','shipping'].includes(order.status)) {
+ const pendingFinal = Math.max(0, (order.quote_amount || 0) - (order.deposit_amount || 0));
+ if (pendingFinal > 0 && !order.final_paid) {
+ actionHtml = `
+ <div>
+ <button onclick="closeOrderDetail(); payFinal('${order.order_no}')" style="width: 100%; padding: 14px; background: var(--accent-orange); border: none; border-radius: 12px; color: #000; font-weight: 600; cursor: pointer; white-space: nowrap;">支付尾款 ¥${pendingFinal}</button>
+ <div style="text-align: center; font-size: 12px; color: var(--text-secondary); margin-top: 8px;">付清尾款后商家将尽快发货</div>
+ </div>
+ `;
+ } else {
+ actionHtml = `
+ <button disabled style="width: 100%; padding: 14px; background: var(--bg-secondary); border: 1px solid var(--border-subtle); border-radius: 12px; color: var(--text-secondary); font-weight: 600; cursor: not-allowed;">等待商家发货</button>
+ `;
+ }
+ } else if (order.status === 'delivered') {
+ const countdown = getAutoConfirmCountdown(order);
+ const pendingFinal = Math.max(0, (order.quote_amount || 0) - (order.deposit_amount || 0));
+ if (pendingFinal > 0 && !order.final_paid) {
+ actionHtml = `
+ <div>
+ <button onclick="closeOrderDetail(); payFinal('${order.order_no}')" style="width: 100%; padding: 14px; background: var(--accent-green); border: none; border-radius: 12px; color: #000; font-weight: 600; cursor: pointer; white-space: nowrap;">支付尾款 ¥${pendingFinal} 并确认收货</button>
+ ${countdown ? `<div style="text-align: center; font-size: 12px; color: var(--text-secondary); margin-top: 8px;">${countdown}</div>` : ''}
+ </div>
+ `;
+ } else {
+ actionHtml = `
+ <div>
+ <button onclick="closeOrderDetail(); confirmReceiveOrder('${order.order_no}')" style="width: 100%; padding: 14px; background: var(--accent-blue); border: none; border-radius: 12px; color: #fff; font-weight: 600; cursor: pointer; white-space: nowrap;">确认收货</button>
+ ${countdown ? `<div style="text-align: center; font-size: 12px; color: var(--text-secondary); margin-top: 8px;">${countdown}</div>` : ''}
+ </div>
+ `;
+ }
+ }
+
+ // 维修点信息
+ let merchantHtml = '';
+ if (order.merchant_name) {
+ const m = currentMerchant || {};
+ const addr = m.address || '地址加载中...';
+ const hours = m.business_hours || '';
+ const phone = m.phone || '';
+ merchantHtml = `
+ <div style="background: var(--bg-tertiary); border-radius: 12px; padding: 14px; border: 1px solid var(--border-subtle); margin-bottom: 14px;">
+ <div style="font-weight: 600; margin-bottom: 8px;">维修点信息</div>
+ <div style="font-size: 14px; font-weight: 500;">${order.merchant_name}</div>
+ <div style="font-size: 13px; color: var(--text-secondary); margin-top: 4px; line-height: 1.7;">${addr}${hours ? '<br>营业时间:' + hours : ''}${phone ? '<br>电话:' + phone : ''}</div>
+ ${phone ? `
+ <div style="display: flex; gap: 8px; margin-top: 10px;">
+ <a href="tel:${phone}" style="flex: 1; text-align: center; padding: 10px; background: var(--accent-green); border: none; border-radius: 8px; color: #000; font-weight: 600; text-decoration: none; cursor: pointer; display: block;">📞 拨打商家</a>
+ <a href="https://uri.amap.com/search?keyword=${encodeURIComponent(addr)}" target="_blank" style="flex: 1; text-align: center; padding: 10px; background: var(--accent-blue); border: none; border-radius: 8px; color: #fff; font-weight: 600; text-decoration: none; cursor: pointer; display: block;">🗺️ 导航到店</a>
+ </div>
+ ` : ''}
+ </div>
+ `;
+ }
+
+ header.innerHTML = `
+ <h2 style="font-size: 18px; font-weight: 600;">订单详情</h2>
+ <button onclick="closeOrderDetail()" style="background: none; border: none; color: var(--text-secondary); font-size: 24px; cursor: pointer;">×</button>
+ `;
+
+ content.innerHTML = `
+ <div style="text-align: center; margin-bottom: 16px;">
+ <div style="font-family: monospace; font-size: 22px; font-weight: 700; color: var(--accent-orange); margin-bottom: 8px;">${order.order_no}</div>
+ <span style="display: inline-block; padding: 4px 12px; border-radius: 8px; font-size: 13px; font-weight: 500; background: ${status.color}20; color: ${status.color};">${status.text}</span>
+ </div>
+
+ <div style="background: var(--bg-tertiary); border-radius: 12px; padding: 14px; border: 1px solid var(--border-subtle); margin-bottom: 14px;">
+ <div style="font-weight: 600; margin-bottom: 10px;">基础信息</div>
+ <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px;">
+ <span style="color: var(--text-secondary);">机型</span>
+ <span>${order.drone_model}</span>
+ </div>
+ <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px;">
+ <span style="color: var(--text-secondary);">故障描述</span>
+ <span style="max-width: 60%; text-align: right;">${order.problem_description}</span>
+ </div>
+ <div style="display: flex; justify-content: space-between; font-size: 13px;">
+ <span style="color: var(--text-secondary);">创建时间</span>
+ <span>${new Date(order.created_at).toLocaleString('zh-CN')}</span>
+ </div>
+ </div>
+
+ ${merchantHtml}
+ ${detectionHtml}
+ ${costHtml}
+ ${payHtml}
+ ${logisticsHtml}
+
+ ${actionHtml ? '<div style="margin-top: 16px;">' + actionHtml + '</div>' : ''}
+ `;
+ updateMerchantReportTotal();
+ } catch (e) {
+ content.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--accent-red);">加载详情失败，请检查网络</div>';
+ }
+ }
+
+ function closeOrderDetail() {
+ document.getElementById('orderDetailModal').style.display = 'none';
+ }
+
+ // ========== 对话功能 ==========
+ function quickInput(text) {
+ if (/^[A-Z]{2}\d{14}$/.test(text)) {
+ queryOrderByNumber(text);
+ return;
+ }
+ document.getElementById('chatInput').value = text;
+ sendMessage();
+ }
+
+ async function sendMessage() {
+ const input = document.getElementById('chatInput');
+ const message = input.value.trim();
+ if (!message) return;
+
+ document.getElementById('welcomeScreen').style.display = 'none';
+ addMessage(message, 'user');
+ input.value = '';
+ input.style.height = 'auto';
+ showTyping();
+ await handleConversation(message);
+ }
+
+  async function handleConversation(message) {
+    try {
+      const response = await fetch(`${API_BASE}/ai/parse`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: message })
+      });
+
+      const data = await response.json();
+      hideTyping();
+
+      if (!data.success) {
+        addMessage('抱歉，我遇到了一些问题，请稍后再试。', 'ai');
+        return;
+      }
+
+      const drone = data.entities?.drone;
+      const fault = data.entities?.fault;
+      const intent = data.intent;
+      const msg = message.toLowerCase();
+
+      // ===== 全局意图识别（任何状态下都响应） =====
+
+      // 订单查询
+      if (intent === 'query' || msg.includes('查订单') || msg.includes('查询订单') || msg.includes('我的订单') || /^[A-Z]{2}\d{14}$/.test(message.trim())) {
+        showOrderQueryForm();
+        return;
+      }
+
+      // 问候/闲聊
+      if (intent === 'greet' || /^(你好|hi|hello|嗨|在吗|在不在|你是谁|你是干什么的)/i.test(msg)) {
+        addMessage('你好！我是喵修匠 AI 维修助手 🤖<br>你可以告诉我你的无人机型号和故障现象，我会帮你生成检测报告和维修报价。<br><br>比如：<br>• "Mini 3 Pro 云台不转了"<br>• "Air 3 炸机了"<br>• "Mavic 3 图传不稳定"', 'ai');
+        return;
+      }
+
+      // 价格咨询
+      if (msg.includes('多少钱') || msg.includes('价格') || msg.includes('收费') || msg.includes('费用') || msg.includes('报价')) {
+        if (drone) {
+          conversationState.drone = drone;
+          conversationState.step = 'ask_problem';
+          addMessage(`${drone} 的维修价格取决于具体故障。请描述一下故障现象，我马上帮你估价。<br><br>常见故障：<br>• 云台不转/抖动<br>• 无法起飞/飞控异常<br>• 图传信号丢失<br>• 电池鼓包/充不进电<br>• 炸机/外壳破损`, 'ai');
+        } else {
+          addMessage('维修价格取决于机型和具体故障。请告诉我你的无人机型号，比如：<br>• Mini 3 Pro<br>• Air 3<br>• Mavic 3<br>• 其他型号', 'ai');
+          conversationState.step = 'ask_drone';
+        }
+        return;
+      }
+
+      // 下单/寄修
+      if (msg.includes('下单') || msg.includes('寄修') || msg.includes('我要修') || msg.includes('想修') || msg.includes('怎么修') || msg.includes('如何修')) {
+        if (conversationState.drone && conversationState.problem) {
+          startCreateOrder();
+        } else if (conversationState.drone) {
+          conversationState.step = 'ask_problem';
+          addMessage(`已记录机型 ${conversationState.drone}。请描述故障现象，我帮你生成检测报告后即可下单。`, 'ai');
+        } else {
+          addMessage('好的，我来帮你安排维修。请先告诉我你的无人机型号，比如 Mini 3 Pro、Air 3、Mavic 3 等。', 'ai');
+          conversationState.step = 'ask_drone';
+        }
+        return;
+      }
+
+      // ===== 对话状态机 =====
+      switch(conversationState.step) {
+        case 'welcome':
+        case 'ask_drone':
+          if (drone && fault && fault !== message) {
+            // 用户同时说了机型和故障 → 直接诊断
+            conversationState.drone = drone;
+            conversationState.problem = fault;
+            await generateDiagnosisReport(drone, fault);
+            conversationState.step = 'show_report';
+          } else if (drone) {
+            conversationState.drone = drone;
+            conversationState.step = 'ask_problem';
+            addMessage(`收到，${drone}。请描述故障现象，比如：<br>• 云台不转或抖动<br>• 无法起飞<br>• 图传信号不稳定<br>• 电池充不进电<br>• 炸机/摔机`, 'ai');
+          } else if (fault) {
+            // 用户只说了故障没说机型 → 记录故障，追问机型
+            conversationState.problem = fault;
+            conversationState.step = 'ask_drone';
+            addMessage(`收到，故障现象：${fault}。请告诉我你的无人机型号，比如 Mini 3 Pro、Air 3、Mavic 3 等。`, 'ai');
+          } else {
+            conversationState.step = 'ask_drone';
+            addMessage('请告诉我你的无人机机型和故障现象，比如：<br>• "Mini 3 Pro 云台不转"<br>• "Air 3 炸机了"<br>• "Mavic 3 无法起飞"', 'ai');
+          }
+          break;
+
+        case 'ask_problem':
+          conversationState.problem = message;
+          await generateDiagnosisReport(conversationState.drone, message);
+          conversationState.step = 'show_report';
+          break;
+
+        case 'show_report':
+        case 'confirm_order':
+          if (message.includes('下单') || message.includes('创建') || message.includes('确认') || message.includes('修') || message.includes('好的') || message.includes('可以') || message.includes('行') || message.includes('ok') || message.includes('yes')) {
+            startCreateOrder();
+          } else if (drone) {
+            conversationState.drone = drone;
+            conversationState.problem = null;
+            conversationState.step = 'ask_problem';
+            addMessage(`收到，${drone}。请描述故障现象。`, 'ai');
+          } else {
+            addMessage('你可以：<br>• 说"下单"创建维修工单<br>• 告诉我其他机型获取报价<br>• 输入工单号查询订单进度', 'ai');
+          }
+          break;
+      }
+    } catch (e) {
+      hideTyping();
+      addMessage('网络连接失败，请检查网络后重试。', 'ai');
+    }
+  }
+
+ // ========== AI诊断 ==========
+ async function generateDiagnosisReport(drone, problem) {
+ showToast('正在生成AI检测报告...');
+ let analysis = null;
+ try {
+ const res = await fetch(`${API_BASE}/ai/diagnose`, {
+ method: 'POST',
+ headers: { 'Content-Type': 'application/json' },
+ body: JSON.stringify({ model: drone, problem: problem })
+ });
+ const data = await res.json();
+ if (data.success && data.diagnosis) {
+ analysis = data.diagnosis;
+ } else {
+ analysis = analyzeProblemFallback(drone, problem);
+ }
+ } catch (e) {
+ analysis = analyzeProblemFallback(drone, problem);
+ }
+
+ const partsTags = (analysis.parts_list || []).map(p => `<span class="diagnosis-part-tag">${p.name}</span>`).join('');
+ const dataBadge = analysis.data_driven
+ ? `<span style="display:inline-block; background:rgba(48,209,88,0.15); color:var(--accent-green); padding:2px 8px; border-radius:6px; font-size:12px; margin-left:8px;">数据驱动</span>`
+ : '';
+
+ const checkpointsHtml = (analysis.check_points || []).map((c, idx) => `
+ <label style="display:flex; align-items:flex-start; gap:8px; margin-bottom:8px; cursor:pointer; font-size:13px; color:var(--text-secondary);"
+ onchange="if(this.querySelector('input').checked){ this.style.color='var(--accent-green)'; }else{ this.style.color='var(--text-secondary)'; }">
+ <input type="checkbox" style="width:16px; height:16px; accent-color:var(--accent-green); margin-top:2px; flex-shrink:0;">
+ <span style="flex:1; line-height:1.5;">${c}</span>
+ </label>
+ `).join('');
+
+ const reportId = 'report-' + Date.now();
+ const reportHtml = `
+ <div class="diagnosis-card" id="${reportId}">
+ <div class="diagnosis-card-header" style="cursor:pointer;" onclick="toggleReport('${reportId}')">
+ <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+ <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+ </svg>
+ <span style="flex:1;">AI 故障检测报告${dataBadge}</span>
+ <svg id="${reportId}-icon" style="width:18px;height:18px;transition:transform .2s;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"></polyline></svg>
+ </div>
+ <div id="${reportId}-body" style="transition:all .2s;">
+ <div class="diagnosis-section">
+ <div class="diagnosis-section-title">检测机型</div>
+ <div class="diagnosis-section-content">${drone}</div>
+ </div>
+ <div class="diagnosis-section">
+ <div class="diagnosis-section-title">故障描述</div>
+ <div class="diagnosis-section-content">${problem}</div>
+ </div>
+ <div class="diagnosis-section">
+ <div class="diagnosis-section-title">可能原因</div>
+ <div class="diagnosis-section-content" style="font-size:13px; color:var(--text-secondary);">${(analysis.causes || []).join('<br>')}</div>
+ </div>
+ ${checkpointsHtml ? `
+ <div class="diagnosis-section">
+ <div class="diagnosis-section-title">检测要点（可自检确认）</div>
+ <div style="margin-top:6px;">${checkpointsHtml}</div>
+ </div>
+ ` : ''}
+ <div class="diagnosis-section">
+ <div class="diagnosis-section-title">建议更换配件</div>
+ <div class="diagnosis-parts">${partsTags || '<span style="color:var(--text-tertiary); font-size:13px;">待工程师检测后确定</span>'}</div>
+ </div>
+ <div class="diagnosis-section">
+ <div class="diagnosis-cost">
+ <span class="diagnosis-cost-label">预估维修费用</span>
+ <span class="diagnosis-cost-value">¥${analysis.total_price || 0}</span>
+ </div>
+ </div>
+ <div class="diagnosis-section" style="font-size: 12px; color: var(--text-secondary);">
+ * 此报告由AI根据描述生成，实际故障以专业工程师检测为准
+ ${analysis.data_driven && analysis.history_samples ? `<br>基于 ${analysis.history_samples} 单历史维修案例与平台定价规则生成` : ''}
+ </div>
+ <div class="diagnosis-actions">
+ <button class="diagnosis-btn diagnosis-btn-primary" onclick="startCreateOrder()">创建维修工单</button>
+ <button class="diagnosis-btn diagnosis-btn-secondary" onclick="resetConversation()">重新描述</button>
+ </div>
+ </div>
+ </div>
+ `;
+
+ addMessage(reportHtml, 'ai');
+ conversationState.report = analysis;
+ }
+
+ function toggleReport(id) {
+ const body = document.getElementById(id + '-body');
+ const icon = document.getElementById(id + '-icon');
+ if (!body) return;
+ if (body.style.display === 'none') {
+ body.style.display = 'block';
+ icon.style.transform = 'rotate(0deg)';
+ } else {
+ body.style.display = 'none';
+ icon.style.transform = 'rotate(180deg)';
+ }
+ }
+
+ function updateMerchantReportTotal() {
+ const reportBox = document.querySelector('.merchant-report-box');
+ if (!reportBox) return;
+ const requiredTotal = parseFloat(reportBox.dataset.requiredTotal || '0');
+ const checkedOpts = reportBox.querySelectorAll('.opt-checkbox:checked');
+ let optTotal = 0;
+ const selectedNames = [];
+ checkedOpts.forEach(cb => {
+ optTotal += parseFloat(cb.dataset.price || '0');
+ selectedNames.push(cb.value);
+ });
+ const newTotal = requiredTotal + optTotal;
+
+ const totalEl = document.getElementById('detail-total-price');
+ if (totalEl) totalEl.textContent = '¥' + newTotal.toFixed(2);
+
+ const quoteEl = document.getElementById('pay-quote-amount');
+ if (quoteEl) quoteEl.textContent = '¥' + newTotal.toFixed(2);
+
+ let deposit = 0;
+ if (newTotal > 0 && newTotal < 200) deposit = 50;
+ else if (newTotal >= 200 && newTotal < 500) deposit = 100;
+ else if (newTotal >= 500) deposit = 200;
+
+ const depositEl = document.getElementById('detail-deposit-amount');
+ if (depositEl) depositEl.textContent = '¥' + deposit;
+
+ const depositStatusEl = document.getElementById('pay-deposit-status');
+ if (depositStatusEl) {
+ const paid = depositStatusEl.textContent.includes('已付');
+ depositStatusEl.innerHTML = (paid ? '已付 ' : '待付 ') + '<span id="detail-deposit-amount">¥' + deposit + '</span>';
+ }
+
+ const finalEl = document.getElementById('detail-final-amount');
+ if (finalEl) finalEl.textContent = '¥' + Math.max(0, newTotal - deposit).toFixed(2);
+
+ reportBox.dataset.selectedOptional = JSON.stringify(selectedNames);
+ }
+
+ function analyzeProblemFallback(drone, problem) {
+ const problemLower = problem.toLowerCase();
+ const faultMap = {
+ '云台': { keywords: ['云台', 'gimbal', '抖动', '不转', '歪了', '电机'], causes: ['云台电机损坏、云台控制板故障或云台结构件磨损'], parts_list: [{name:'云台电机', total_price:230}, {name:'云台排线', total_price:80}], total_price: 450 },
+ '图传': { keywords: ['图传', '信号', '画面', '花屏', '断连'], causes: ['图传模块损坏、天线接触不良或信号线断裂'], parts_list: [{name:'图传模块', total_price:260}], total_price: 380 },
+ '电池': { keywords: ['电池', '充电', '续航', '电量', '鼓包'], causes: ['电芯老化、电池管理板故障或充电接口损坏'], parts_list: [{name:'电池', total_price:200}], total_price: 320 },
+ '飞行': { keywords: ['起飞', '飞行', '电机', '螺旋桨', '失控'], causes: ['电机损坏、电调故障或飞控系统异常'], parts_list: [{name:'电机', total_price:150}, {name:'电调', total_price:200}], total_price: 520 },
+ '摄像头': { keywords: ['摄像头', '镜头', '拍照', '录像', '模糊'], causes: ['摄像头模组损坏或图像处理芯片故障'], parts_list: [{name:'摄像头模组'}, {name:'图像处理板'}], total_price: 680 }
+ };
+
+ let matched = null;
+ for (const [type, config] of Object.entries(faultMap)) {
+ if (config.keywords.some(k => problemLower.includes(k))) {
+ matched = config;
+ break;
+ }
+ }
+
+ if (!matched) {
+ matched = { causes: ['需要专业工程师检测后确定具体故障原因'], parts_list: [{name:'待检测'}], total_price: 200 };
+ }
+
+ const modelMultiplier = drone.includes('Mavic 3') ? 1.5 : drone.includes('Air 3') ? 1.3 : 1.0;
+ return { ...matched, total_price: Math.round(matched.total_price * modelMultiplier), data_driven: false, history_samples: 0 };
+ }
+
+ function resetConversation() {
+ conversationState.step = 'ask_problem';
+ conversationState.problem = null;
+ conversationState.report = null;
+ addMessage(`好的,请重新描述${conversationState.drone}的故障现象。`, 'ai');
+ }
+
+ function startCreateOrder() {
+ conversationState.step = 'confirm_order';
+ const report = conversationState.report;
+ const orderForm = `
+ <div style="margin: 12px 0;">
+ <div style="font-weight: 600; margin-bottom: 12px;">确认维修工单信息</div>
+ <div style="background: var(--bg-tertiary); padding: 16px; border-radius: 12px; margin-bottom: 16px;">
+ <div style="margin-bottom: 8px;"><strong>机型:</strong>${conversationState.drone}</div>
+ <div style="margin-bottom: 8px;"><strong>故障:</strong>${conversationState.problem}</div>
+ <div style="margin-bottom: 8px;"><strong>建议配件:</strong>${(report.parts_list || []).map(p => p.name).join('、') || '待检测'}</div>
+ <div style="color: var(--accent-orange); font-weight: 600;">预估费用:¥${report.total_price || 0}</div>
+ </div>
+ <div style="display: flex; gap: 8px;">
+ <button onclick="confirmCreateOrder()" style="flex: 1; padding: 12px; background: var(--accent-orange); color: #000; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; white-space: nowrap;">确认提交</button>
+ <button onclick="cancelOrder()" style="flex: 1; padding: 12px; background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-subtle); border-radius: 8px; cursor: pointer; white-space: nowrap;">取消</button>
+ </div>
+ </div>
+ `;
+ addMessage(orderForm, 'ai');
+ }
+
+ async function confirmCreateOrder() {
+ let phone = prompt('请输入您的手机号,用于接收维修进度通知:');
+ if (!phone) return;
+ phone = phone.trim().replace(/\s+/g, '');
+ if (!/^1[3-9]\d{9}$/.test(phone)) {
+ alert('手机号格式不正确,请输入11位手机号码');
+ return;
+ }
+
+ showToast('正在创建工单...');
+
+ try {
+ const res = await fetch(`${API_BASE}/order/create`, {
+ method: 'POST',
+ headers: { 'Content-Type': 'application/json' },
+ body: JSON.stringify({
+ phone: phone,
+ model: conversationState.drone,
+ problem: conversationState.problem,
+ name: localStorage.getItem('customerName') || '',
+ repair_mode: 'express',
+ client_id: CLIENT_ID
+ })
+ });
+
+ const data = await res.json();
+
+ if (data.success) {
+ currentOrderInfo = { ...data, phone };
+ showToast('✅ 工单创建成功!');
+ startPolling(data.order_no, phone);
+
+ // 保存客户姓名
+ if (localStorage.getItem('customerName')) {
+ localStorage.setItem('customerName', localStorage.getItem('customerName'));
+ }
+
+ const dispatchHtml = data.dispatch_result && data.dispatch_result.success
+ ? `<div style="font-size: 14px; color: var(--text-secondary); margin-bottom: 8px;">
+ 系统已为您分配维修点：<strong style="color: var(--text-primary);">${data.dispatch_result.merchant_name}</strong><br>
+ <span style="font-size: 12px; color: var(--text-tertiary);">${data.dispatch_result.reason}</span>
+ </div>`
+ : `<div style="font-size: 14px; color: var(--text-secondary); margin-bottom: 8px;">
+ 系统正在为您匹配最优维修点，匹配完成后将以短信通知您。
+ </div>`;
+
+ // 根据配送方式显示后续指引
+ let nextStepsHtml = '';
+ if (deliveryType === 'express') {
+ nextStepsHtml = `
+ <div style="margin-top: 12px; padding: 12px; background: var(--bg-secondary); border-radius: 8px; border: 1px dashed var(--border-subtle);">
+ <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 8px;">📦 <strong>下一步：寄出无人机</strong></div>
+ <div style="font-size: 12px; color: var(--text-tertiary); line-height: 1.6;">
+ 1. 请将无人机妥善包装<br>
+ 2. 选择顺丰/京东等快递寄出<br>
+ 3. 在"我的订单"中填写物流单号
+ </div>
+ </div>`;
+ } else {
+ nextStepsHtml = `
+ <div style="margin-top: 12px; padding: 12px; background: var(--bg-secondary); border-radius: 8px; border: 1px dashed var(--border-subtle);">
+ <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 8px;">🏪 <strong>下一步：到店维修</strong></div>
+ <div style="font-size: 12px; color: var(--text-tertiary); line-height: 1.6;">
+ 1. 保存好工单号：${data.order_no}<br>
+ 2. 前往维修点出示工单号<br>
+ 3. 工程师将为您安排检测
+ </div>
+ </div>`;
+ }
+
+ const successMsg = `
+ <div style="margin: 12px 0;">
+ <div style="font-weight: 600; color: var(--accent-green); margin-bottom: 12px;">✓ 工单创建成功</div>
+ <div style="background: var(--bg-tertiary); padding: 16px; border-radius: 12px; border: 1px solid var(--accent-green);">
+ <div style="margin-bottom: 12px; font-family: monospace; font-size: 18px; color: var(--accent-orange);">${data.order_no}</div>
+ <div style="font-size: 14px; color: var(--text-secondary); margin-bottom: 8px;">
+ 请保存好工单号，用于查询进度
+ </div>
+ ${dispatchHtml}
+ ${nextStepsHtml}
+ </div>
+ </div>
+ `;
+ addMessage(successMsg, 'ai');
+
+ // 如果已经分配网点，自动弹出送修方式选择
+ if (data.dispatch_result && data.dispatch_result.success) {
+ setTimeout(() => {
+ selectDeliveryForOrder(data.order_no, data.dispatch_result.merchant_name);
+ }, 800);
+ }
+
+ conversationState.step = 'welcome';
+ conversationState.drone = null;
+ conversationState.problem = null;
+ conversationState.report = null;
+ } else {
+ showToast('❌ 创建失败:' + data.message);
+ }
+ } catch (e) {
+ showToast('❌ 网络错误');
+ }
+ }
+
+ function cancelOrder() {
+ addMessage('已取消,如需帮助随时可以问我。', 'ai');
+ conversationState.step = 'show_report';
+ }
+
+ // ========== 送修方式 ==========
+ function selectDeliveryForOrder(orderNo, merchantName) {
+ closeOrderListModal();
+ currentOrderInfo = { order_no: orderNo };
+ document.querySelector('#deliveryModal .modal-title').textContent = `${merchantName} 已接单 · 选择送修方式`;
+ showDeliveryModal();
+ }
+
+ function showDeliveryModal() {
+ document.getElementById('deliveryModal').classList.add('show');
+ resetDeliveryForm();
+ const m = currentMerchant || {};
+ const shopText = document.getElementById('shopAddressText');
+ if (shopText) {
+ shopText.innerHTML = (m.address ? m.address + '<br>' : '') + (m.business_hours ? '营业时间:' + m.business_hours + '<br>' : '') + (m.phone ? '联系电话:' + m.phone : '');
+ }
+ }
+
+ function closeDeliveryModal() {
+ document.getElementById('deliveryModal').classList.remove('show');
+ resetDeliveryForm();
+ }
+
+ function resetDeliveryForm() {
+ deliveryType = null;
+ expressRetryCount = 3;
+ document.getElementById('expressOption').classList.remove('selected');
+ document.getElementById('shopOption').classList.remove('selected');
+ document.getElementById('expressForm').classList.remove('show');
+ document.getElementById('shopForm').classList.remove('show');
+ document.getElementById('expressCompany').value = '';
+ document.getElementById('expressNumber').value = '';
+ document.getElementById('expressNumber').classList.remove('error');
+ document.getElementById('expressError').textContent = '';
+ document.getElementById('retryCount').textContent = '剩余修改次数:3';
+ document.getElementById('appointmentTime').value = '';
+ document.getElementById('confirmDeliveryBtn').disabled = true;
+ }
+
+ function selectDeliveryType(type) {
+ deliveryType = type;
+ document.getElementById('expressOption').classList.toggle('selected', type === 'express');
+ document.getElementById('shopOption').classList.toggle('selected', type === 'shop');
+ document.getElementById('expressForm').classList.toggle('show', type === 'express');
+ document.getElementById('shopForm').classList.toggle('show', type === 'shop');
+ updateConfirmButton();
+ }
+
+ function validateExpressNumber() {
+ const company = document.getElementById('expressCompany').value;
+ const number = document.getElementById('expressNumber').value.trim().toUpperCase();
+ const errorDiv = document.getElementById('expressError');
+ const input = document.getElementById('expressNumber');
+
+ if (!company) { errorDiv.textContent = '请先选择快递公司'; input.classList.add('error'); return false; }
+ if (!number) { errorDiv.textContent = '请输入快递单号'; input.classList.add('error'); return false; }
+ const rule = expressRules[company];
+ if (rule && !rule.test(number)) { errorDiv.textContent = `${company}单号格式不正确`; input.classList.add('error'); return false; }
+
+ errorDiv.textContent = '';
+ input.classList.remove('error');
+ return true;
+ }
+
+ function updateConfirmButton() {
+ const btn = document.getElementById('confirmDeliveryBtn');
+ if (!deliveryType) { btn.disabled = true; return; }
+
+ if (deliveryType === 'express') {
+ const company = document.getElementById('expressCompany').value;
+ const number = document.getElementById('expressNumber').value.trim();
+ btn.disabled = !company || !number;
+ } else if (deliveryType === 'shop') {
+ btn.disabled = !document.getElementById('appointmentTime').value;
+ }
+ }
+
+ async function confirmDelivery() {
+ if (!deliveryType || !currentOrderInfo) return;
+
+ let deliveryData = { order_no: currentOrderInfo.order_no, delivery_type: deliveryType };
+
+ if (deliveryType === 'express') {
+ if (!validateExpressNumber()) return;
+ deliveryData.express_company = document.getElementById('expressCompany').value;
+ deliveryData.express_number = document.getElementById('expressNumber').value.trim().toUpperCase();
+ } else if (deliveryType === 'shop') {
+ const time = document.getElementById('appointmentTime').value;
+ if (!time) { showToast('请选择预计到店时间'); return; }
+ deliveryData.appointment_time = time;
+ }
+
+ showToast('正在提交...');
+
+ try {
+ const res = await fetch(`${API_BASE}/order/select-delivery`, {
+ method: 'POST',
+ headers: { 'Content-Type': 'application/json' },
+ body: JSON.stringify({
+ order_no: currentOrderInfo.order_no,
+ repair_mode: deliveryType,
+ express_company: deliveryData.express_company || null,
+ express_number: deliveryData.express_number || null,
+ appointment_time: deliveryData.appointment_time || null
+ })
+ });
+ const data = await res.json();
+
+ if (data.success) {
+ closeDeliveryModal();
+ startPolling(currentOrderInfo.order_no, localStorage.getItem('customerPhone') || '');
+
+ let successMsg = '';
+ if (deliveryType === 'express') {
+ successMsg = `
+ <div style="margin: 12px 0;">
+ <div style="font-weight: 600; color: var(--accent-green); margin-bottom: 12px;">✓ 送修信息已提交</div>
+ <div style="background: var(--bg-tertiary); padding: 16px; border-radius: 12px;">
+ <div style="margin-bottom: 8px;"><strong>送修方式:</strong>快递寄修</div>
+ <div style="margin-bottom: 8px;"><strong>快递公司:</strong>${deliveryData.express_company}</div>
+ <div style="margin-bottom: 8px; font-family: monospace;"><strong>快递单号:</strong>${deliveryData.express_number}</div>
+ <div style="font-size: 14px; color: var(--text-secondary);">请尽快将设备寄出,商家确认收货后将开始检测</div>
+ </div>
+ </div>
+ `;
+ } else {
+ successMsg = `
+ <div style="margin: 12px 0;">
+ <div style="font-weight: 600; color: var(--accent-green); margin-bottom: 12px;">✓ 预约成功</div>
+ <div style="background: var(--bg-tertiary); padding: 16px; border-radius: 12px;">
+ <div style="margin-bottom: 8px;"><strong>送修方式:</strong>到店维修</div>
+ <div style="margin-bottom: 8px;"><strong>预约时间:</strong>${new Date(deliveryData.appointment_time).toLocaleString('zh-CN')}</div>
+ <div style="margin-bottom: 8px; font-size: 14px; color: var(--text-secondary);">维修点地址:${(currentMerchant || {}).address || '加载中...'}</div>
+ <div style="font-size: 14px; color: var(--accent-orange);">请按时到店,超过预约时间2小时将自动取消订单</div>
+ </div>
+ </div>
+ `;
+ }
+ addMessage(successMsg, 'ai');
+ showToast('✅ 提交成功');
+ } else {
+ showToast('❌ ' + (data.message || '提交失败'));
+ }
+ } catch (e) {
+ showToast('❌ 提交失败,请重试');
+ }
+ }
+
+ // ========== 订单查询 ==========
+ function showOrderQueryForm() {
+ const formHtml = `
+ <div style="margin: 12px 0;">
+ <div style="margin-bottom: 12px; color: var(--text-secondary);">请输入工单号查询订单进度:</div>
+ <div style="display: flex; gap: 8px;">
+ <input type="text" id="queryOrderNo" placeholder="如:WR20260408102532" style="flex: 1; padding: 12px; background: var(--bg-tertiary); border: 1px solid var(--border-subtle); border-radius: 8px; color: var(--text-primary); font-size: 16px; font-family: monospace;">
+ <button onclick="queryOrder()" style="padding: 12px 20px; background: var(--accent-orange); color: #000; border: none; border-radius: 8px; font-weight: 600; cursor: pointer;">查询</button>
+ </div>
+ <div style="margin-top: 8px; font-size: 12px; color: var(--text-tertiary);">首次查询?输入手机号可查看所有订单</div>
+ </div>
+ `;
+ addMessage(formHtml, 'ai');
+ }
+
+ async function queryOrder() {
+ const orderNo = document.getElementById('queryOrderNo')?.value?.trim().toUpperCase();
+ if (!orderNo) { showToast('请输入工单号'); return; }
+ await queryOrderByNumber(orderNo);
+ }
+
+ async function queryOrderByNumber(orderNo) {
+ showToast('查询中...');
+ try {
+ const res = await fetch(`${API_BASE}/order/detail?order_no=${encodeURIComponent(orderNo)}`);
+ const data = await res.json();
+
+ if (data.success && data.order) {
+ hideTyping();
+ displayOrderDetail(data.order);
+ } else {
+ hideTyping();
+ const retryHtml = `
+ <div style="margin: 12px 0;">
+ <div style="color: var(--text-secondary); margin-bottom: 12px;">未找到工单号 ${orderNo},请检查是否输入正确,或使用手机号查询。</div>
+ <div style="display: flex; gap: 8px;">
+ <input type="tel" id="retryPhone" placeholder="输入手机号" style="flex: 1; padding: 10px; background: var(--bg-tertiary); border: 1px solid var(--border-subtle); border-radius: 8px; color: var(--text-primary);">
+ <button onclick="queryByPhoneForOrder('${orderNo}')" style="padding: 10px 16px; background: var(--accent-orange); color: #000; border: none; border-radius: 8px; font-weight: 600; cursor: pointer;">查询</button>
+ </div>
+ </div>
+ `;
+ addMessage(retryHtml, 'ai');
+ }
+ } catch (e) {
+ hideTyping();
+ addMessage('查询失败,请稍后重试。', 'ai');
+ }
+ }
+
+ async function queryByPhoneForOrder(expectedOrderNo) {
+ const phone = document.getElementById('retryPhone')?.value?.trim();
+ if (!phone) { showToast('请输入手机号'); return; }
+
+ showToast('查询中...');
+ try {
+ const res = await fetch(`${API_BASE}/order/query?phone=${encodeURIComponent(phone)}`);
+ const data = await res.json();
+
+ if (data.success && data.orders && data.orders.length > 0) {
+ const matched = data.orders.find(o => o.order_no === expectedOrderNo);
+ if (matched) displayOrderDetail(matched);
+ else displayOrders(data.orders);
+ } else {
+ addMessage('未找到该手机号的订单。', 'ai');
+ }
+ } catch (e) {
+ addMessage('查询失败,请稍后重试。', 'ai');
+ }
+ }
+
+ function displayOrderDetail(order) {
+ const statusMap = {
+ 'pending': { text: '待接单', color: '#FF9500' },
+ 'assigned': { text: '已分配维修点', color: '#AF52DE' },
+ 'accepted': { text: '已接单', color: '#0A84FF' },
+ 'received': { text: '待检测', color: '#5856D6' },
+ 'detected': { text: '检测完成', color: '#AF52DE' },
+ 'inspected': { text: '检测中', color: '#BF5AF2' },
+ 'quoted': { text: '待确认报价', color: '#FF9F0A' },
+ 'confirmed': { text: '待维修', color: '#FF453A' },
+ 'repairing': { text: '维修中', color: '#30D158' },
+ 'repaired': { text: '待发货', color: '#30D158' },
+ 'shipping': { text: '待发货', color: '#30D158' },
+ 'delivered': { text: '待收货', color: '#30D158' },
+ 'completed': { text: '已完成', color: '#30D158' },
+ 'cancelled': { text: '已取消', color: '#FF453A' }
+ };
+ const status = statusMap[order.status] || { text: order.status, color: '#8E8E93' };
+
+ // 解析检测摘要
+ let diagnosisSummary = '';
+ if (order.detection_result) {
+ let d = order.detection_result;
+ if (typeof d === 'string') {
+ try { d = JSON.parse(d); } catch (e) {}
+ }
+ if (typeof d === 'object' && d !== null) {
+ diagnosisSummary = d.fault_description ? d.fault_description.substring(0, 40) + '...' : '商家已出具检测报告';
+ } else {
+ diagnosisSummary = String(d).substring(0, 40) + '...';
+ }
+ } else if (order.ai_diagnosis && order.ai_diagnosis.causes) {
+ const rawCauses = order.ai_diagnosis.causes;
+ const causesText = Array.isArray(rawCauses) ? rawCauses.join(', ') : String(rawCauses);
+ diagnosisSummary = 'AI初诊: ' + causesText.substring(0, 40) + '...';
+ }
+
+ const detailHtml = `
+ <div class="order-card" style="border-left: 3px solid ${status.color};">
+ <div class="order-card-header">
+ <span class="order-id" style="font-size: 16px;">${order.order_no}</span>
+ <span class="order-status" style="background: ${status.color}20; color: ${status.color};">${status.text}</span>
+ </div>
+ <div class="order-info-row">
+ <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+ <span><strong>机型:</strong>${order.drone_model || '未知'}</span>
+ </div>
+ <div class="order-info-row">
+ <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/></svg>
+ <span><strong>故障:</strong>${(order.problem_description || '无描述').substring(0, 24)}${(order.problem_description || '').length > 24 ? '...' : ''}</span>
+ </div>
+ ${order.merchant_name ? `
+ <div class="order-info-row">
+ <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+ <span><strong>维修点:</strong>${order.merchant_name}</span>
+ </div>
+ ` : ''}
+ <div class="order-info-row">
+ <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+ <span><strong>创建时间:</strong>${order.created_at?.split('T')[0] || '-'}</span>
+ </div>
+ ${order.quote_amount ? `
+ <div class="order-info-row">
+ <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+ <span><strong>报价:</strong><span style="color: var(--accent-orange); font-weight: 600;">¥${order.quote_amount}</span></span>
+ </div>
+ ` : ''}
+ ${diagnosisSummary ? `
+ <div style="margin-top: 10px; padding: 10px; background: rgba(255,255,255,0.03); border-radius: 8px; font-size: 13px; color: var(--text-secondary); line-height: 1.5;">
+ ${diagnosisSummary}
+ </div>
+ ` : ''}
+ <div style="margin-top: 12px;">
+ <button onclick="showOrderDetail('${order.order_no}')" style="width: 100%; padding: 10px; background: transparent; border: 1px solid var(--border-subtle); border-radius: 8px; color: var(--text-secondary); font-weight: 500; cursor: pointer;">查看完整详情 ›</button>
+ </div>
+ ${order.status === 'quoted' ? `
+ <div style="display: flex; gap: 8px; margin-top: 12px;" onclick="event.stopPropagation();">
+ ${!order.deposit_paid ? `
+ <button onclick="payDeposit('${order.order_no}')" style="flex: 1; padding: 12px; background: var(--accent-green); border: none; border-radius: 8px; color: #000; font-weight: 600; cursor: pointer;">✓ 接受并付定金 ¥${order.deposit_amount || 0}</button>
+ ` : `
+ <button onclick="confirmQuote('${order.order_no}', true)" style="flex: 1; padding: 12px; background: var(--accent-green); border: none; border-radius: 8px; color: #000; font-weight: 600; cursor: pointer; white-space: nowrap;">✓ 接受报价</button>
+ `}
+ <button onclick="confirmQuote('${order.order_no}', false)" style="flex: 1; padding: 12px; background: var(--bg-secondary); border: 1px solid var(--border-subtle); border-radius: 8px; color: var(--accent-red); font-weight: 600; cursor: pointer; white-space: nowrap;">✕ 拒绝报价</button>
+ </div>
+ ` : ''}
+ </div>
+ `;
+ addMessage(detailHtml, 'ai');
+ }
+
+ function displayOrders(orders) {
+ let ordersHtml = '<div style="margin: 12px 0;"><div style="font-weight: 600; margin-bottom: 12px;">找到 ' + orders.length + ' 个订单:</div>';
+ const statusMap = { 'pending': '待接单', 'assigned': '已分配', 'accepted': '已接单', 'received': '待检测', 'detected': '检测完成', 'inspected': '检测中', 'quoted': '待确认', 'confirmed': '待维修', 'repairing': '维修中', 'repaired': '待发货', 'shipping': '待发货', 'delivered': '待收货', 'completed': '已完成', 'cancelled': '已取消' };
+
+ orders.forEach(order => {
+ const statusText = statusMap[order.status] || order.status;
+ const priceLabel = (order.quote_amount || order.estimated_price) ? `<div style="font-size: 12px; color: var(--accent-orange); margin-top: 6px; font-weight: 500;">报价 ¥${order.quote_amount || order.estimated_price}</div>` : '';
+ ordersHtml += `
+ <div class="order-card" onclick="showOrderDetail('${order.order_no}')" style="cursor: pointer;">
+ <div class="order-card-header">
+ <span class="order-id">${order.order_no}</span>
+ <span class="order-status order-status-${order.status}">${statusText}</span>
+ </div>
+ <div class="order-info-row">
+ <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+ <span>${order.drone_model || '未知机型'}</span>
+ </div>
+ <div class="order-info-row">
+ <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+ <span>${order.created_at?.split('T')[0] || '-'}</span>
+ </div>
+ ${priceLabel}
+ <div style="margin-top: 10px;">
+ <span style="font-size: 12px; color: var(--text-tertiary);">点击查看完整详情 ›</span>
+ </div>
+ </div>
+ `;
+ });
+ ordersHtml += '</div>';
+ addMessage(ordersHtml, 'ai');
+ }
+
+ // ========== 通知系统 ==========
+ async function startPolling(orderNo, phone) {
+ if (pollingOrders[orderNo]) return;
+
+ // 先获取当前真实状态作为初始值,避免误报
+ let initialStatus = 'pending';
+ try {
+ const res = await fetch(`${API_BASE}/order/detail?order_no=${encodeURIComponent(orderNo)}`);
+ const data = await res.json();
+ if (data.success && data.order) {
+ initialStatus = data.order.status;
+ }
+ } catch (e) {
+ console.error('[Polling] 获取初始状态失败:', e);
+ }
+
+ pollingOrders[orderNo] = { phone: phone, status: initialStatus };
+ console.log('[Polling] 开始轮询订单:', orderNo, '初始状态:', initialStatus);
+
+ const intervalId = setInterval(() => {
+ if (!pollingOrders[orderNo]) { clearInterval(intervalId); return; }
+ checkOrderStatus(orderNo, phone);
+ }, 10000);
+ pollingOrders[orderNo].intervalId = intervalId;
+
+ // 立即执行一次检查,避免等30秒才能看到变化
+ setTimeout(() => checkOrderStatus(orderNo, phone), 0);
+ }
+
+ function stopPolling(orderNo) {
+ if (pollingOrders[orderNo]) {
+ clearInterval(pollingOrders[orderNo].intervalId);
+ delete pollingOrders[orderNo];
+ }
+ }
+
+ async function checkOrderStatus(orderNo, phone) {
+ try {
+ const res = await fetch(`${API_BASE}/order/detail?order_no=${encodeURIComponent(orderNo)}`);
+ const data = await res.json();
+ if (!data.success || !data.order) return;
+
+ const order = unwrap(data.order);
+ const lastStatus = pollingOrders[orderNo]?.status;
+
+ if (lastStatus && lastStatus !== order.status) {
+ handleStatusChange(order, lastStatus);
+ }
+ if (pollingOrders[orderNo]) pollingOrders[orderNo].status = order.status;
+ if (['completed', 'cancelled'].includes(order.status)) stopPolling(orderNo);
+ } catch (e) {}
+ }
+
+ function handleStatusChange(order, oldStatus) {
+ document.getElementById('menuBadge').style.display = 'block';
+ const statusMessages = {
+ 'assigned': { title: '商家已接单!', content: `${order.merchant_name || '维修点'} 已接单,请选择送修方式`, action: () => selectDeliveryForOrder(order.order_no, order.merchant_name || '系统') },
+ 'accepted': { title: '送修方式已确认', content: '商家已确认,准备开始检测', action: () => showToast('送修方式已确认') },
+ 'inspected': { title: '检测完成', content: '故障已检测,请查看报价', action: () => showOrderDetail(order.order_no) },
+ 'quoted': { title: '报价已生成', content: '请确认是否接受报价', action: () => showOrderDetail(order.order_no) },
+ 'repairing': { title: '开始维修', content: '设备已进入维修阶段', action: () => showToast('开始维修') },
+ 'delivered': { title: '维修完成,已发货', content: `快递: ${order.merchant_carrier || '未知'} ${order.merchant_tracking_no || ''}`, action: () => showOrderDetail(order.order_no) },
+ 'completed': { title: '订单已完成', content: '感谢您的使用', action: () => showToast('订单已完成') }
+ };
+
+ const msg = statusMessages[order.status];
+ if (msg) showNotification(msg.title, msg.content, msg.action);
+ }
+
+ function showNotification(title, content, action) {
+ currentNotification = action;
+ document.getElementById('notifTitle').textContent = title;
+ document.getElementById('notifContent').textContent = content;
+ document.getElementById('notificationToast').style.display = 'block';
+ setTimeout(() => document.getElementById('notificationToast').style.display = 'none', 10000);
+ }
+
+ function handleNotificationClick() {
+ document.getElementById('notificationToast').style.display = 'none';
+ if (currentNotification) {
+ currentNotification();
+ currentNotification = null;
+ }
+ }
+
+ async function restorePolling(phone) {
+ try {
+ const res = await fetch(`${API_BASE}/order/query?phone=${phone}`);
+ const data = await res.json();
+ if (data.success && data.orders) {
+ data.orders.forEach(order => {
+ if (!['completed', 'cancelled'].includes(order.status)) startPolling(order.order_no, phone);
+ });
+ }
+ } catch (e) {}
+ }
+
+ // ========== 工具函数 ==========
+ function addMessage(content, type) {
+ const container = document.getElementById('chatContainer');
+ const messageDiv = document.createElement('div');
+ messageDiv.className = `message ${type}`;
+ const avatarSvg = type === 'user'
+ ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>'
+ : '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>';
+ messageDiv.innerHTML = `<div class="message-avatar">${avatarSvg}</div><div class="message-content">${content}</div>`;
+ container.appendChild(messageDiv);
+ container.scrollTop = container.scrollHeight;
+ }
+
+ function showTyping() {
+ const container = document.getElementById('chatContainer');
+ const typingDiv = document.createElement('div');
+ typingDiv.className = 'message ai';
+ typingDiv.id = 'typingIndicator';
+ typingDiv.innerHTML = `<div class="message-avatar"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg></div><div class="message-content"><div class="typing-indicator"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div></div>`;
+ container.appendChild(typingDiv);
+ container.scrollTop = container.scrollHeight;
+ }
+
+ function hideTyping() {
+ const typing = document.getElementById('typingIndicator');
+ if (typing) typing.remove();
+ }
+
+ function showToast(msg) {
+ const toast = document.getElementById('toast');
+ toast.textContent = msg;
+ toast.classList.add('show');
+ setTimeout(() => toast.classList.remove('show'), 3000);
+ }
+
+ function startVoice() {
+ alert('语音输入功能开发中,请使用文字输入');
+ }
+
+ async function refreshOrderList() {
+ const content = document.getElementById('orderListContent');
+ const savedPhone = localStorage.getItem('customerPhone') || '';
+ let orders = [];
+ if (CLIENT_ID) {
+ try {
+ const res = await fetch(`${API_BASE}/order/query_by_client?client_id=${CLIENT_ID}`);
+ const data = await res.json();
+ if (data.success && data.orders) orders = orders.concat(data.orders);
+ } catch (e) {}
+ }
+ if (savedPhone) {
+ try {
+ const res = await fetch(`${API_BASE}/order/query?phone=${savedPhone}`);
+ const data = await res.json();
+ if (data.success && data.orders) {
+ const existingNos = new Set(orders.map(o => o.order_no));
+ data.orders.forEach(o => { if (!existingNos.has(o.order_no)) orders.push(o); });
+ }
+ } catch (e) {}
+ }
+ orders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+ if (orders.length > 0) {
+ renderOrderList(orders, true);
+ } else {
+ content.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--text-secondary);">暂无订单</div>';
+ }
+ }
+
+ // ========== 缺失函数补充 ==========
+ async function confirmQuote(orderNo, accept, preselectedOptional = null) {
+ if (!confirm(accept ? '确认接受此报价?接受后商家将开始维修。' : '确认拒绝此报价?拒绝后订单将取消。')) return;
+ let selectedOptional = preselectedOptional;
+ if (selectedOptional === null) {
+ const reportBox = document.querySelector('.merchant-report-box');
+ if (reportBox && reportBox.dataset.selectedOptional) {
+ try { selectedOptional = JSON.parse(reportBox.dataset.selectedOptional); } catch (e) {}
+ }
+ }
+ showToast('正在提交...');
+ try {
+ const res = await fetch(`${API_BASE}/order/confirm_quote`, {
+ method: 'POST',
+ headers: { 'Content-Type': 'application/json' },
+ body: JSON.stringify({ order_no: orderNo, confirmed: accept, selected_optional: selectedOptional || [] })
+ });
+ const data = await res.json();
+ if (data.success) {
+ showToast(accept ? '✅ 已接受报价' : '❌ 已拒绝报价,订单取消');
+ startPolling(orderNo, localStorage.getItem('customerPhone') || '');
+ closeOrderDetail();
+ if (document.getElementById('orderListModal').style.display === 'block') {
+ refreshOrderList();
+ }
+ } else {
+ showToast('❌ ' + (data.message || '操作失败'));
+ }
+ } catch (e) {
+ showToast('❌ 网络错误');
+ }
+ }
+
+ async function viewOrderDetailByNo(orderNo) {
+ showOrderDetail(orderNo);
+ }
+
+ function getAutoConfirmCountdown(order) {
+ const baseTime = order.merchant_ship_time || order.updated_at;
+ if (!baseTime) return null;
+ const deadline = new Date(new Date(baseTime).getTime() + 7 * 24 * 60 * 60 * 1000);
+ const now = new Date();
+ const diff = deadline - now;
+ if (diff <= 0) return '已自动确认';
+ const days = Math.floor(diff / (24 * 60 * 60 * 1000));
+ const hours = Math.floor((diff % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
+ return `剩余 ${days}天${hours}小时自动确认`;
+ }
+
+ async function payDeposit(orderNo) {
+ let selectedOptional = [];
+ const reportBox = document.querySelector('.merchant-report-box');
+ if (reportBox && reportBox.dataset.selectedOptional) {
+ try { selectedOptional = JSON.parse(reportBox.dataset.selectedOptional); } catch (e) {}
+ }
+ showToast('正在发起定金支付...');
+ try {
+ const res = await fetch(`${API_BASE}/pay/create-deposit`, {
+ method: 'POST',
+ headers: { 'Content-Type': 'application/json' },
+ body: JSON.stringify({ order_no: orderNo, selected_optional: selectedOptional })
+ });
+ const data = await res.json();
+ if (data.success) {
+ showToast(`✅ 定金支付成功 ¥${data.deposit_amount}`);
+ await confirmQuote(orderNo, true, selectedOptional);
+ } else {
+ showToast('❌ ' + (data.message || '支付失败'));
+ }
+ } catch (e) {
+ showToast('❌ 网络错误');
+ }
+ }
+
+ async function payFinal(orderNo) {
+ showToast('正在发起尾款支付...');
+ try {
+ const res = await fetch(`${API_BASE}/pay/create-final`, {
+ method: 'POST',
+ headers: { 'Content-Type': 'application/json' },
+ body: JSON.stringify({ order_no: orderNo })
+ });
+ const data = await res.json();
+ if (data.success) {
+ showToast(`✅ 尾款支付成功 ¥${data.final_amount}`);
+ showOrderDetail(orderNo);
+ } else {
+ showToast('❌ ' + (data.message || '支付失败'));
+ }
+ } catch (e) {
+ showToast('❌ 网络错误');
+ }
+ }
+
+ async function confirmReceiveOrder(orderNo) {
+ if (!confirm('确认已收到维修好的设备？确认后订单将完成。')) return;
+ showToast('正在提交...');
+ try {
+ const res = await fetch(`${API_BASE}/order/receive`, {
+ method: 'POST',
+ headers: { 'Content-Type': 'application/json' },
+ body: JSON.stringify({ order_no: orderNo })
+ });
+ const data = await res.json();
+ if (data.success) {
+ showToast('✅ 确认收货成功，订单已完成');
+ closeOrderDetail();
+ if (document.getElementById('orderListModal').style.display === 'block') {
+ refreshOrderList();
+ }
+ } else if (data.require_payment) {
+ showToast('⚠️ ' + data.message);
+ if (data.payment_type === 'final' && data.pending_amount) {
+ await payFinal(orderNo);
+ }
+ } else {
+ showToast('❌ ' + (data.message || '操作失败'));
+ }
+ } catch (e) {
+ showToast('❌ 网络错误');
+ }
+ }
+ </script>
+</body>
+</html>

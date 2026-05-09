@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>我的订单 - 喵修匠</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --background: #ffffff;
+            --foreground: #1f2937;
+            --card: #ffffff;
+            --primary: #667eea;
+            --secondary: #f3f4f6;
+            --muted: #f3f4f6;
+            --muted-foreground: #6b7280;
+            --border: #e5e7eb;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --radius: 12px;
+            --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--background);
+            color: var(--foreground);
+            min-height: 100vh;
+        }
+        
+        .header {
+            position: sticky;
+            top: 0;
+            background: var(--gradient-primary);
+            padding: 16px 20px;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .back-btn {
+            width: 40px;
+            height: 40px;
+            background: rgba(255,255,255,0.15);
+            border: none;
+            border-radius: 10px;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+        }
+        
+        .header h1 {
+            font-size: 18px;
+            font-weight: 600;
+            color: white;
+        }
+        
+        .main {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .phone-section {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .phone-input {
+            width: 100%;
+            padding: 14px 16px;
+            background: var(--secondary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            font-size: 16px;
+            outline: none;
+            margin-bottom: 12px;
+        }
+        
+        .btn {
+            width: 100%;
+            padding: 14px 20px;
+            border-radius: var(--radius);
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            text-align: center;
+        }
+        
+        .btn-primary {
+            background: var(--gradient-primary);
+            color: white;
+        }
+        
+        .order-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        
+        .order-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 16px;
+        }
+        
+        .order-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .order-no {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--primary);
+        }
+        
+        .order-status {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .status-pending { background: #fef3c7; color: #92400e; }
+        .status-accepted { background: #dbeafe; color: #1e40af; }
+        .status-detected { background: #e0e7ff; color: #3730a3; }
+        .status-quoted { background: #d1fae5; color: #065f46; }
+        .status-confirmed { background: #c7d2fe; color: #312e81; }
+        .status-repairing { background: #fce7f3; color: #9d174d; }
+        .status-shipping { background: #e9d5ff; color: #6b21a8; }
+        .status-completed { background: #d1fae5; color: #065f46; }
+        
+        .order-info {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .order-info-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 14px;
+        }
+        
+        .order-info-label {
+            color: var(--muted-foreground);
+        }
+        
+        .order-info-value {
+            font-weight: 500;
+        }
+        
+        .order-price {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--primary);
+            margin-top: 12px;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: var(--muted-foreground);
+        }
+        
+        .empty {
+            text-align: center;
+            padding: 60px 20px;
+        }
+        
+        .empty-icon {
+            font-size: 64px;
+            margin-bottom: 16px;
+        }
+        
+        .empty-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        
+        .empty-desc {
+            color: var(--muted-foreground);
+            font-size: 14px;
+        }
+        
+        .error {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #991b1b;
+            padding: 16px;
+            border-radius: var(--radius);
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <button class="back-btn" onclick="history.back()">←</button>
+        <h1>我的订单</h1>
+    </header>
+    
+    <main class="main">
+        <div class="phone-section" id="phoneSection">
+            <input type="tel" class="phone-input" id="phoneInput" placeholder="请输入手机号查询订单" maxlength="11">
+            <button class="btn btn-primary" onclick="queryOrders()">查询订单</button>
+        </div>
+        
+        <div id="orderList"></div>
+    </main>
+    
+    <script>
+        const API_BASE = window.location.hostname === 'localhost' 
+            ? 'https://njuosun-miaoxiujiang-d3a96a8c70e.service.tcloudbase.com/api'
+            : 'https://njuosun-miaoxiujiang-d3a96a8c70e.service.tcloudbase.com/api';
+        
+        // 页面加载时检查本地存储的手机号
+        document.addEventListener('DOMContentLoaded', () => {
+            const savedPhone = localStorage.getItem('lastPhone');
+            if (savedPhone && savedPhone !== 'miniprogram_auto') {
+                document.getElementById('phoneInput').value = savedPhone;
+                queryOrders();
+            }
+        });
+        
+        const STATUS_MAP = {
+            'pending': { text: '待接单', class: 'status-pending' },
+            'accepted': { text: '已接单', class: 'status-accepted' },
+            'detected': { text: '已检测', class: 'status-detected' },
+            'quoted': { text: '待确认', class: 'status-quoted' },
+            'confirmed': { text: '已确认', class: 'status-confirmed' },
+            'repairing': { text: '维修中', class: 'status-repairing' },
+            'shipping': { text: '待收货', class: 'status-shipping' },
+            'completed': { text: '已完成', class: 'status-completed' },
+            'cancelled': { text: '已取消', class: 'status-pending' }
+        };
+        
+        async function queryOrders() {
+            const phone = document.getElementById('phoneInput').value.trim();
+            if (!phone || phone.length !== 11) {
+                alert('请输入正确的11位手机号');
+                return;
+            }
+            
+            const listEl = document.getElementById('orderList');
+            listEl.innerHTML = '<div class="loading">加载中...</div>';
+            
+            try {
+                const res = await fetch(`${API_BASE}/order/query?phone=${phone}`);
+                const data = await res.json();
+                
+                if (data.success && data.orders && data.orders.length > 0) {
+                    localStorage.setItem('lastPhone', phone);
+                    renderOrders(data.orders);
+                } else {
+                    listEl.innerHTML = `
+                        <div class="empty">
+                            <div class="empty-icon">📋</div>
+                            <div class="empty-title">暂无订单</div>
+                            <div class="empty-desc">该手机号暂无维修订单</div>
+                        </div>
+                    `;
+                }
+            } catch (err) {
+                listEl.innerHTML = `
+                    <div class="error">
+                        查询失败，请稍后重试
+                    </div>
+                `;
+            }
+        }
+        
+        function renderOrders(orders) {
+            const listEl = document.getElementById('orderList');
+            
+            listEl.innerHTML = orders.map(order => {
+                const status = STATUS_MAP[order.status] || { text: order.status, class: '' };
+                const price = order.final_price || order.estimated_price || '待评估';
+                
+                return `
+                    <div class="order-card">
+                        <div class="order-header">
+                            <span class="order-no">${order.order_no}</span>
+                            <span class="order-status ${status.class}">${status.text}</span>
+                        </div>
+                        <div class="order-info">
+                            <div class="order-info-row">
+                                <span class="order-info-label">机型</span>
+                                <span class="order-info-value">${order.drone_model}</span>
+                            </div>
+                            <div class="order-info-row">
+                                <span class="order-info-label">故障</span>
+                                <span class="order-info-value">${order.problem_description}</span>
+                            </div>
+                            <div class="order-info-row">
+                                <span class="order-info-label">创建时间</span>
+                                <span class="order-info-value">${order.created_at}</span>
+                            </div>
+                        </div>
+                        <div class="order-price">¥${price}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+    </script>
+</body>
+</html>

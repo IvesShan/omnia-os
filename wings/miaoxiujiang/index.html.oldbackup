@@ -1,0 +1,1608 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>喵修匠 - 无人机维修</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        :root {
+            --primary: #FF6B35;
+            --primary-dark: #E85A2B;
+            --secondary: #2D3436;
+            --success: #00B894;
+            --warning: #FDCB6E;
+            --danger: #D63031;
+            --info: #0984E3;
+            --gray-100: #F8F9FA;
+            --gray-200: #E9ECEF;
+            --gray-300: #DEE2E6;
+            --gray-600: #6C757D;
+            --gray-800: #343A40;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background: var(--gray-100);
+            min-height: 100vh;
+            padding-bottom: 80px;
+            color: var(--gray-800);
+        }
+        
+        /* 顶部导航 */
+        .header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+            padding: 40px 20px 80px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .header::before {
+            content: '🚁';
+            position: absolute;
+            font-size: 120px;
+            opacity: 0.1;
+            right: -20px;
+            top: -20px;
+            transform: rotate(-15deg);
+        }
+        
+        .header h1 {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        
+        /* 主内容区 */
+        .container {
+            max-width: 600px;
+            margin: -50px auto 0;
+            padding: 0 16px;
+            position: relative;
+            z-index: 1;
+        }
+        
+        /* 卡片样式 */
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 16px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        }
+        
+        .card-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--gray-800);
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .card-title::before {
+            content: '';
+            width: 4px;
+            height: 20px;
+            background: var(--primary);
+            border-radius: 2px;
+        }
+        
+        /* 快捷按钮 */
+        .quick-actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        
+        .quick-btn {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            padding: 20px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .quick-btn .icon {
+            font-size: 32px;
+        }
+        
+        .quick-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(255, 107, 53, 0.4);
+        }
+        
+        .quick-btn.secondary {
+            background: white;
+            color: var(--gray-800);
+            border: 2px solid var(--gray-200);
+        }
+        
+        .quick-btn.secondary:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+        
+        /* 表单样式 */
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--gray-800);
+            margin-bottom: 8px;
+        }
+        
+        .form-input, .form-select, .form-textarea {
+            width: 100%;
+            padding: 14px 16px;
+            border: 2px solid var(--gray-200);
+            border-radius: 12px;
+            font-size: 15px;
+            transition: all 0.3s;
+            background: white;
+        }
+        
+        .form-input:focus, .form-select:focus, .form-textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 4px rgba(255, 107, 53, 0.1);
+        }
+        
+        .form-textarea {
+            min-height: 120px;
+            resize: vertical;
+            font-family: inherit;
+        }
+        
+        /* 按钮样式 */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 14px 24px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            width: 100%;
+            gap: 8px;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(255, 107, 53, 0.4);
+        }
+        
+        .btn-secondary {
+            background: var(--gray-200);
+            color: var(--gray-800);
+        }
+        
+        .btn-secondary:hover {
+            background: var(--gray-300);
+        }
+        
+        .btn-success {
+            background: linear-gradient(135deg, var(--success) 0%, #00A383 100%);
+            color: white;
+        }
+        
+        .btn-danger {
+            background: linear-gradient(135deg, var(--danger) 0%, #B91C1C 100%);
+            color: white;
+        }
+        
+        .btn-outline {
+            background: white;
+            color: var(--primary);
+            border: 2px solid var(--primary);
+        }
+        
+        .btn-outline:hover {
+            background: var(--primary);
+            color: white;
+        }
+        
+        .btn-sm {
+            padding: 8px 16px;
+            font-size: 14px;
+        }
+        
+        /* 底部固定操作栏 */
+        .bottom-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            padding: 12px 16px;
+            box-shadow: 0 -4px 20px rgba(0,0,0,0.08);
+            display: flex;
+            gap: 12px;
+            max-width: 600px;
+            margin: 0 auto;
+            z-index: 100;
+        }
+        
+        .bottom-bar .btn {
+            flex: 1;
+        }
+        
+        /* 状态标签 */
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .status-pending {
+            background: #FFF3CD;
+            color: #856404;
+        }
+        
+        .status-accepted, .status-detected {
+            background: #D1ECF1;
+            color: #0C5460;
+        }
+        
+        .status-quoted {
+            background: #E2D4F0;
+            color: #6F42C1;
+        }
+        
+        .status-confirmed {
+            background: #D4EDDA;
+            color: #155724;
+        }
+        
+        .status-repairing {
+            background: #CCE5FF;
+            color: #004085;
+        }
+        
+        .status-shipping {
+            background: #D1ECF1;
+            color: #0C5460;
+        }
+        
+        .status-completed {
+            background: #D4EDDA;
+            color: #155724;
+        }
+        
+        .status-cancelled {
+            background: #F8D7DA;
+            color: #721C24;
+        }
+        
+        /* 工单列表 */
+        .order-item {
+            background: white;
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 12px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+            cursor: pointer;
+            transition: all 0.3s;
+            border: 2px solid transparent;
+        }
+        
+        .order-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.12);
+            border-color: var(--primary);
+        }
+        
+        .order-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        
+        .order-no {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--gray-800);
+            font-family: monospace;
+        }
+        
+        .order-model {
+            font-size: 15px;
+            font-weight: 500;
+            color: var(--gray-800);
+            margin-bottom: 4px;
+        }
+        
+        .order-problem {
+            font-size: 13px;
+            color: var(--gray-600);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        .order-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid var(--gray-200);
+        }
+        
+        .order-price {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--primary);
+        }
+        
+        .order-date {
+            font-size: 12px;
+            color: var(--gray-600);
+        }
+        
+        /* 页面切换 */
+        .page {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+        
+        .page.active {
+            display: block;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* 进度条 */
+        .progress-steps {
+            display: flex;
+            justify-content: space-between;
+            margin: 24px 0;
+            position: relative;
+        }
+        
+        .progress-steps::before {
+            content: '';
+            position: absolute;
+            top: 15px;
+            left: 10%;
+            right: 10%;
+            height: 2px;
+            background: var(--gray-200);
+            z-index: 0;
+        }
+        
+        .step {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .step-dot {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: var(--gray-200);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        
+        .step.active .step-dot {
+            background: var(--primary);
+            color: white;
+        }
+        
+        .step.completed .step-dot {
+            background: var(--success);
+            color: white;
+        }
+        
+        .step-label {
+            font-size: 11px;
+            color: var(--gray-600);
+            text-align: center;
+        }
+        
+        .step.active .step-label {
+            color: var(--primary);
+            font-weight: 600;
+        }
+        
+        /* 信息块 */
+        .info-block {
+            background: var(--gray-100);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+        
+        .info-block-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--gray-600);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--gray-200);
+        }
+        
+        .info-row:last-child {
+            border-bottom: none;
+        }
+        
+        .info-label {
+            color: var(--gray-600);
+            font-size: 14px;
+        }
+        
+        .info-value {
+            font-weight: 500;
+            font-size: 14px;
+        }
+        
+        /* AI诊断卡片 */
+        .ai-diagnosis {
+            background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
+            border-radius: 16px;
+            padding: 20px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .ai-diagnosis-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #667eea;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .diagnosis-section {
+            margin-bottom: 16px;
+        }
+        
+        .diagnosis-section:last-child {
+            margin-bottom: 0;
+        }
+        
+        .diagnosis-section-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--gray-800);
+            margin-bottom: 8px;
+        }
+        
+        .diagnosis-list {
+            list-style: none;
+            padding: 0;
+        }
+        
+        .diagnosis-list li {
+            padding: 8px 0;
+            padding-left: 24px;
+            position: relative;
+            font-size: 14px;
+            color: var(--gray-700);
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+        }
+        
+        .diagnosis-list li:last-child {
+            border-bottom: none;
+        }
+        
+        .diagnosis-list li::before {
+            content: '•';
+            position: absolute;
+            left: 8px;
+            color: #667eea;
+            font-weight: bold;
+        }
+        
+        .price-tag {
+            display: inline-flex;
+            align-items: center;
+            background: white;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: 700;
+            color: #667eea;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        /* 报价确认 */
+        .quote-card {
+            background: white;
+            border: 2px solid var(--primary);
+            border-radius: 16px;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .quote-price {
+            font-size: 36px;
+            font-weight: 700;
+            color: var(--primary);
+            margin: 16px 0;
+        }
+        
+        .quote-detail {
+            display: flex;
+            justify-content: space-around;
+            margin: 20px 0;
+            padding: 16px;
+            background: var(--gray-100);
+            border-radius: 12px;
+        }
+        
+        .quote-detail-item {
+            text-align: center;
+        }
+        
+        .quote-detail-value {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--gray-800);
+        }
+        
+        .quote-detail-label {
+            font-size: 12px;
+            color: var(--gray-600);
+            margin-top: 4px;
+        }
+        
+        /* Toast 提示 */
+        .toast {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.85);
+            color: white;
+            padding: 14px 28px;
+            border-radius: 12px;
+            font-size: 14px;
+            z-index: 1000;
+            display: none;
+            backdrop-filter: blur(10px);
+        }
+        
+        .toast.show {
+            display: block;
+            animation: slideDown 0.3s ease;
+        }
+        
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+            to { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+        
+        /* 加载动画 */
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 0.8s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* 空状态 */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--gray-600);
+        }
+        
+        .empty-state-icon {
+            font-size: 64px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+        
+        .empty-state-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--gray-800);
+        }
+        
+        /* 物流信息 */
+        .tracking-info {
+            background: linear-gradient(135deg, #00B89415 0%, #00A38315 100%);
+            border-radius: 16px;
+            padding: 20px;
+            border-left: 4px solid var(--success);
+        }
+        
+        .tracking-number {
+            font-family: monospace;
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--success);
+            letter-spacing: 1px;
+        }
+        
+        /* 底部导航 */
+        .tab-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            display: flex;
+            justify-content: space-around;
+            padding: 8px 0 calc(8px + env(safe-area-inset-bottom));
+            box-shadow: 0 -4px 20px rgba(0,0,0,0.08);
+            z-index: 100;
+        }
+        
+        .tab-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            padding: 8px 24px;
+            cursor: pointer;
+            color: var(--gray-600);
+            transition: all 0.3s;
+            border: none;
+            background: none;
+            font-size: 12px;
+        }
+        
+        .tab-item.active {
+            color: var(--primary);
+        }
+        
+        .tab-item .icon {
+            font-size: 24px;
+        }
+        
+        /* 响应式 */
+        @media (max-width: 600px) {
+            .container {
+                padding: 0 12px;
+            }
+            
+            .quick-actions {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Toast 提示 -->
+    <div class="toast" id="toast"></div>
+
+    <!-- ==================== 客户小程序 ==================== -->
+    
+    <!-- 首页 -->
+    <div class="page active" id="page-home">
+        <div class="header">
+            <h1>🐱 喵修匠</h1>
+            <p>专业无人机维修 · AI智能诊断 · 全程透明</p>
+        </div>
+        
+        <div class="container">
+            <!-- 快捷操作 -->
+            <div class="card">
+                <div class="card-title">快速服务</div>
+                <div class="quick-actions">
+                    <button class="quick-btn" onclick="showPage('page-submit')">
+                        <span class="icon">📝</span>
+                        <span>提交维修</span>
+                    </button>
+                    <button class="quick-btn secondary" onclick="showPage('page-query')">
+                        <span class="icon">🔍</span>
+                        <span>查询进度</span>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- 最近工单 -->
+            <div class="card">
+                <div class="card-title">最近工单</div>
+                <div id="recent-orders">
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📭</div>
+                        <div class="empty-state-title">暂无工单</div>
+                        <p>点击"提交维修"创建您的第一个工单</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 服务说明 -->
+            <div class="card">
+                <div class="card-title">服务流程</div>
+                <div class="progress-steps">
+                    <div class="step completed">
+                        <div class="step-dot">1</div>
+                        <div class="step-label">提交申请</div>
+                    </div>
+                    <div class="step completed">
+                        <div class="step-dot">2</div>
+                        <div class="step-label">AI诊断</div>
+                    </div>
+                    <div class="step active">
+                        <div class="step-dot">3</div>
+                        <div class="step-label">维修报价</div>
+                    </div>
+                    <div class="step">
+                        <div class="step-dot">4</div>
+                        <div class="step-label">确认维修</div>
+                    </div>
+                    <div class="step">
+                        <div class="step-dot">5</div>
+                        <div class="step-label">完成发货</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 提交维修页面 -->
+    <div class="page" id="page-submit">
+        <div class="header">
+            <h1>📝 提交维修申请</h1>
+            <p>填写信息，AI将自动诊断并给出预估报价</p>
+        </div>
+        
+        <div class="container">
+            <div class="card">
+                <div class="form-group">
+                    <label class="form-label">📱 手机号 *</label>
+                    <input type="tel" class="form-input" id="phone" placeholder="请输入手机号" maxlength="11">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">👤 姓名（选填）</label>
+                    <input type="text" class="form-input" id="name" placeholder="请输入姓名">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">🚁 无人机型号 *</label>
+                    <select class="form-select" id="model">
+                        <option value="">请选择型号</option>
+                        <option value="DJI Mini 3">DJI Mini 3</option>
+                        <option value="DJI Mini 3 Pro">DJI Mini 3 Pro</option>
+                        <option value="DJI Mini 4 Pro">DJI Mini 4 Pro</option>
+                        <option value="DJI Air 3">DJI Air 3</option>
+                        <option value="DJI Air 3S">DJI Air 3S</option>
+                        <option value="DJI Mavic 3">DJI Mavic 3</option>
+                        <option value="DJI Mavic 3 Pro">DJI Mavic 3 Pro</option>
+                        <option value="DJI Avata 2">DJI Avata 2</option>
+                        <option value="DJI FPV">DJI FPV</option>
+                        <option value="其他型号">其他型号</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">🔧 故障描述 *</label>
+                    <textarea class="form-textarea" id="problem" placeholder="请详细描述故障现象，例如：
+• 无法起飞，红灯闪烁
+• 云台抖动，画面不稳
+• 图传丢失，信号中断
+• 电池不充电
+• 其他异常..."></textarea>
+                </div>
+                
+                <button class="btn btn-primary" onclick="submitOrder()">
+                    提交申请
+                </button>
+            </div>
+        </div>
+        
+        <div class="bottom-bar">
+            <button class="btn btn-secondary" onclick="showPage('page-home')">
+                ← 返回首页
+            </button>
+        </div>
+    </div>
+
+    <!-- 查询进度页面 -->
+    <div class="page" id="page-query">
+        <div class="header">
+            <h1>🔍 查询维修进度</h1>
+            <p>输入手机号查看所有工单状态</p>
+        </div>
+        
+        <div class="container">
+            <div class="card">
+                <div class="form-group">
+                    <label class="form-label">📱 手机号</label>
+                    <div style="display: flex; gap: 12px;">
+                        <input type="tel" class="form-input" id="query-phone" placeholder="请输入手机号" style="flex: 1;">
+                        <button class="btn btn-primary" onclick="queryOrders()" style="width: auto; padding: 14px 24px;">
+                            查询
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="orders-list">
+                <!-- 工单列表将在这里显示 -->
+            </div>
+        </div>
+        
+        <div class="bottom-bar">
+            <button class="btn btn-secondary" onclick="showPage('page-home')">
+                ← 返回首页
+            </button>
+        </div>
+    </div>
+
+    <!-- 工单详情页面 -->
+    <div class="page" id="page-detail">
+        <div class="header">
+            <h1>📋 工单详情</h1>
+            <p id="detail-order-no"></p>
+        </div>
+        
+        <div class="container">
+            <!-- 状态进度 -->
+            <div class="card">
+                <div id="detail-progress"></div>
+            </div>
+            
+            <!-- 基本信息 -->
+            <div class="card">
+                <div class="card-title">基本信息</div>
+                <div id="detail-basic"></div>
+            </div>
+            
+            <!-- AI诊断 -->
+            <div class="card" id="detail-diagnosis-card" style="display: none;">
+                <div class="card-title">🔍 AI 智能诊断</div>
+                <div id="detail-diagnosis"></div>
+            </div>
+            
+            <!-- 检测结果 -->
+            <div class="card" id="detail-detection-card" style="display: none;">
+                <div class="card-title">🔧 检测结果</div>
+                <div id="detail-detection"></div>
+            </div>
+            
+            <!-- 报价信息 -->
+            <div class="card" id="detail-quote-card" style="display: none;">
+                <div class="card-title">💰 维修报价</div>
+                <div id="detail-quote"></div>
+            </div>
+            
+            <!-- 物流信息 -->
+            <div class="card" id="detail-shipping-card" style="display: none;">
+                <div class="card-title">🚚 发货信息</div>
+                <div id="detail-shipping"></div>
+            </div>
+            
+            <!-- 操作按钮 -->
+            <div id="detail-actions"></div>
+        </div>
+        
+        <div class="bottom-bar">
+            <button class="btn btn-secondary" onclick="showPage('page-query')">
+                ← 返回列表
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // API 配置
+        const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+            ? 'https://njuosun-miaoxiujiang-d3a96a8c70e.service.tcloudbase.com/api'
+            : 'http://' + window.location.hostname + ':5000/api';
+        
+        // 状态映射
+        const STATUS_MAP = {
+            'pending': { text: '待接单', class: 'status-pending' },
+            'accepted': { text: '已接单', class: 'status-accepted' },
+            'detected': { text: '已检测', class: 'status-detected' },
+            'quoted': { text: '待确认', class: 'status-quoted' },
+            'confirmed': { text: '已确认', class: 'status-confirmed' },
+            'repairing': { text: '维修中', class: 'status-repairing' },
+            'shipping': { text: '发货中', class: 'status-shipping' },
+            'completed': { text: '已完成', class: 'status-completed' },
+            'cancelled': { text: '已取消', class: 'status-cancelled' }
+        };
+        
+        // 当前查看的工单
+        let currentOrder = null;
+        let currentPhone = '';
+        
+        // 页面切换
+        function showPage(pageId) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.getElementById(pageId).classList.add('active');
+            window.scrollTo(0, 0);
+        }
+        
+        // Toast 提示
+        function showToast(message, duration = 3000) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), duration);
+        }
+        
+        // 提交工单
+        async function submitOrder() {
+            const phone = document.getElementById('phone').value.trim();
+            const name = document.getElementById('name').value.trim();
+            const model = document.getElementById('model').value;
+            const problem = document.getElementById('problem').value.trim();
+            
+            if (!phone || !model || !problem) {
+                showToast('请填写必填项');
+                return;
+            }
+            
+            if (!/^1\d{10}$/.test(phone)) {
+                showToast('请输入正确的手机号');
+                return;
+            }
+            
+            const btn = event.target;
+            btn.innerHTML = '<span class="loading"></span> 提交中...';
+            btn.disabled = true;
+            
+            try {
+                const response = await fetch(`${API_BASE}/order/create`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phone, name, model, problem })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showToast(`✅ 提交成功！工单号：${data.order_no}`);
+                    
+                    // 保存手机号
+                    localStorage.setItem('lastPhone', phone);
+                    
+                    // 清空表单
+                    document.getElementById('phone').value = '';
+                    document.getElementById('name').value = '';
+                    document.getElementById('model').value = '';
+                    document.getElementById('problem').value = '';
+                    
+                    // 延迟跳转到详情页
+                    setTimeout(() => {
+                        currentPhone = phone;
+                        showOrderDetail(data.order_no);
+                    }, 1500);
+                } else {
+                    showToast(data.message || '提交失败');
+                }
+            } catch (error) {
+                showToast('❌ 网络错误，请检查连接');
+                console.error(error);
+            } finally {
+                btn.innerHTML = '提交申请';
+                btn.disabled = false;
+            }
+        }
+        
+        // 查询工单
+        async function queryOrders() {
+            const phone = document.getElementById('query-phone').value.trim();
+            
+            if (!phone) {
+                showToast('请输入手机号');
+                return;
+            }
+            
+            currentPhone = phone;
+            localStorage.setItem('lastPhone', phone);
+            
+            try {
+                const response = await fetch(`${API_BASE}/order/query?phone=${phone}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    renderOrders(data.orders);
+                } else {
+                    showToast(data.message || '查询失败');
+                }
+            } catch (error) {
+                showToast('❌ 网络错误，请检查连接');
+                console.error(error);
+            }
+        }
+        
+        // 渲染工单列表
+        function renderOrders(orders) {
+            const container = document.getElementById('orders-list');
+            
+            if (!orders || orders.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📭</div>
+                        <div class="empty-state-title">未找到工单</div>
+                        <p>该手机号暂无维修工单</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = orders.map(order => {
+                const status = STATUS_MAP[order.status] || { text: order.status, class: '' };
+                const price = order.final_price || order.estimated_price;
+                
+                return `
+                    <div class="order-item" onclick="showOrderDetail('${order.order_no}')">
+                        <div class="order-header">
+                            <span class="order-no">${order.order_no}</span>
+                            <span class="status-badge ${status.class}">${status.text}</span>
+                        </div>
+                        <div class="order-model">${order.drone_model}</div>
+                        <div class="order-problem">${order.problem_description}</div>
+                        <div class="order-footer">
+                            <span class="order-price">${price ? '¥' + price : '待报价'}</span>
+                            <span class="order-date">${formatDate(order.created_at)}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        // 显示工单详情
+        async function showOrderDetail(orderNo) {
+            try {
+                const response = await fetch(`${API_BASE}/order/detail?order_no=${orderNo}`);
+                const data = await response.json();
+                
+                if (!data.success || !data.order) {
+                    showToast('工单不存在');
+                    return;
+                }
+                
+                currentOrder = data.order;
+                
+                // 更新页面标题
+                document.getElementById('detail-order-no').textContent = `工单号：${orderNo}`;
+                
+                // 渲染进度条
+                renderProgress(data.order.status);
+                
+                // 渲染基本信息
+                renderBasicInfo(data.order);
+                
+                // 渲染AI诊断
+                renderDiagnosis(data.order);
+                
+                // 渲染检测结果
+                renderDetection(data.order);
+                
+                // 渲染报价
+                renderQuote(data.order);
+                
+                // 渲染物流
+                renderShipping(data.order);
+                
+                // 渲染操作按钮
+                renderActions(data.order);
+                
+                showPage('page-detail');
+            } catch (error) {
+                showToast('加载详情失败');
+                console.error(error);
+            }
+        }
+        
+        // 渲染进度条
+        function renderProgress(status) {
+            const steps = [
+                { key: 'pending', label: '提交申请' },
+                { key: 'accepted', label: '已接单' },
+                { key: 'quoted', label: '已报价' },
+                { key: 'confirmed', label: '已确认' },
+                { key: 'completed', label: '已完成' }
+            ];
+            
+            const statusOrder = ['pending', 'accepted', 'detected', 'quoted', 'confirmed', 'repairing', 'shipping', 'completed'];
+            const currentIndex = statusOrder.indexOf(status);
+            
+            let html = '<div class="progress-steps">';
+            steps.forEach((step, index) => {
+                const stepIndex = statusOrder.indexOf(step.key);
+                let state = '';
+                if (stepIndex < currentIndex) state = 'completed';
+                else if (stepIndex === currentIndex || (step.key === 'quoted' && ['detected', 'quoted'].includes(status))) state = 'active';
+                
+                html += `
+                    <div class="step ${state}">
+                        <div class="step-dot">${state === 'completed' ? '✓' : index + 1}</div>
+                        <div class="step-label">${step.label}</div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            
+            document.getElementById('detail-progress').innerHTML = html;
+        }
+        
+        // 渲染基本信息
+        function renderBasicInfo(order) {
+            const status = STATUS_MAP[order.status] || { text: order.status };
+            
+            document.getElementById('detail-basic').innerHTML = `
+                <div class="info-block">
+                    <div class="info-row">
+                        <span class="info-label">当前状态</span>
+                        <span class="status-badge ${status.class}">${status.text}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">客户姓名</span>
+                        <span class="info-value">${order.customer_name || '未填写'}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">联系电话</span>
+                        <span class="info-value">${order.customer_phone}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">无人机型号</span>
+                        <span class="info-value">${order.drone_model}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">创建时间</span>
+                        <span class="info-value">${formatDateTime(order.created_at)}</span>
+                    </div>
+                    ${order.merchant_name ? `
+                    <div class="info-row">
+                        <span class="info-label">维修商家</span>
+                        <span class="info-value">${order.merchant_name}</span>
+                    </div>
+                    ` : ''}
+                </div>
+                <div class="info-block">
+                    <div class="info-block-title">🔧 故障描述</div>
+                    <p style="line-height: 1.6; color: var(--gray-700);">${order.problem_description}</p>
+                </div>
+            `;
+        }
+        
+        // 渲染AI诊断
+        function renderDiagnosis(order) {
+            const card = document.getElementById('detail-diagnosis-card');
+            const container = document.getElementById('detail-diagnosis');
+            
+            let diag = order.ai_diagnosis;
+            if (typeof diag === 'string') {
+                try { diag = JSON.parse(diag); } catch(e) { diag = null; }
+            }
+            
+            if (!diag || !diag.causes) {
+                card.style.display = 'none';
+                return;
+            }
+            
+            card.style.display = 'block';
+            
+            let html = '<div class="ai-diagnosis">';
+            
+            // 可能原因
+            if (diag.causes && diag.causes.length > 0) {
+                html += `
+                    <div class="diagnosis-section">
+                        <div class="diagnosis-section-title">🔍 可能原因</div>
+                        <ul class="diagnosis-list">
+                            ${diag.causes.map(c => `<li>${c}</li>`).join('')}
+                        </ul>
+                    </div>
+                `;
+            }
+            
+            // 检查要点
+            if (diag.check_points && diag.check_points.length > 0) {
+                html += `
+                    <div class="diagnosis-section">
+                        <div class="diagnosis-section-title">✅ 检查要点</div>
+                        <ul class="diagnosis-list">
+                            ${diag.check_points.map(p => `<li>${p}</li>`).join('')}
+                        </ul>
+                    </div>
+                `;
+            }
+            
+            // 所需配件
+            if (diag.parts_list && diag.parts_list.length > 0) {
+                html += `
+                    <div class="diagnosis-section">
+                        <div class="diagnosis-section-title">📦 所需配件</div>
+                        <div style="background: white; border-radius: 12px; padding: 12px; margin-top: 8px;">
+                            ${diag.parts_list.map(part => `
+                                <div class="info-row" style="padding: 8px 0;">
+                                    <span class="info-label">${part.name}</span>
+                                    <span class="info-value" style="color: var(--primary); font-weight: 600;">¥${part.price}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // 费用明细
+            if (diag.parts_cost !== undefined && diag.labor_cost !== undefined) {
+                html += `
+                    <div class="diagnosis-section">
+                        <div class="diagnosis-section-title">💰 费用明细</div>
+                        <div style="background: white; border-radius: 12px; padding: 16px; margin-top: 8px;">
+                            <div class="info-row">
+                                <span class="info-label">配件费用</span>
+                                <span class="info-value">¥${diag.parts_cost}</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">人工费用</span>
+                                <span class="info-value">¥${diag.labor_cost}</span>
+                            </div>
+                            <div class="info-row" style="border-top: 2px solid var(--gray-200); margin-top: 8px; padding-top: 12px;">
+                                <span class="info-label" style="font-weight: 600;">预估总价</span>
+                                <span class="info-value" style="color: var(--primary); font-size: 20px; font-weight: 700;">¥${diag.total_price}</span>
+                            </div>
+                            ${diag.warranty_days ? `
+                            <div style="text-align: center; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--gray-200);">
+                                <span style="color: var(--success); font-weight: 600;">✓ ${diag.warranty_days}天质保</span>
+                            </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // 建议操作
+            if (diag.suggested_action) {
+                html += `
+                    <div style="margin-top: 16px; padding: 16px; background: white; border-radius: 12px;">
+                        <strong style="color: #667eea;">💡 建议操作</strong>
+                        <p style="margin-top: 8px; color: var(--gray-700); line-height: 1.6;">${diag.suggested_action}</p>
+                    </div>
+                `;
+            }
+            
+            // 回收选项（进水故障）
+            if (diag.recycle_option && diag.recycle_option.available) {
+                html += `
+                    <div style="margin-top: 16px; padding: 16px; background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%); border-radius: 12px; border-left: 4px solid var(--warning);">
+                        <strong style="color: #856404;">♻️ 回收选项</strong>
+                        <p style="margin-top: 8px; color: var(--gray-700);">如损坏严重，可选择回收，回收价约 <strong style="color: var(--primary);">¥${diag.recycle_option.price}</strong></p>
+                    </div>
+                `;
+            }
+            
+            html += '</div>';
+            container.innerHTML = html;
+        }
+        
+        // 渲染检测结果
+        function renderDetection(order) {
+            const card = document.getElementById('detail-detection-card');
+            const container = document.getElementById('detail-detection');
+            
+            let detection = order.detection_result;
+            if (typeof detection === 'string') {
+                try { detection = JSON.parse(detection); } catch(e) { detection = null; }
+            }
+            
+            if (!detection) {
+                card.style.display = 'none';
+                return;
+            }
+            
+            card.style.display = 'block';
+            
+            let html = '<div class="info-block">';
+            
+            if (detection.actual_problem) {
+                html += `
+                    <div class="info-row">
+                        <span class="info-label">实际故障</span>
+                        <span class="info-value">${detection.actual_problem}</span>
+                    </div>
+                `;
+            }
+            
+            if (detection.damage_parts && detection.damage_parts.length > 0) {
+                html += `
+                    <div class="info-row">
+                        <span class="info-label">损坏部件</span>
+                        <span class="info-value">${detection.damage_parts.join('、')}</span>
+                    </div>
+                `;
+            }
+            
+            if (detection.repair_plan) {
+                html += `
+                    <div class="info-row">
+                        <span class="info-label">维修方案</span>
+                        <span class="info-value">${detection.repair_plan}</span>
+                    </div>
+                `;
+            }
+            
+            html += '</div>';
+            
+            if (detection.parts_list && detection.parts_list.length > 0) {
+                html += `
+                    <div class="info-block" style="margin-top: 16px;">
+                        <div class="info-block-title">📦 需更换配件</div>
+                        ${detection.parts_list.map(part => `
+                            <div class="info-row">
+                                <span class="info-label">${part.name}</span>
+                                <span class="info-value">¥${part.price}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }
+            
+            container.innerHTML = html;
+        }
+        
+        // 渲染报价
+        function renderQuote(order) {
+            const card = document.getElementById('detail-quote-card');
+            const container = document.getElementById('detail-quote');
+            
+            let quote = order.quote_data;
+            if (typeof quote === 'string') {
+                try { quote = JSON.parse(quote); } catch(e) { quote = null; }
+            }
+            
+            if (!quote && !order.estimated_price) {
+                card.style.display = 'none';
+                return;
+            }
+            
+            card.style.display = 'block';
+            
+            if (quote) {
+                container.innerHTML = `
+                    <div class="quote-card">
+                        <div style="color: var(--gray-600); font-size: 14px;">维修总价</div>
+                        <div class="quote-price">¥${quote.total}</div>
+                        <div class="quote-detail">
+                            <div class="quote-detail-item">
+                                <div class="quote-detail-value">¥${quote.labor_cost}</div>
+                                <div class="quote-detail-label">人工费</div>
+                            </div>
+                            <div class="quote-detail-item">
+                                <div class="quote-detail-value">¥${quote.parts_cost}</div>
+                                <div class="quote-detail-label">配件费</div>
+                            </div>
+                            <div class="quote-detail-item">
+                                <div class="quote-detail-value">${quote.warranty_days}天</div>
+                                <div class="quote-detail-label">质保期</div>
+                            </div>
+                        </div>
+                        ${quote.description ? `<p style="color: var(--gray-600); font-size: 14px; margin-top: 12px;">${quote.description}</p>` : ''}
+                    </div>
+                `;
+            } else {
+                container.innerHTML = `
+                    <div class="info-block">
+                        <div class="info-row">
+                            <span class="info-label">预估价格</span>
+                            <span class="info-value" style="color: var(--primary); font-size: 18px; font-weight: 700;">
+                                ¥${order.estimated_price}
+                            </span>
+                        </div>
+                        <p style="color: var(--gray-600); font-size: 13px; margin-top: 12px;">
+                            * 此为AI智能诊断预估价格，实际价格以维修商检测后报价为准
+                        </p>
+                    </div>
+                `;
+            }
+        }
+        
+        // 渲染物流
+        function renderShipping(order) {
+            const card = document.getElementById('detail-shipping-card');
+            const container = document.getElementById('detail-shipping');
+            
+            if (!order.tracking_no) {
+                card.style.display = 'none';
+                return;
+            }
+            
+            card.style.display = 'block';
+            
+            container.innerHTML = `
+                <div class="tracking-info">
+                    <div style="margin-bottom: 12px;">
+                        <span style="color: var(--gray-600); font-size: 14px;">快递公司</span>
+                        <div style="font-weight: 600; margin-top: 4px;">${order.carrier || '未知'}</div>
+                    </div>
+                    <div>
+                        <span style="color: var(--gray-600); font-size: 14px;">快递单号</span>
+                        <div class="tracking-number">${order.tracking_no}</div>
+                    </div>
+                    <button class="btn btn-outline btn-sm" style="margin-top: 16px;" onclick="copyTracking('${order.tracking_no}')">
+                        📋 复制单号
+                    </button>
+                </div>
+            `;
+        }
+        
+        // 渲染操作按钮
+        function renderActions(order) {
+            const container = document.getElementById('detail-actions');
+            
+            if (order.status === 'quoted') {
+                container.innerHTML = `
+                    <div class="card">
+                        <div class="card-title">🤔 确认维修</div>
+                        <p style="color: var(--gray-600); margin-bottom: 16px;">
+                            请确认是否同意以上报价进行维修？
+                        </p>
+                        <div style="display: flex; gap: 12px;">
+                            <button class="btn btn-success" onclick="confirmQuote(true)" style="flex: 1;">
+                                ✅ 确认维修
+                            </button>
+                            <button class="btn btn-danger" onclick="confirmQuote(false)" style="flex: 1;">
+                                ❌ 拒绝报价
+                            </button>
+                        </div>
+                    </div>
+                `;
+            } else {
+                container.innerHTML = '';
+            }
+        }
+        
+        // 确认报价
+        async function confirmQuote(confirmed) {
+            if (!currentOrder) return;
+            
+            if (!confirmed && !confirm('确定要拒绝该报价吗？工单将被取消。')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/order/confirm_quote`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        order_no: currentOrder.order_no,
+                        confirmed: confirmed
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showToast(confirmed ? '✅ 已确认维修' : '❌ 已拒绝报价');
+                    setTimeout(() => showOrderDetail(currentOrder.order_no), 1000);
+                } else {
+                    showToast(data.message || '操作失败');
+                }
+            } catch (error) {
+                showToast('❌ 网络错误');
+            }
+        }
+        
+        // 复制快递单号
+        function copyTracking(trackingNo) {
+            navigator.clipboard.writeText(trackingNo).then(() => {
+                showToast('✅ 已复制到剪贴板');
+            }).catch(() => {
+                showToast('❌ 复制失败');
+            });
+        }
+        
+        // 格式化日期
+        function formatDate(dateStr) {
+            if (!dateStr) return '';
+            const date = new Date(dateStr);
+            return `${date.getMonth() + 1}/${date.getDate()}`;
+        }
+        
+        function formatDateTime(dateStr) {
+            if (!dateStr) return '';
+            const date = new Date(dateStr);
+            return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+        }
+        
+        // 页面加载
+        window.onload = async function() {
+            // 恢复上次查询的手机号
+            const lastPhone = localStorage.getItem('lastPhone');
+            if (lastPhone) {
+                document.getElementById('query-phone').value = lastPhone;
+                currentPhone = lastPhone;
+                
+                // 自动加载最近工单
+                try {
+                    const response = await fetch(`${API_BASE}/order/query?phone=${lastPhone}`);
+                    const data = await response.json();
+                    if (data.success && data.orders && data.orders.length > 0) {
+                        const container = document.getElementById('recent-orders');
+                        container.innerHTML = data.orders.slice(0, 3).map(order => {
+                            const status = STATUS_MAP[order.status] || { text: order.status, class: '' };
+                            const price = order.final_price || order.estimated_price;
+                            return `
+                                <div class="order-item" onclick="showOrderDetail('${order.order_no}')">
+                                    <div class="order-header">
+                                        <span class="order-no">${order.order_no}</span>
+                                        <span class="status-badge ${status.class}">${status.text}</span>
+                                    </div>
+                                    <div class="order-model">${order.drone_model}</div>
+                                    <div class="order-problem">${order.problem_description}</div>
+                                    <div class="order-footer">
+                                        <span class="order-price">${price ? '¥' + price : '待报价'}</span>
+                                        <span class="order-date">${formatDate(order.created_at)}</span>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('');
+                    }
+                } catch (e) {
+                    console.log('加载最近工单失败', e);
+                }
+            }
+        };
+    </script>
+</body>
+</html>

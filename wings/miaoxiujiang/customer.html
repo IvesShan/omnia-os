@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>喵修匠 - 维修报价确认</title>
+    <style>
+        :root {
+            --bg-primary: #000000;
+            --bg-secondary: #1C1C1E;
+            --bg-tertiary: #2C2C2E;
+            --text-primary: #FFFFFF;
+            --text-secondary: rgba(255,255,255,0.6);
+            --accent-orange: #FF9500;
+            --accent-green: #30D158;
+            --accent-red: #FF453A;
+            --border-subtle: rgba(255,255,255,0.1);
+        }
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+        
+        /* 头部 */
+        .header {
+            padding: 60px 20px 30px;
+            text-align: center;
+            background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+        }
+        
+        .logo {
+            font-size: 48px;
+            margin-bottom: 12px;
+        }
+        
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        
+        .header p {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+        
+        /* 查询区域 */
+        .search-section {
+            padding: 20px;
+        }
+        
+        .input-group {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        
+        .phone-input {
+            flex: 1;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            padding: 16px;
+            color: var(--text-primary);
+            font-size: 16px;
+            outline: none;
+        }
+        
+        .phone-input:focus {
+            border-color: var(--accent-orange);
+        }
+        
+        .btn {
+            padding: 16px 24px;
+            border-radius: 12px;
+            border: none;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .btn-primary {
+            background: var(--accent-orange);
+            color: #000;
+        }
+        
+        .btn-success {
+            background: var(--accent-green);
+            color: #000;
+        }
+        
+        .btn-danger {
+            background: var(--accent-red);
+            color: #fff;
+        }
+        
+        .btn:active {
+            transform: scale(0.96);
+            opacity: 0.9;
+        }
+        
+        .btn-full {
+            width: 100%;
+        }
+        
+        /* 订单列表 */
+        .orders-section {
+            padding: 0 20px 20px;
+        }
+        
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .order-card {
+            background: var(--bg-secondary);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 16px;
+            border: 1px solid var(--border-subtle);
+        }
+        
+        .order-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+        
+        .order-no {
+            font-size: 16px;
+            font-weight: 600;
+        }
+        
+        .order-status {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .status-quoted { 
+            background: rgba(255,149,0,0.2); 
+            color: var(--accent-orange); 
+        }
+        
+        .status-repairing { 
+            background: rgba(10,132,255,0.2); 
+            color: #0A84FF; 
+        }
+        
+        .status-completed { 
+            background: rgba(48,209,88,0.2); 
+            color: var(--accent-green); 
+        }
+        
+        /* 物流信息 */
+        .logistics-section {
+            background: var(--bg-tertiary);
+            border-radius: 12px;
+            padding: 16px;
+            margin: 16px 0;
+            border-left: 4px solid var(--accent-orange);
+        }
+        
+        .logistics-title {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .logistics-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            font-size: 14px;
+        }
+        
+        .logistics-label {
+            color: var(--text-secondary);
+        }
+        
+        .logistics-value {
+            font-weight: 500;
+            font-family: monospace;
+        }
+        
+        .auto-confirm-timer {
+            background: rgba(255,149,0,0.1);
+            border-radius: 8px;
+            padding: 10px 12px;
+            margin-top: 12px;
+            font-size: 13px;
+            color: var(--accent-orange);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .timer-icon {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        /* 设备信息 */
+        .device-info {
+            margin-bottom: 16px;
+        }
+        
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+        
+        .info-row:last-child {
+            border-bottom: none;
+        }
+        
+        .info-label {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+        
+        .info-value {
+            font-size: 14px;
+            font-weight: 500;
+        }
+        
+        /* 报价区域 */
+        .quote-section {
+            background: var(--bg-tertiary);
+            border-radius: 12px;
+            padding: 16px;
+            margin: 16px 0;
+        }
+        
+        .quote-title {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+        }
+        
+        .quote-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            font-size: 14px;
+        }
+        
+        .quote-total {
+            display: flex;
+            justify-content: space-between;
+            padding-top: 12px;
+            margin-top: 12px;
+            border-top: 1px solid var(--border-subtle);
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--accent-orange);
+        }
+        
+        /* 操作按钮 */
+        .action-buttons {
+            display: flex;
+            gap: 12px;
+            margin-top: 20px;
+        }
+        
+        .action-buttons .btn {
+            flex: 1;
+        }
+        
+        /* 检测结果 */
+        .detect-section {
+            margin: 16px 0;
+        }
+        
+        .detect-title {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+        
+        .detect-content {
+            background: var(--bg-tertiary);
+            border-radius: 12px;
+            padding: 12px;
+            font-size: 14px;
+            line-height: 1.6;
+            color: var(--text-secondary);
+        }
+        
+        /* 加载和空状态 */
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-secondary);
+        }
+        
+        .empty {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-secondary);
+        }
+        
+        .empty-icon {
+            font-size: 64px;
+            margin-bottom: 16px;
+        }
+        
+        /* Toast */
+        .toast {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            padding: 16px 24px;
+            border-radius: 12px;
+            font-size: 16px;
+            z-index: 100;
+            display: none;
+            border: 1px solid var(--border-subtle);
+        }
+        
+        .toast.active {
+            display: block;
+            animation: fadeIn 0.3s;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translate(-50%, -40%); }
+            to { opacity: 1; transform: translate(-50%, -50%); }
+        }
+        
+        /* 底部说明 */
+        .footer {
+            text-align: center;
+            padding: 20px;
+            color: var(--text-tertiary);
+            font-size: 12px;
+        }
+        
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <!-- 头部 -->
+    <div class="header">
+        <div class="logo">🔧</div>
+        <h1>喵修匠维修报价</h1>
+        <p>专业无人机维修服务</p>
+    </div>
+    
+    <!-- 查询区域 -->
+    <div class="search-section">
+        <div class="input-group">
+            <input type="tel" class="phone-input" id="phoneInput" placeholder="请输入手机号查询" maxlength="11">
+            <button class="btn btn-primary" onclick="searchOrders()">查询</button>
+        </div>
+    </div>
+    
+    <!-- 订单列表 -->
+    <div class="orders-section" id="ordersSection">
+        <div class="empty">
+            <div class="empty-icon">📱</div>
+            <p>输入手机号查询您的维修订单</p>
+        </div>
+    </div>
+    
+    <!-- 底部 -->
+    <div class="footer">
+        南京物熵信息科技有限公司<br>
+        服务热线：13185092117
+    </div>
+    
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
+    
+    <script>
+        const API_BASE = 'https://njuosun-miaoxiujiang-d3a96a8c70e.service.tcloudbase.com/api';
+        
+        const STATUS_MAP = {
+            'quoted': { text: '待确认报价', class: 'status-quoted' },
+            'confirmed': { text: '已确认，维修中', class: 'status-repairing' },
+            'repairing': { text: '维修中', class: 'status-repairing' },
+            'payment': { text: '待付款', class: 'status-quoted' },
+            'paid': { text: '已付款，待发货', class: 'status-repairing' },
+            'delivered': { text: '待客户收货', class: 'status-repairing' },
+            'completed': { text: '已完成', class: 'status-completed' }
+        };
+        
+        // 查询订单
+        async function searchOrders() {
+            const phone = document.getElementById('phoneInput').value.trim();
+            
+            if (!phone || phone.length !== 11) {
+                showToast('请输入正确的11位手机号');
+                return;
+            }
+            
+            const section = document.getElementById('ordersSection');
+            section.innerHTML = '<div class="loading">查询中...</div>';
+            
+            try {
+                // 调用客户查询接口
+                const res = await fetch(`${API_BASE}/customer/orders?phone=${phone}`);
+                const data = await res.json();
+                
+                if (data.success && data.orders && data.orders.length > 0) {
+                    renderOrders(data.orders);
+                } else {
+                    section.innerHTML = `
+                        <div class="empty">
+                            <div class="empty-icon">📭</div>
+                            <p>未找到该手机号的订单</p>
+                            <p style="font-size: 12px; margin-top: 8px;">请检查手机号是否正确</p>
+                        </div>
+                    `;
+                }
+            } catch (e) {
+                section.innerHTML = `
+                    <div class="empty">
+                        <div class="empty-icon">⚠️</div>
+                        <p>查询失败，请稍后重试</p>
+                    </div>
+                `;
+            }
+        }
+        
+        // 渲染订单
+        function renderOrders(orders) {
+            const section = document.getElementById('ordersSection');
+            
+            // 只显示有报价的订单
+            const displayOrders = orders.filter(o => 
+                ['quoted', 'confirmed', 'repairing', 'payment', 'paid', 'delivered', 'completed'].includes(o.status)
+            );
+            
+            if (displayOrders.length === 0) {
+                section.innerHTML = `
+                    <div class="empty">
+                        <div class="empty-icon">⏳</div>
+                        <p>暂无待确认的报价</p>
+                        <p style="font-size: 12px; margin-top: 8px;">您的订单正在检测中，请稍后查询</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            section.innerHTML = `
+                <div class="section-title">
+                    <span>📋</span>
+                    <span>找到 ${displayOrders.length} 个订单</span>
+                </div>
+                ${displayOrders.map(order => renderOrderCard(order)).join('')}
+            `;
+        }
+        
+        // 渲染单个订单卡片
+        function renderOrderCard(order) {
+            const status = STATUS_MAP[order.status] || { text: order.status, class: '' };
+            const quoteData = order.quote_data ? JSON.parse(order.quote_data) : null;
+            const detection = order.detection_result ? JSON.parse(order.detection_result) : null;
+            
+            const showActions = order.status === 'quoted';
+            
+            return `
+                <div class="order-card">
+                    <div class="order-header">
+                        <span class="order-no">${order.order_no}</span>
+                        <span class="order-status ${status.class}">${status.text}</span>
+                    </div>
+                    
+                    <div class="device-info">
+                        <div class="info-row">
+                            <span class="info-label">机型</span>
+                            <span class="info-value">${order.drone_model || '未指定'}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">故障描述</span>
+                            <span class="info-value">${order.problem_description || '待检测'}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">下单时间</span>
+                            <span class="info-value">${order.created_at?.split('T')[0] || '-'}</span>
+                        </div>
+                    </div>
+                    
+                    ${detection ? `
+                    <div class="detect-section">
+                        <div class="detect-title">🔍 检测结果</div>
+                        <div class="detect-content">
+                            ${detection.actual_problem || detection.external_damage || '检测完成'}
+                        </div>
+                    </div>
+                    ` : ''}
+                    
+                    ${quoteData ? `
+                    <div class="quote-section">
+                        <div class="quote-title">💰 维修报价</div>
+                        ${quoteData.items ? quoteData.items.map(item => `
+                            <div class="quote-item">
+                                <span>${item.name}</span>
+                                <span>¥${item.price}</span>
+                            </div>
+                        `).join('') : ''}
+                        <div class="quote-total">
+                            <span>合计</span>
+                            <span>¥${quoteData.total || 0}</span>
+                        </div>
+                    </div>
+                    ` : '<div class="quote-section"><div class="detect-title">报价生成中...</div></div>'}
+                    
+                    ${showActions ? `
+                    <div class="action-buttons">
+                        <button class="btn btn-danger" onclick="rejectQuote('${order.order_no}')">拒绝</button>
+                        <button class="btn btn-success" onclick="confirmQuote('${order.order_no}')">确认报价</button>
+                    </div>
+                    <p style="font-size: 12px; color: var(--text-tertiary); text-align: center; margin-top: 12px;">
+                        确认后我们将立即开始维修
+                    </p>
+                    ` : ''}
+                    
+                    ${order.status === 'delivered' ? `
+                    <!-- 物流信息 -->
+                    <div class="logistics-section">
+                        <div class="logistics-title">📦 物流信息</div>
+                        <div class="logistics-row">
+                            <span class="logistics-label">快递公司</span>
+                            <span class="logistics-value">${order.carrier || '顺丰速运'}</span>
+                        </div>
+                        <div class="logistics-row">
+                            <span class="logistics-label">快递单号</span>
+                            <span class="logistics-value">${order.tracking_no || 'SF1234567890'}</span>
+                        </div>
+                        <div class="logistics-row">
+                            <span class="logistics-label">发货时间</span>
+                            <span class="logistics-value">${order.shipped_at ? order.shipped_at.split('T')[0] : '-'}</span>
+                        </div>
+                        <div class="auto-confirm-timer">
+                            <span class="timer-icon">⏰</span>
+                            <span id="timer-${order.order_no}">计算中...</span>
+                        </div>
+                    </div>
+                    
+                    <!-- 确认收货按钮 -->
+                    <div class="action-buttons" style="margin-top: 20px;">
+                        <button class="btn btn-success btn-full" onclick="confirmReceive('${order.order_no}')">
+                            ✅ 确认收货
+                        </button>
+                    </div>
+                    <p style="font-size: 12px; color: var(--text-tertiary); text-align: center; margin-top: 12px;">
+                        收到商品后请点击确认收货，7天后将自动确认
+                    </p>
+                    ` : ''}
+                </div>
+            `;
+        }
+        
+        // 确认报价
+        async function confirmQuote(orderNo) {
+            if (!confirm('确认接受此报价？确认后我们将立即开始维修。')) return;
+            
+            try {
+                const res = await fetch(`${API_BASE}/order/confirm`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ order_no: orderNo })
+                });
+                
+                const data = await res.json();
+                if (data.success) {
+                    showToast('✅ 已确认报价，开始维修！');
+                    // 刷新列表
+                    setTimeout(() => searchOrders(), 1000);
+                } else {
+                    showToast('❌ ' + (data.message || '确认失败'));
+                }
+            } catch (e) {
+                showToast('❌ 网络错误，请重试');
+            }
+        }
+        
+        // 拒绝报价
+        async function rejectQuote(orderNo) {
+            const reason = prompt('请输入拒绝原因（可选）：');
+            if (reason === null) return; // 用户点击取消
+            
+            try {
+                const res = await fetch(`${API_BASE}/order/reject`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        order_no: orderNo,
+                        reason: reason || '客户拒绝'
+                    })
+                });
+                
+                const data = await res.json();
+                if (data.success) {
+                    showToast('已拒绝报价');
+                    setTimeout(() => searchOrders(), 1000);
+                } else {
+                    showToast('❌ ' + (data.message || '操作失败'));
+                }
+            } catch (e) {
+                showToast('❌ 网络错误');
+            }
+        }
+        
+        // 确认收货
+        async function confirmReceive(orderNo) {
+            if (!confirm('确认已收到维修好的无人机？\n\n确认后订单将标记为已完成。')) return;
+            
+            try {
+                const res = await fetch(`${API_BASE}/order/customer-confirm-receive`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ order_no: orderNo })
+                });
+                
+                const data = await res.json();
+                if (data.success) {
+                    showToast('✅ 确认收货成功！');
+                    setTimeout(() => searchOrders(), 1500);
+                } else {
+                    showToast('❌ ' + (data.message || '确认失败'));
+                }
+            } catch (e) {
+                showToast('❌ 网络错误，请重试');
+            }
+        }
+        
+        // 计算自动确认倒计时
+        function calculateAutoConfirmTimer(shippedAt, orderNo) {
+            const AUTO_CONFIRM_DAYS = 7;
+            const shipped = new Date(shippedAt);
+            const autoConfirm = new Date(shipped.getTime() + AUTO_CONFIRM_DAYS * 24 * 60 * 60 * 1000);
+            const now = new Date();
+            const diff = autoConfirm - now;
+            
+            if (diff <= 0) {
+                return '已自动确认';
+            }
+            
+            const days = Math.floor(diff / (24 * 60 * 60 * 1000));
+            const hours = Math.floor((diff % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
+            
+            if (days > 0) {
+                return `${days}天${hours}小时后自动确认`;
+            } else {
+                return `${hours}小时后自动确认`;
+            }
+        }
+        
+        // 更新所有倒计时
+        function updateTimers(orders) {
+            orders.forEach(order => {
+                if (order.status === 'delivered' && order.shipped_at) {
+                    const timerEl = document.getElementById(`timer-${order.order_no}`);
+                    if (timerEl) {
+                        timerEl.textContent = calculateAutoConfirmTimer(order.shipped_at, order.order_no);
+                    }
+                }
+            });
+        }
+        
+        // 渲染订单后更新倒计时
+        const originalRenderOrders = renderOrders;
+        renderOrders = function(orders) {
+            originalRenderOrders(orders);
+            updateTimers(orders);
+            // 每分钟更新一次
+            setInterval(() => updateTimers(orders), 60000);
+        };
+        
+        // 显示提示
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.textContent = msg;
+            toast.classList.add('active');
+            setTimeout(() => toast.classList.remove('active'), 2000);
+        }
+        
+        // 回车查询
+        document.getElementById('phoneInput')?.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') searchOrders();
+        });
+    </script>
+</body>
+</html>
