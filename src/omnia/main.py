@@ -106,19 +106,9 @@ async def root():
     }
 
 
-@app.get("/api/status")
-async def api_status():
-    """API 状态"""
-    return {
-        "status": "ok",
-        "provider": settings.current_provider,
-        "version": "2.0.0"
-    }
-
-
 # ========== 挂载路由模块 ==========
 
-from src.omnia.routers import provider, chat, memory, graph
+from src.omnia.routers import provider, chat, memory, graph, status
 
 # Provider 管理
 app.include_router(provider.router, prefix="/api", tags=["provider"])
@@ -132,11 +122,13 @@ app.include_router(memory.router, prefix="/api", tags=["memory"])
 # 神经图谱
 app.include_router(graph.router, prefix="/api", tags=["graph"])
 
+# 状态监控
+app.include_router(status.router, prefix="/api", tags=["status"])
+
 # 后续添加其他路由
-# from src.omnia.routers import workflow, feishu, status
+# from src.omnia.routers import workflow, feishu
 # app.include_router(workflow.router, prefix="/api", tags=["workflow"])
 # app.include_router(feishu.router, prefix="/webhook", tags=["feishu"])
-# app.include_router(status.router, prefix="/api", tags=["status"])
 
 
 if __name__ == "__main__":
