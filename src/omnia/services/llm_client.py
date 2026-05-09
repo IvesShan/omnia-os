@@ -1,246 +1,250 @@
 """
-LLM 客户端
-支持多个 Provider 的异步调用
+LLM 客户端 - 异步版本
+支持：多 Provider、流式输出、工具调用
 """
-
+import os
 import json
-from typing import AsyncGenerator, Dict, List, Optional
-
 import httpx
-import yaml
+from typing import AsyncGenerator, Optional, List
+from pathlib import Path
 
 from src.omnia.config import settings
 
 
 class LLMClient:
-    """LLM 客户端 - 支持异步调用"""
+    """异步 LLM 客户端"""
+    
+    # Provider 配置
+    PROVIDER_URLS = {
+        "deepseek": "https://api.deepseek.com/v1/chat/completions",
+        "kimi": "https://api.moonshot.cn/v1/chat/completions",
+        "xiaomi": "https://api.maimemo.com/v1/chat/completions",
+        "openai": "https://api.openai.com/v1/chat/completions",
+        "qianfan": "https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/chat/completions",
+    }
+    
+    PROVIDER_MODELS = {
+        "deepseek": "deepseek-v4-flash",
+        "kimi": "K2.6-code-preview",
+        "xiaomi": "mimo-v2.5-pro",
+        "openai": "gpt-4o",
+        "qianfan": "baiduqianfancodingplan/qianfan-code-latest",
+    }
     
     def __init__(self):
-        self.timeout = settings.request_timeout
-        self._load_providers()
+        self.client = httpx.AsyncClient(timeout=120.0)
     
-    def _load_providers(self):
-        """加载 Provider 配置"""
-        self.providers = {}
-        
-        # 加载本地模型配置
-        if settings.local_llm_config.exists():
-            try:
-                with open(settings.local_llm_config) as f:
-                    config = yaml.safe_load(f)
-                    self.providers["local"] = config
-            except Exception as e:
-                print(f"[WARNING] Failed to load local LLM config: {e}")
-        
-        # 从环境变量加载 API keys
-        if settings.openai_api_key:
-            self.providers["openai"] = {
-                "api_key": settings.openai_api_key,
-                "base_url": "https://api.openai.com/v1"
-            }
-        
-        if settings.deepseek_api_key:
-            self.providers["deepseek"] = {
-                "api_key": settings.deepseek_api_key,
-                "base_url": "https://api.deepseek.com/v1"
-            }
-        
-        if settings.moonshot_api_key:
-            self.providers["moonshot"] = {
-                "api_key": settings.moonshot_api_key,
-                "base_url": "https://api.moonshot.cn/v1"
-            }
-        
-        if settings.zhipu_api_key:
-            self.providers["zhipu"] = {
-                "api_key": settings.zhipu_api_key,
-                "base_url": "https://open.bigmodel.cn/api/paas/v4"
-            }
+    async def close(self):
+        """关闭客户端"""
+        await self.client.aclose()
     
-    async def call(
+    def _load_api_key(self, provider: str) -> str | None:
+        """加载 API Key"""
+        env_keys = {
+            "deepseek": "DEEPSEEK_API_KEY",
+            "kimi": "MOONSHOT_API_KEY",
+            "xiaomi": "MIMO_API_KEY",
+            "openai": "OPENAI_API_KEY",
+            "qianfan": "QIANFAN_API_KEY",
+        }
+        
+        env_key = env_keys.get(provider)
+        if not env_key:
+            return None
+        
+        # 优先从环境变量加载
+        api_key = os.environ.get(env_key)
+        if api_key:
+            return api_key
+        
+        # 从 .env 文件加载
+        env_file = settings.project_root / ".env"
+        if env_file.exists():
+            for line in env_file.read_text(encoding="utf-8").splitlines():
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                if line.startswith(f"{env_key}="):
+                    return line.split("=", 1)[1].strip()
+        
+        return None
+    
+    def _build_headers(self, api_key: str, provider: str) -> dict:
+        """构建请求头"""
+        headers = {"Content-Type": "application/json"}
+        
+        if provider == "xiaomi":
+            headers["api-key"] = api_key
+        else:
+            headers["Authorization"] = f"Bearer {api_key}"
+        
+        return headers
+    
+    def _get_model(self, provider: str) -> str:
+        """获取模型名称"""
+        # 优先从环境变量读取
+        env_model = os.environ.get(f"{provider.upper()}_MODEL")
+        if env_model:
+            return env_model
+        
+        # 使用默认模型
+        return self.PROVIDER_MODELS.get(provider, "unknown")
+    
+    async def chat(
         self,
-        provider: str,
-        messages: List[Dict],
-        tools: Optional[List[Dict]] = None,
-        stream: bool = False,
-        **kwargs
-    ) -> Dict:
+        messages: List[dict],
+        provider: str = "deepseek",
+        tools: List[dict] = None,
+        stream: bool = False
+    ) -> dict:
         """
-        调用 LLM（非流式）
+        非流式聊天
         
         Args:
-            provider: Provider 名称
             messages: 消息列表
+            provider: Provider 名称
             tools: 工具列表
-            stream: 是否流式
-            **kwargs: 其他参数
+            stream: 是否流式（此方法固定为 False）
         
         Returns:
-            响应结果
+            {"content": str, "usage": dict}
         """
-        if provider == "local":
-            return await self._call_local(messages, tools, stream, **kwargs)
-        else:
-            return await self._call_api(provider, messages, tools, stream, **kwargs)
-    
-    async def stream(
-        self,
-        provider: str,
-        messages: List[Dict],
-        tools: Optional[List[Dict]] = None,
-        **kwargs
-    ) -> AsyncGenerator[str, None]:
-        """
-        流式调用 LLM
+        # 加载 API Key
+        api_key = self._load_api_key(provider)
+        if not api_key:
+            raise ValueError(f"No API key configured for provider: {provider}")
         
-        Args:
-            provider: Provider 名称
-            messages: 消息列表
-            tools: 工具列表
-            **kwargs: 其他参数
+        # 构建请求
+        url = self.PROVIDER_URLS.get(provider)
+        if not url:
+            raise ValueError(f"Unknown provider: {provider}")
+        
+        model = self._get_model(provider)
+        headers = self._build_headers(api_key, provider)
+        
+        payload = {
+            "model": model,
+            "messages": messages,
+            "temperature": 0.7,
+            "stream": False,
+        }
+        
+        # 添加工具
+        if tools:
+            payload["tools"] = tools
+        
+        # 发送请求
+        response = await self.client.post(url, headers=headers, json=payload)
+        
+        if response.status_code != 200:
+            raise ValueError(f"API error {response.status_code}: {response.text[:500]}")
+        
+        data = response.json()
+        
+        # 解析响应
+        content = ""
+        usage = {}
+        
+        if "choices" in data and len(data["choices"]) > 0:
+            content = data["choices"][0].get("message", {}).get("content", "")
+        
+        if "usage" in data:
+            usage = data["usage"]
+        
+        return {"content": content, "usage": usage}
+    
+    async def stream_chat(
+        self,
+        messages: List[dict],
+        provider: str = "deepseek",
+        tools: List[dict] = None
+    ) -> AsyncGenerator[dict, None]:
+        """
+        流式聊天
         
         Yields:
-            流式响应块
+            {"type": "token", "content": str}
+            {"type": "tool_call", "name": str, "arguments": dict}
+            {"type": "tool_result", "name": str, "content": str}
+            {"type": "done", "full_content": str}
+            {"type": "error", "message": str}
         """
-        if provider == "local":
-            async for chunk in self._stream_local(messages, tools, **kwargs):
-                yield chunk
-        else:
-            async for chunk in self._stream_api(provider, messages, tools, **kwargs):
-                yield chunk
-    
-    async def _call_local(
-        self,
-        messages: List[Dict],
-        tools: Optional[List[Dict]] = None,
-        stream: bool = False,
-        **kwargs
-    ) -> Dict:
-        """调用本地模型"""
-        url = f"{settings.local_llm_base_url}/v1/chat/completions"
+        # 加载 API Key
+        api_key = self._load_api_key(provider)
+        if not api_key:
+            yield {"type": "error", "message": f"No API key configured for provider: {provider}"}
+            return
+        
+        # 构建请求
+        url = self.PROVIDER_URLS.get(provider)
+        if not url:
+            yield {"type": "error", "message": f"Unknown provider: {provider}"}
+            return
+        
+        model = self._get_model(provider)
+        headers = self._build_headers(api_key, provider)
         
         payload = {
-            "model": settings.local_llm_model,
+            "model": model,
             "messages": messages,
-            "stream": stream,
-            **kwargs
-        }
-        
-        if tools:
-            payload["tools"] = tools
-        
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
-            response = await client.post(url, json=payload)
-            response.raise_for_status()
-            return response.json()
-    
-    async def _stream_local(
-        self,
-        messages: List[Dict],
-        tools: Optional[List[Dict]] = None,
-        **kwargs
-    ) -> AsyncGenerator[str, None]:
-        """流式调用本地模型"""
-        url = f"{settings.local_llm_base_url}/v1/chat/completions"
-        
-        payload = {
-            "model": settings.local_llm_model,
-            "messages": messages,
+            "temperature": 0.7,
             "stream": True,
-            **kwargs
         }
         
+        # 添加工具
         if tools:
             payload["tools"] = tools
         
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
-            async with client.stream("POST", url, json=payload) as response:
-                response.raise_for_status()
-                async for line in response.aiter_lines():
-                    if line.startswith("data: "):
-                        yield line
-    
-    async def _call_api(
-        self,
-        provider: str,
-        messages: List[Dict],
-        tools: Optional[List[Dict]] = None,
-        stream: bool = False,
-        **kwargs
-    ) -> Dict:
-        """调用云端 API"""
-        if provider not in self.providers:
-            raise ValueError(f"Provider {provider} not configured")
-        
-        config = self.providers[provider]
-        url = f"{config['base_url']}/chat/completions"
-        
-        payload = {
-            "model": kwargs.get("model", self._get_default_model(provider)),
-            "messages": messages,
-            "stream": stream,
-            **kwargs
-        }
-        
-        if tools:
-            payload["tools"] = tools
-        
-        headers = {
-            "Authorization": f"Bearer {config['api_key']}",
-            "Content-Type": "application/json"
-        }
-        
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
-            response = await client.post(url, json=payload, headers=headers)
-            response.raise_for_status()
-            return response.json()
-    
-    async def _stream_api(
-        self,
-        provider: str,
-        messages: List[Dict],
-        tools: Optional[List[Dict]] = None,
-        **kwargs
-    ) -> AsyncGenerator[str, None]:
-        """流式调用云端 API"""
-        if provider not in self.providers:
-            raise ValueError(f"Provider {provider} not configured")
-        
-        config = self.providers[provider]
-        url = f"{config['base_url']}/chat/completions"
-        
-        payload = {
-            "model": kwargs.get("model", self._get_default_model(provider)),
-            "messages": messages,
-            "stream": True,
-            **kwargs
-        }
-        
-        if tools:
-            payload["tools"] = tools
-        
-        headers = {
-            "Authorization": f"Bearer {config['api_key']}",
-            "Content-Type": "application/json"
-        }
-        
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
-            async with client.stream("POST", url, json=payload, headers=headers) as response:
-                response.raise_for_status()
-                async for line in response.aiter_lines():
-                    if line.startswith("data: "):
-                        yield line
-    
-    def _get_default_model(self, provider: str) -> str:
-        """获取 Provider 的默认模型"""
-        defaults = {
-            "openai": "gpt-4o-mini",
-            "deepseek": "deepseek-chat",
-            "moonshot": "moonshot-v1-8k",
-            "zhipu": "glm-4-flash"
-        }
-        return defaults.get(provider, "gpt-4o-mini")
-    
-    def get_available_providers(self) -> List[str]:
-        """获取可用的 Provider 列表"""
-        return list(self.providers.keys())
+        # 发送流式请求
+        async with self.client.stream("POST", url, headers=headers, json=payload) as response:
+            if response.status_code != 200:
+                error_text = await response.aread()
+                yield {"type": "error", "message": f"API error {response.status_code}: {error_text[:500]}"}
+                return
+            
+            # 解析流式响应
+            full_content = ""
+            
+            async for line in response.aiter_lines():
+                if not line:
+                    continue
+                
+                if line.startswith("data: "):
+                    data_str = line[6:]
+                    
+                    if data_str == "[DONE]":
+                        break
+                    
+                    try:
+                        data = json.loads(data_str)
+                        
+                        if "choices" in data and len(data["choices"]) > 0:
+                            delta = data["choices"][0].get("delta", {})
+                            
+                            # 文本内容
+                            if "content" in delta and delta["content"]:
+                                content = delta["content"]
+                                full_content += content
+                                yield {"type": "token", "content": content}
+                            
+                            # 思考内容（DeepSeek V4 / Gemma 3）
+                            if "reasoning_content" in delta and delta["reasoning_content"]:
+                                yield {"type": "thinking", "content": delta["reasoning_content"]}
+                        
+                    except json.JSONDecodeError:
+                        continue
+            
+            # 发送完成事件
+            yield {"type": "done", "full_content": full_content}
+
+
+# 全局客户端实例
+_client: Optional[LLMClient] = None
+
+
+async def get_llm_client() -> LLMClient:
+    """获取 LLM 客户端实例（依赖注入）"""
+    global _client
+    if _client is None:
+        _client = LLMClient()
+    return _client
