@@ -101,7 +101,7 @@ async def health():
 
 # ========== 挂载路由模块（必须在静态文件路由之前）==========
 
-from src.omnia.routers import provider, chat, memory, graph, status
+from src.omnia.routers import provider, chat, memory, graph, status, workflow
 
 # Provider 管理
 app.include_router(provider.router, prefix="/api", tags=["provider"])
@@ -118,10 +118,8 @@ app.include_router(graph.router, prefix="/api", tags=["graph"])
 # 状态监控
 app.include_router(status.router, prefix="/api", tags=["status"])
 
-# 后续添加其他路由
-# from src.omnia.routers import workflow, feishu
-# app.include_router(workflow.router, prefix="/api", tags=["workflow"])
-# app.include_router(feishu.router, prefix="/webhook", tags=["feishu"])
+# 工作流
+app.include_router(workflow.router, prefix="/api", tags=["workflow"])
 
 
 # ========== 前端路由（必须放在最后）==========

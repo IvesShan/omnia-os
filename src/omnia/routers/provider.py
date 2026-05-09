@@ -42,6 +42,12 @@ class SetProviderResponse(BaseModel):
     provider: str
 
 
+class ProviderListResponse(BaseModel):
+    """兼容 Flask 前端的 Provider 列表响应"""
+    providers: list[ProviderInfo]
+    active: Optional[str] = None
+
+
 def _check_provider_configured(env_key: str) -> bool:
     """检查 Provider 是否已配置"""
     # 检查环境变量
@@ -115,9 +121,8 @@ def _detect_active_provider() -> str | None:
     return None
 
 
-@router.get("/providers", response_model=list[ProviderInfo])
-async def get_providers():
-    """获取可用的 Provider 列表"""
+def _collect_providers() -> tuple[list[ProviderInfo], str | None]:
+    """收集所有 Provider 并检测活跃的"""
     providers = []
     
     # 云端 Provider
@@ -135,12 +140,40 @@ async def get_providers():
     # 本地模型
     providers.extend(_load_local_models())
     
-    return providers
+    # 检测活跃的
+    active = _detect_active_provider()
+    
+    return providers, active
 
 
-@router.post("/provider", response_model=SetProviderResponse)
-async def set_provider(req: SetProviderRequest):
-    """设置当前活跃的 Provider"""
+# ========== 兼容前端的路由 ==========
+
+@router.get("/providers")
+async def get_providers() -> dict:
+    """
+    获取可用的 Provider 列表（兼容 Flask 前端格式）
+    
+    前端期望格式:
+    {
+        "providers": [...],
+        "active": "deepseek"
+    }
+    """
+    providers, active = _collect_providers()
+    
+    return {
+        "providers": [p.model_dump() for p in providers],
+        "active": active,
+    }
+
+
+@router.post("/providers")
+async def set_provider(req: SetProviderRequest) -> dict:
+    """
+    切换当前活跃的 Provider（兼容 Flask 前端格式）
+    
+    前端通过 POST /api/providers 发送 {"provider": "deepseek"}
+    """
     provider = req.provider
     
     # 允许 local-* 格式
@@ -151,7 +184,7 @@ async def set_provider(req: SetProviderRequest):
     # 本地模型：直接设置
     if provider == "local" or provider.startswith("local-"):
         settings.current_provider = provider
-        return SetProviderResponse(ok=True, provider=provider)
+        return {"ok": True, "provider": provider}
     
     # 云端模型：检查是否已配置
     env_key = {
@@ -161,14 +194,16 @@ async def set_provider(req: SetProviderRequest):
         "openai": "OPENAI_API_KEY",
         "xiaomi": "MIMO_API_KEY",
         "anthropic": "ANTHROPIC_API_KEY",
-    }[provider]
+    }.get(provider)
     
-    if not _check_provider_configured(env_key):
+    if not env_key or not _check_provider_configured(env_key):
         raise HTTPException(status_code=400, detail=f"Provider {provider} is not configured")
     
     settings.current_provider = provider
-    return SetProviderResponse(ok=True, provider=provider)
+    return {"ok": True, "provider": provider}
 
+
+# ========== 内部使用的路由（保留） ==========
 
 @router.get("/provider/current")
 async def get_current_provider():
