@@ -174,8 +174,42 @@ async def create_task(request: CreateTaskRequest):
     # 如果调度器正在运行，添加任务
     scheduler = get_scheduler()
     if scheduler and request.enabled:
-        # TODO: 实际添加到调度器
-        pass
+        # 创建 ScheduledTask 并添加到调度器
+        from core.orchestration.scheduler import ScheduledTask
+        
+        async def task_action():
+            if task_data["action_type"] == "http_callback":
+                import aiohttp
+                url = task_data["action_config"].get("url")
+                if url:
+                    async with aiohttp.ClientSession() as session:
+                        async with session.post(url, json=task_data["action_config"].get("payload", {})) as resp:
+                            return await resp.text()
+            elif task_data["action_type"] == "workflow":
+                from core.orchestration.workflow_engine import WorkflowEngine
+                engine = WorkflowEngine()
+                workflow_id = task_data["action_config"].get("workflow_id")
+                if workflow_id:
+                    return await engine.execute_workflow(workflow_id)
+            elif task_data["action_type"] == "script":
+                import subprocess
+                script = task_data["action_config"].get("script")
+                if script:
+                    result = subprocess.run(script, shell=True, capture_output=True, text=True)
+                    return result.stdout
+            return "completed"
+        
+        scheduled_task = ScheduledTask(
+            name=task_id,
+            action=task_action,
+            cron=request.cron,
+            interval_seconds=request.interval_seconds,
+            run_once=request.run_once,
+            run_at=request.run_at,
+            enabled=request.enabled,
+            max_retries=request.max_retries,
+        )
+        scheduler.add_task(scheduled_task)
     
     return TaskResponse(
         task_id=task_data["task_id"],
@@ -314,11 +348,22 @@ async def run_task_now(task_id: str):
     task["status"] = "running"
     task["last_run"] = datetime.now()
     
-    # TODO: 实际执行任务
-    # 根据 action_type 执行不同的操作
-    if task["action_type"] == "http_callback":
-        # 调用 HTTP 回调
-        pass
+    # 实际执行任务
+    scheduler = get_scheduler()
+    if scheduler:
+        scheduled_task = scheduler.get_task(task_id)
+        if scheduled_task:
+            try:
+                import asyncio
+                if asyncio.iscoroutinefunction(scheduled_task.action):
+                    result = await scheduled_task.action()
+                else:
+                    result = scheduled_task.action()
+                task["last_result"] = str(result) if result else "success"
+            except Exception as e:
+                task["last_result"] = f"error: {str(e)}"
+                task["status"] = "error"
+                raise
     elif task["action_type"] == "workflow":
         # 执行工作流
         pass
@@ -377,8 +422,8 @@ async def start_scheduler():
     if scheduler is None:
         raise HTTPException(status_code=500, detail="Failed to initialize scheduler")
     
-    # TODO: 实际启动调度器
-    # scheduler.start()
+    # 启动调度器
+    scheduler.start()
     
     return {"ok": True, "message": "Scheduler started"}
 
@@ -393,8 +438,8 @@ async def stop_scheduler():
     if scheduler is None:
         raise HTTPException(status_code=500, detail="Failed to initialize scheduler")
     
-    # TODO: 实际停止调度器
-    # scheduler.stop()
+    # 停止调度器
+    scheduler.stop()
     
     return {"ok": True, "message": "Scheduler stopped"}
 
