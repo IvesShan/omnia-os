@@ -50,6 +50,8 @@ class ChannelType(Enum):
     LARK = "lark"
 
 
+    WEBHOOK = "webhook"
+    WEBSOCKET = "websocket"
 @dataclass
 class MessageEvent:
     """消息事件"""

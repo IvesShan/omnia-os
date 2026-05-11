@@ -181,6 +181,7 @@ from src.omnia.routers import computer, interrupt, wake
 from src.omnia.routers import confirm, ide, model_status
 from src.omnia.routers import discuss, long_task, fts
 from src.omnia.routers import learner
+from src.omnia.routers import vector, plan, gateway
 
 # Provider 管理
 app.include_router(provider.router, prefix="/api", tags=["provider"])
@@ -231,6 +232,9 @@ app.include_router(skills.router, tags=["skills"])
 
 # AutoLearner 自动学习
 app.include_router(learner.router, tags=["learner"])
+app.include_router(vector.router, tags=["vector"])
+app.include_router(plan.router, tags=["plan"])
+app.include_router(gateway.router, tags=["gateway"])
 # Computer Controller 电脑控制
 app.include_router(computer.router, tags=["computer"])
 
