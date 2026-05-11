@@ -15,7 +15,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from core.config import OMNIA_HOME
+from src.omnia.config import settings
 
 
 class TaskComplexity(Enum):

@@ -9,7 +9,7 @@ import sqlite3
 
 from src.omnia.config import settings
 from src.omnia.dependencies import get_memory_palace
-from core.config import MEMORY_PALACE_DB
+# 使用 settings.memory_palace_db
 
 router = APIRouter()
 
@@ -46,8 +46,8 @@ class MemoryStatsResponse(BaseModel):
 def _memory_counts() -> dict:
     """获取记忆统计（直接查询数据库）"""
     counts = {}
-    if MEMORY_PALACE_DB.exists():
-        with sqlite3.connect(str(MEMORY_PALACE_DB)) as conn:
+    if settings.memory_palace_db.exists():
+        with sqlite3.connect(str(settings.memory_palace_db)) as conn:
             cursor = conn.cursor()
             for table in ["facts", "relations", "habits", "timeline", "conversation_logs"]:
                 try:

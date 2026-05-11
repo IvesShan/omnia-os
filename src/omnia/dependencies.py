@@ -25,9 +25,8 @@ async def get_memory_palace():
     
     if _memory_palace is None:
         from core.memory_palace.memory_palace import MemoryPalace
-        from core.config import MEMORY_PALACE_DB
         
-        _memory_palace = MemoryPalace(db_path=str(MEMORY_PALACE_DB))
+        _memory_palace = MemoryPalace(db_path=str(settings.memory_palace_db))
         _memory_palace.initialize()
     
     return _memory_palace

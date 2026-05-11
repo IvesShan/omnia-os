@@ -1,6 +1,6 @@
 """
 聊天核心路由
-负责：聊天、流式聊天、工具调用
+负责：聊天、流式聊天、工具调用、会话管理
 """
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import StreamingResponse
@@ -13,6 +13,12 @@ from src.omnia.models.chat import ChatRequest, ChatResponse
 from src.omnia.services.llm_client import LLMClient
 from src.omnia.config import settings
 from src.omnia.dependencies import get_llm_client
+from src.omnia.services.agent_engine import agent_engine
+from src.omnia.services.session_manager import (
+    get_session_manager,
+    load_recent_conversations,
+    merge_histories,
+)
 
 router = APIRouter()
 
@@ -20,10 +26,10 @@ router = APIRouter()
 def _detect_provider_from_env() -> str:
     """从环境变量检测 Provider"""
     model_mode = os.environ.get("OMNIA_MODEL_MODE", "cloud")
-    
+
     if model_mode == "local":
         return "local"
-    
+
     # 检查 .env 文件
     env_file = settings.project_root / ".env"
     if env_file.exists():
@@ -33,7 +39,7 @@ def _detect_provider_from_env() -> str:
                 continue
             if line.startswith("OMNIA_PROVIDER="):
                 return line.split("=", 1)[1].strip()
-    
+
     # 自动检测
     if os.environ.get("DEEPSEEK_API_KEY"):
         return "deepseek"
@@ -45,7 +51,7 @@ def _detect_provider_from_env() -> str:
         return "openai"
     elif os.environ.get("QIANFAN_API_KEY"):
         return "qianfan"
-    
+
     return "deepseek"  # 默认
 
 
@@ -56,35 +62,43 @@ async def chat(
 ):
     """
     聊天接口 - 非流式
-    返回完整的回复内容
-    
-    支持两种格式：
-    1. 简单格式：{"message": "你好"}
-    2. 完整格式：{"messages": [{"role": "user", "content": "你好"}]}
+    使用 Agent 引擎自动处理工具调用
+    自动管理会话和记录对话历史
     """
     # 获取消息列表
     messages = req.get_messages()
-    
+
     if not messages:
         raise HTTPException(status_code=400, detail="消息不能为空")
-    
+
     # 检测 Provider
     provider = req.provider or settings.current_provider or _detect_provider_from_env()
-    
+
+    # ===== 会话管理 =====
+    session_manager = get_session_manager()
+    session_id = session_manager.get_or_create_session(provider=provider)
+
+    # NOTE: 已禁用自动合并数据库历史，避免会话污染
+    # 前端负责管理历史消息，后端只处理当前请求的消息
+    pass
+
     try:
-        # 调用 LLM
-        result = await client.chat(
+        # ===== 使用 Agent 引擎处理工具调用（传入 session_id） =====
+        result = await agent_engine.process_with_tools(
+            llm_client=client,
             messages=messages,
             provider=provider,
-            tools=req.tools,
-            stream=False
+            stream=False,
+            session_id=session_id,  # 传入 session_id 用于自动记录
         )
-        
+
         return ChatResponse(
             ok=True,
             content=result.get("content", ""),
             provider=provider,
-            usage=result.get("usage")
+            usage=result.get("usage"),
+            tool_calls=result.get("tool_calls", 0),
+            rounds=result.get("rounds", 0),
         )
     except Exception as e:
         return ChatResponse(
@@ -100,26 +114,36 @@ async def chat_stream(
 ):
     """
     流式聊天接口 - SSE
-    返回 Server-Sent Events 流
+    使用 Agent 引擎自动处理工具调用
+    自动管理会话和记录对话历史
     """
     # 获取消息列表
     messages = req.get_messages()
-    
+
     if not messages:
         raise HTTPException(status_code=400, detail="消息不能为空")
-    
+
     # 检测 Provider
     provider = req.provider or settings.current_provider or _detect_provider_from_env()
-    
+
+    # ===== 会话管理 =====
+    session_manager = get_session_manager()
+    session_id = session_manager.get_or_create_session(provider=provider)
+
+    # NOTE: 已禁用自动合并数据库历史，避免会话污染
+    # 前端负责管理历史消息，后端只处理当前请求的消息
+    pass
+
     async def generate():
         """生成 SSE 事件流"""
         try:
-            async for event in client.stream_chat(
+            # ===== 使用 Agent 引擎的流式处理（传入 session_id） =====
+            async for event in agent_engine.process_stream_with_tools(
+                llm_client=client,
                 messages=messages,
                 provider=provider,
-                tools=req.tools
+                session_id=session_id,
             ):
-                # 格式化为 SSE
                 yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
         except Exception as e:
             error_event = {
@@ -127,41 +151,37 @@ async def chat_stream(
                 "message": f"Stream error: {str(e)}"
             }
             yield f"data: {json.dumps(error_event, ensure_ascii=False)}\n\n"
-            
+
             done_event = {"type": "done", "full_content": ""}
             yield f"data: {json.dumps(done_event, ensure_ascii=False)}\n\n"
-    
+
     return StreamingResponse(
         generate(),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",  # 禁用 Nginx 缓冲
+            "X-Accel-Buffering": "no",
         }
     )
 
 
 @router.post("/chat/gateway")
 async def chat_gateway(req: ChatRequest):
-    """
-    Gateway 模式聊天
-    通过 OpenClaw Gateway 处理
-    """
+    """Gateway 模式聊天"""
     messages = req.get_messages()
-    
+
     if not messages:
         raise HTTPException(status_code=400, detail="消息不能为空")
-    
-    # 检查是否启用 Gateway 模式
+
     use_gateway = os.environ.get("OMNIA_USE_GATEWAY", "false").lower() == "true"
-    
+
     if not use_gateway:
         raise HTTPException(status_code=400, detail="Gateway mode is not enabled")
-    
+
     try:
         from gateway.integration import handle_chat_unified
-        
+
         async def generate():
             for event in handle_chat_unified(
                 req.message,
@@ -169,7 +189,7 @@ async def chat_gateway(req: ChatRequest):
                 req.provider
             ):
                 yield event
-        
+
         return StreamingResponse(
             generate(),
             media_type="text/event-stream"

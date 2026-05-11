@@ -15,7 +15,7 @@ from typing import Generator, Dict
 from pathlib import Path
 
 
-from core.config import MEMORY_PALACE_DB
+from src.omnia.config import settings
 from omnia.wake import assemble_wake_prompt
 from omnia.tool_trigger import check_and_run
 from omnia.chat import _load_api_key, _build_model_config
@@ -102,7 +102,7 @@ def stream_chat(message: str, history: list = None, provider: str = None) -> Gen
     import uuid
     session_id = str(uuid.uuid4())
     try:
-        mp = MemoryPalace(db_path=str(MEMORY_PALACE_DB))
+        mp = MemoryPalace(db_path=str(settings.memory_palace_db))
         mp.initialize()
         mp.log_conversation(session_id, 0, "user", message)
     except Exception as e:
@@ -358,7 +358,7 @@ def _stream_chat_unified(
                 # 记录助手回复
                 if session_id and full_content:
                     try:
-                        mp = MemoryPalace(db_path=str(MEMORY_PALACE_DB))
+                        mp = MemoryPalace(db_path=str(settings.memory_palace_db))
                         mp.initialize()
                         mp.log_conversation(session_id, 1, "assistant", full_content)
                     except Exception as e:
@@ -372,7 +372,7 @@ def _stream_chat_unified(
                 # 记录助手回复
                 if session_id and full_content:
                     try:
-                        mp = MemoryPalace(db_path=str(MEMORY_PALACE_DB))
+                        mp = MemoryPalace(db_path=str(settings.memory_palace_db))
                         mp.initialize()
                         mp.log_conversation(session_id, 1, "assistant", full_content)
                     except Exception as e:
@@ -470,7 +470,7 @@ def _stream_chat_unified(
         # 记录中间步骤
         if session_id:
             try:
-                mp = MemoryPalace(db_path=str(MEMORY_PALACE_DB))
+                mp = MemoryPalace(db_path=str(settings.memory_palace_db))
                 mp.initialize()
                 mp.log_conversation(session_id, iteration, "assistant", f"[Tool calls executed: {len(tool_calls)} tools]")
             except Exception as e:

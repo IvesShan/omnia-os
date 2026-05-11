@@ -30,19 +30,22 @@ def main():
             # 进程不存在，继续启动
             PID_FILE.unlink(missing_ok=True)
 
-    # 选择 Python 环境
-    pytorch_python = Path.home() / "pytorch_env" / "bin" / "python3"
+    # 选择 Python 环境（优先系统 Python，因为它有 fastapi）
     omnia_venv_python = PROJECT_ROOT / ".venv" / "bin" / "python3"
     
-    if pytorch_python.exists():
-        python_exe = str(pytorch_python)
-        print("✓ 使用 pytorch_env")
+    # 测试系统 Python 是否有 fastapi
+    import importlib.util
+    fastapi_spec = importlib.util.find_spec("fastapi")
+    
+    if fastapi_spec:
+        python_exe = sys.executable
+        print(f"✓ 使用系统 Python ({python_exe})")
     elif omnia_venv_python.exists():
         python_exe = str(omnia_venv_python)
         print("✓ 使用 omnia venv")
     else:
         python_exe = sys.executable
-        print("⚠ 使用系统 Python")
+        print("⚠ 使用系统 Python (fastapi 可能未安装)")
 
     # 确保日志目录存在
     LOG_FILE.parent.mkdir(parents=True, exist_ok=True)

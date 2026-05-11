@@ -21,7 +21,13 @@ class Settings(BaseSettings):
     
     # 项目路径
     project_root: Path = Path(__file__).parent.parent.parent
+    
+    # Omnia 主目录（保持与旧版本一致）
     omnia_home: Path = Path.home() / ".omnia"
+    
+    # 数据库路径（使用旧的数据库位置）
+    memory_palace_db: Path = omnia_home / "memory_palace.db"
+    neural_graph_db: Path = omnia_home / "neural_graph.db"
     
     # 文件路径
     pending_conf_path: Path = omnia_home / "pending_confirmations.json"
@@ -33,7 +39,7 @@ class Settings(BaseSettings):
     
     # 服务配置
     host: str = "0.0.0.0"
-    port: int = 8000
+    port: int = 8765
     debug: bool = True
     
     # 飞书配置
@@ -59,6 +65,17 @@ class Settings(BaseSettings):
         super().__init__(**kwargs)
         # 确保目录存在
         self.omnia_home.mkdir(parents=True, exist_ok=True)
+        
+    # 兼容旧代码的属性别名
+    @property
+    def MEMORY_PALACE_DB(self) -> Path:
+        """兼容旧代码的别名"""
+        return self.memory_palace_db
+    
+    @property
+    def NEURAL_GRAPH_DB(self) -> Path:
+        """兼容旧代码的别名"""
+        return self.neural_graph_db
 
 
 # 全局单例

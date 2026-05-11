@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-from core.config import MEMORY_PALACE_DB, OMNIA_HOME
 import sys
 from pathlib import Path
 
@@ -32,10 +31,10 @@ def cmd_chat(args):
 
 def cmd_status(args):
     workspace_root = PROJECT_ROOT.parent
-    pid_file = OMNIA_HOME / "daemon.pid"
-    log_file = OMNIA_HOME / "daemon.log"
-    db_file = MEMORY_PALACE_DB
-    queue_file = OMNIA_HOME / "notifications.jsonl"
+    pid_file = settings.omnia_home / "daemon.pid"
+    log_file = settings.omnia_home / "daemon.log"
+    db_file = settings.memory_palace_db
+    queue_file = settings.omnia_home / "notifications.jsonl"
 
     print("=" * 60)
     print("Omnia Status")

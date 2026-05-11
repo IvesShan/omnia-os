@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-from core.config import OMNIA_HOME, MEMORY_PALACE_DB
 import sys
 from pathlib import Path
 from typing import List, Optional, Tuple
@@ -22,7 +21,7 @@ from core.context_manager import ContextManager
 
 
 def _load_ide_context(workspace_root: Path) -> Optional[str]:
-    ide_path = OMNIA_HOME / "ide_context.json"
+    ide_path = settings.omnia_home / "ide_context.json"
     if not ide_path.exists():
         return None
     try:
@@ -143,7 +142,7 @@ def assemble_wake_prompt(
         plan = up.plan(message)
 
     # 4. Memory Palace recall
-    db_path = MEMORY_PALACE_DB
+    db_path = settings.memory_palace_db
     mp = MemoryPalace(db_path)
     mp.initialize()
 
@@ -290,7 +289,7 @@ def assemble_wake_prompt(
         ))
     
     # Load last session context (NEW - 解决对话连续性问题)
-    context_manager = ContextManager(OMNIA_HOME)
+    context_manager = ContextManager(settings.omnia_home)
     last_context = context_manager.load_context()
     if last_context:
         context_parts = ["## 上次会话上下文"]

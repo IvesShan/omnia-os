@@ -17,7 +17,6 @@ from flask_cors import CORS
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
-from core.config import MEMORY_PALACE_DB, NEURAL_GRAPH_DB, OMNIA_HOME
 
 from core.actuator.agent_swarm import SwarmOrchestrator
 from core.actuator.tool_registry import (
@@ -40,7 +39,7 @@ from omnia.tool_trigger import check_and_run, should_force_tool_check
 
 WEB_DIR = PROJECT_ROOT / "web"
 WORKSPACE = PROJECT_ROOT  # Git repo is here, not parent
-PENDING_CONF_PATH = OMNIA_HOME / "pending_confirmations.json"
+PENDING_CONF_PATH = settings.omnia_home / "pending_confirmations.json"
 
 import atexit
 import threading
@@ -106,7 +105,7 @@ def _pop_confirmation(cid: str) -> dict | None:
 
 
 def _daemon_status() -> bool:
-    pid_file = OMNIA_HOME / "daemon.pid"
+    pid_file = settings.omnia_home / "daemon.pid"
     if pid_file.exists():
         try:
             os.kill(int(pid_file.read_text().strip()), 0)
@@ -117,7 +116,7 @@ def _daemon_status() -> bool:
 
 
 def _memory_counts() -> dict:
-    db_file = MEMORY_PALACE_DB
+    db_file = settings.memory_palace_db
     counts = {}
     if db_file.exists():
         import sqlite3
@@ -132,7 +131,7 @@ def _memory_counts() -> dict:
     return counts
 
 def _ide_context() -> dict | None:
-    ide_file = OMNIA_HOME / "ide_context.json"
+    ide_file = settings.omnia_home / "ide_context.json"
     if ide_file.exists():
         try:
             return json.loads(ide_file.read_text(encoding="utf-8"))
@@ -200,7 +199,7 @@ def _skills_summary() -> dict:
 
 
 def _notifications() -> list:
-    q = NotificationQueue(OMNIA_HOME / "notifications.jsonl")
+    q = NotificationQueue(settings.omnia_home / "notifications.jsonl")
     notes = q.pop_pending(limit=5, mark_popped=False)
     return [
         {
@@ -439,7 +438,7 @@ def create_app() -> Flask:
         if not data:
             return jsonify({"error": "No data"}), 400
         
-        ide_file = OMNIA_HOME / "ide_context.json"
+        ide_file = settings.omnia_home / "ide_context.json"
         ide_file.parent.mkdir(parents=True, exist_ok=True)
         
         try:

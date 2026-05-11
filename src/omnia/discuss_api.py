@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from core.config import OMNIA_HOME
+from src.omnia.config import settings
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -12,7 +12,7 @@ PROJECT_ROOT = Path(__file__).parent.parent.parent
 WORKSPACE = PROJECT_ROOT.parent
 
 # 讨论会话存储
-DISCUSSION_DIR = OMNIA_HOME / "discussions"
+DISCUSSION_DIR = settings.omnia_home / "discussions"
 
 
 def _ensure_discussion_dir():

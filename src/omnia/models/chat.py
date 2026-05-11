@@ -35,6 +35,8 @@ class ChatResponse(BaseModel):
     error: Optional[str] = None
     provider: Optional[str] = None
     usage: Optional[dict] = None
+    tool_calls: Optional[int] = Field(None, description="工具调用次数")
+    rounds: Optional[int] = Field(None, description="执行轮数")
 
 
 class StreamEvent(BaseModel):

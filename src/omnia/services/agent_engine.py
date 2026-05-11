@@ -1,0 +1,585 @@
+"""
+agent_engine.py — Agent 执行引擎（融合版）
+
+融合 Flask 版的可靠性能力 + FastAPI 的现代架构
+
+核心能力：
+1. 工具触发分析（tool_trigger）→ 判断是否需要工具
+2. 安全门（safety_gate）→ 风险分级和拦截
+3. 虚假声称检测（tool_call_validator）→ 防止 LLM 幻觉
+4. 智能终止（analyze_tool_results）→ 信息足够时停止循环
+5. 上下文保存（context_manager）→ 跨重启保持连续性
+6. 前置检查（check_and_run）→ git/status 等高频场景自动注入
+7. 流式 SSE 推送 → 实时 thinking/token/tool_call/tool_result/done
+"""
+
+import json
+import re
+from typing import List, Dict, Any, Optional, AsyncGenerator
+from pathlib import Path
+
+from src.omnia.services.tool_registry import tool_registry
+from src.omnia.services.safety_gate import check_tool_safety
+from src.omnia.services.tool_trigger import (
+    analyze_message,
+    get_tool_choice_for_provider,
+    get_suggested_tool_prompt,
+    check_and_run,
+    ToolTriggerResult,
+)
+from src.omnia.services.tool_call_validator import (
+    validate_tool_execution,
+    build_retry_prompt,
+    analyze_tool_results,
+)
+from src.omnia.services.context_manager import (
+    save_current_context,
+    load_last_context,
+    extract_topic,
+    extract_next_steps,
+)
+
+
+class AgentEngine:
+    """Agent 执行引擎 — 单例"""
+
+    _instance = None
+    _initialized = False
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+
+    def __init__(self):
+        if self._initialized:
+            return
+        self._initialized = True
+
+        # 最大工具调用轮数
+        self.max_tool_rounds = 50
+
+        # 是否启用工具注入
+        self.tool_injection_enabled = True
+
+        # 支持 API 级工具调用的 Provider
+        self.api_tool_providers = {"deepseek", "openai", "kimi", "xiaomi"}
+
+        # 工具执行步骤记录（用于智能终止分析）
+        self._steps: List[Dict] = []
+
+    def inject_system_prompt(self, messages: List[dict]) -> List[dict]:
+        """
+        将工具系统提示注入到 system message 中
+
+        包含：
+        - 工具 schema 列表
+        - 上次会话上下文（如果有）
+        """
+        if not self.tool_injection_enabled:
+            return messages
+
+        schemas = tool_registry.get_all_schemas()
+        if not schemas:
+            return messages
+
+        tool_prompt = tool_registry.get_system_prompt()
+
+        # 加载上次会话上下文
+        last_ctx = load_last_context()
+        if last_ctx:
+            ctx_summary = f"""
+
+## 上次会话上下文
+
+📅 时间: {last_ctx.timestamp}
+📌 主题: {last_ctx.topic}
+📝 摘要: {last_ctx.summary}
+"""
+            if last_ctx.next_steps:
+                ctx_summary += f"➡️ 下一步: {', '.join(last_ctx.next_steps[:3])}"
+            tool_prompt += ctx_summary
+
+        has_system = any(m.get("role") == "system" for m in messages)
+
+        if has_system:
+            new_messages = []
+            for m in messages:
+                if m.get("role") == "system":
+                    enhanced = {
+                        "role": "system",
+                        "content": m["content"] + "\n\n" + tool_prompt,
+                    }
+                    new_messages.append(enhanced)
+                else:
+                    new_messages.append(m)
+            return new_messages
+        else:
+            return [{"role": "system", "content": tool_prompt}] + messages
+
+    async def process_with_tools(
+        self,
+        llm_client,
+        messages: List[dict],
+        provider: str = "deepseek",
+        stream: bool = False,
+        session_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        非流式处理消息并自动执行工具调用
+        """
+        tool_calls_made = 0
+        rounds = 0
+
+        current_messages = self.inject_system_prompt(messages)
+
+        while rounds < self.max_tool_rounds:
+            rounds += 1
+
+            result = await llm_client.chat(
+                messages=current_messages,
+                provider=provider,
+                tools=tool_registry.get_all_schemas(),
+                stream=False,
+            )
+
+            content = result.get("content", "")
+            api_tool_calls = result.get("tool_calls", [])
+
+            tool_call = None
+            if api_tool_calls:
+                tool_call = api_tool_calls[0]
+            else:
+                tool_call = self._extract_text_tool_call(content)
+
+            if not tool_call:
+                # 虚假声称检测
+                validation = validate_tool_execution(
+                    response=content,
+                    tool_calls=[],
+                    tool_results=[],
+                    user_message=messages[-1].get("content", "") if messages else "",
+                )
+                if not validation["valid"] and validation["false_claim"]:
+                    current_messages.append({"role": "user", "content": validation["retry_hint"]})
+                    continue
+
+                return {
+                    "content": content,
+                    "tool_calls": tool_calls_made,
+                    "rounds": rounds,
+                    "usage": result.get("usage"),
+                }
+
+            # 安全检查
+            tool_name = tool_call.get("name", "")
+            tool_args = tool_call.get("arguments", {})
+            safety = check_tool_safety(tool_name, tool_args)
+
+            if not safety.allowed:
+                current_messages.append({
+                    "role": "tool",
+                    "content": f"❌ 安全拦截: {safety.reason}",
+                    "tool_call_id": tool_call.get("id", f"call_{rounds}"),
+                    "name": tool_name,
+                })
+                tool_calls_made += 1
+                continue
+
+            # 添加助手消息
+            assistant_msg = {
+                "role": "assistant",
+                "content": content or f"我需要调用工具 {tool_name}。",
+            }
+            rc = result.get("reasoning_content", "")
+            if rc:
+                assistant_msg["reasoning_content"] = rc
+            if api_tool_calls:
+                assistant_msg["tool_calls"] = [{
+                    "id": tool_call.get("id", f"call_{rounds}"),
+                    "type": "function",
+                    "function": {
+                        "name": tool_name,
+                        "arguments": json.dumps(tool_args, ensure_ascii=False),
+                    },
+                }]
+            current_messages.append(assistant_msg)
+
+            # 执行工具
+            try:
+                exec_result = await tool_registry.execute(tool_name, tool_args)
+                result_content = json.dumps(exec_result.get("result", exec_result), ensure_ascii=False)[:3000]
+                error = exec_result.get("error")
+
+                tool_result_msg = f"工具 [{tool_name}] 执行结果:\n"
+                if error:
+                    tool_result_msg += f"❌ 错误: {error}\n"
+                else:
+                    tool_result_msg += f"✅ 成功: {result_content}\n"
+
+                current_messages.append({
+                    "role": "tool",
+                    "content": tool_result_msg,
+                    "tool_call_id": tool_call.get("id", f"call_{rounds}"),
+                    "name": tool_name,
+                })
+
+                tool_calls_made += 1
+
+            except Exception as e:
+                current_messages.append({
+                    "role": "tool",
+                    "content": f"工具 [{tool_name}] 执行异常: {str(e)}",
+                    "tool_call_id": tool_call.get("id", f"call_{rounds}"),
+                    "name": tool_name,
+                })
+
+        return {
+            "content": f"工具调用已达到最大轮数限制（{self.max_tool_rounds}轮）。",
+            "tool_calls": tool_calls_made,
+            "rounds": rounds,
+        }
+
+    async def process_stream_with_tools(
+        self,
+        llm_client,
+        messages: List[dict],
+        provider: str = "deepseek",
+        session_id: Optional[str] = None,
+    ) -> AsyncGenerator[dict, None]:
+        """
+        流式处理消息并自动执行工具调用
+
+        融合了 Flask 版的：
+        - 工具触发分析（tool_trigger）
+        - 前置检查（check_and_run）
+        - 安全门（safety_gate）
+        - 虚假声称检测（tool_call_validator）
+        - 智能终止（analyze_tool_results）
+        - 上下文保存（context_manager）
+        """
+        tool_calls_made = 0
+        rounds = 0
+        total_tokens = 0
+        self._steps = []
+        original_user_message = ""
+
+        # 提取用户原始消息
+        for m in reversed(messages):
+            if m.get("role") == "user":
+                original_user_message = m.get("content", "")
+                break
+
+        # ═══ 1. 工具触发分析 ═══
+        last_assistant_msg = ""
+        for m in reversed(messages):
+            if m.get("role") == "assistant":
+                last_assistant_msg = m.get("content", "")
+                break
+
+        trigger_result = analyze_message(original_user_message, last_assistant_msg, messages)
+
+        # ═══ 2. 前置检查 ═══
+        preroll_result = check_and_run(original_user_message)
+        if preroll_result:
+            yield {"type": "preroll", "content": preroll_result}
+
+        # ═══ 3. 注入工具提示 ═══
+        if trigger_result.should_trigger and provider.lower() not in {"kimi", "openai", "anthropic"}:
+            tool_hint = get_suggested_tool_prompt(trigger_result)
+            if tool_hint:
+                # 注入到最后一条用户消息中
+                for i in range(len(messages) - 1, -1, -1):
+                    if messages[i].get("role") == "user":
+                        messages[i] = {
+                            "role": "user",
+                            "content": messages[i]["content"] + "\n" + tool_hint,
+                        }
+                        break
+
+        # ═══ 4. 注入系统提示（含工具 schema + 上下文） ═══
+        current_messages = self.inject_system_prompt(messages)
+
+        # ═══ 5. 工具调用循环 ═══
+        while rounds < self.max_tool_rounds:
+            rounds += 1
+
+            full_content = ""
+            pending_tool_calls = []
+            has_api_tool_call = False
+            round_usage = {}
+
+            # 决定 tool_choice
+            tool_choice = get_tool_choice_for_provider(trigger_result, provider) if trigger_result.should_trigger else None
+
+            # 流式调用 LLM
+            async for event in llm_client.stream_chat(
+                messages=current_messages,
+                provider=provider,
+                tools=tool_registry.get_all_schemas(),
+            ):
+                event_type = event.get("type")
+
+                if event_type == "token":
+                    full_content += event.get("content", "")
+                    yield event
+
+                elif event_type == "thinking":
+                    yield event
+
+                elif event_type == "tool_call":
+                    pending_tool_calls.append(event)
+                    has_api_tool_call = True
+                    yield event
+
+                elif event_type == "tool_call_end":
+                    pending_tool_calls = event.get("tool_calls", [])
+                    has_api_tool_call = True
+                    # ★ 关键：将每个工具调用作为 tool_call 事件 yield 给前端
+                    for tc in pending_tool_calls:
+                        tc_name = tc.get("name", "")
+                        tc_args = tc.get("arguments", {})
+                        yield {
+                            "type": "tool_call",
+                            "name": tc_name,
+                            "arguments": tc_args,
+                            "id": tc.get("id", ""),
+                        }
+
+                elif event_type == "done":
+                    full_content = event.get("full_content", full_content)
+                    round_usage = event.get("usage", {})
+
+                elif event_type == "error":
+                    yield event
+                    return
+
+            # 累计 token
+            if round_usage:
+                total_tokens += round_usage.get("total_tokens", 0)
+
+            # 决定工具调用
+            tool_call = None
+
+            if has_api_tool_call and pending_tool_calls:
+                tool_call = pending_tool_calls[0]
+                if isinstance(tool_call, dict):
+                    if "name" not in tool_call and "function" in tool_call:
+                        func = tool_call.get("function", {})
+                        tool_call = {
+                            "name": func.get("name", ""),
+                            "arguments": func.get("arguments", {}),
+                            "id": tool_call.get("id", f"call_{rounds}"),
+                        }
+
+            if not tool_call:
+                text_tc = self._extract_text_tool_call(full_content)
+                if text_tc:
+                    tool_call = text_tc
+
+            if not tool_call:
+                # ═══ 没有工具调用 ═══
+
+                # 虚假声称检测
+                validation = validate_tool_execution(
+                    response=full_content,
+                    tool_calls=[],
+                    tool_results=[],
+                    user_message=original_user_message,
+                )
+
+                if not validation["valid"] and validation["false_claim"]:
+                    yield {"type": "validation_failed", "reason": validation["reason"]}
+                    # 注入重试提示
+                    current_messages.append({"role": "user", "content": validation["retry_hint"]})
+                    # 强制下一轮触发
+                    trigger_result = ToolTriggerResult(
+                        should_trigger=True,
+                        trigger_type="forced_retry",
+                        confidence=1.0,
+                        suggested_tools=[],
+                    )
+                    continue
+
+                # 保存上下文
+                try:
+                    save_current_context(
+                        topic=extract_topic(original_user_message),
+                        summary=full_content[:200] if full_content else "",
+                        next_steps=extract_next_steps(full_content),
+                    )
+                except Exception as e:
+                    print(f"[AgentEngine] Failed to save context: {e}")
+
+                yield {
+                    "type": "done",
+                    "full_content": full_content,
+                    "show_summary": tool_calls_made > 0,
+                    "stats": {
+                        "total_tokens_used": total_tokens,
+                        "rounds_executed": rounds,
+                        "tools_called": tool_calls_made,
+                        "trigger_type": trigger_result.trigger_type,
+                    },
+                }
+                return
+
+            # ═══ 有工具调用 ═══
+            tool_name = tool_call.get("name", "")
+            tool_args = tool_call.get("arguments", {})
+
+            # ═══ 6. 安全门检查 ═══
+            safety = check_tool_safety(tool_name, tool_args)
+
+            if not safety.allowed:
+                # 被安全门拦截
+                yield {
+                    "type": "tool_error",
+                    "name": tool_name,
+                    "content": f"❌ 安全拦截: {safety.reason}",
+                    "safety_level": safety.level,
+                }
+                current_messages.append({
+                    "role": "tool",
+                    "content": f"❌ 安全拦截: {safety.reason}",
+                    "tool_call_id": tool_call.get("id", f"call_{rounds}"),
+                    "name": tool_name,
+                })
+                tool_calls_made += 1
+                continue
+
+            if safety.requires_confirm:
+                # 需要确认的操作（目前自动放行，未来可加前端确认流程）
+                yield {
+                    "type": "safety_warning",
+                    "name": tool_name,
+                    "level": safety.level,
+                    "reason": safety.reason,
+                }
+
+            # 添加助手消息
+            assistant_msg = {
+                "role": "assistant",
+                "content": full_content or f"我需要调用工具 {tool_name}。",
+            }
+            if has_api_tool_call:
+                assistant_msg["tool_calls"] = [{
+                    "id": tool_call.get("id", f"call_{rounds}"),
+                    "type": "function",
+                    "function": {
+                        "name": tool_name,
+                        "arguments": json.dumps(tool_args, ensure_ascii=False),
+                    },
+                }]
+            current_messages.append(assistant_msg)
+
+            # 执行工具
+            try:
+                exec_result = await tool_registry.execute(tool_name, tool_args)
+                result_content = json.dumps(
+                    exec_result.get("result", exec_result), ensure_ascii=False
+                )[:3000]
+                error = exec_result.get("error")
+
+                if error:
+                    error_msg = f"工具 [{tool_name}] 执行失败: {error}"
+                    yield {"type": "tool_error", "name": tool_name, "content": error_msg}
+                    current_messages.append({
+                        "role": "tool",
+                        "content": error_msg,
+                        "tool_call_id": tool_call.get("id", f"call_{rounds}"),
+                        "name": tool_name,
+                    })
+
+                    # 记录步骤
+                    self._steps.append({
+                        "tool": tool_name,
+                        "arguments": tool_args,
+                        "result_summary": f"ERROR: {error}",
+                    })
+                else:
+                    success_msg = f"✅ {result_content}"
+                    yield {"type": "tool_result", "name": tool_name, "content": success_msg}
+                    current_messages.append({
+                        "role": "tool",
+                        "content": success_msg,
+                        "tool_call_id": tool_call.get("id", f"call_{rounds}"),
+                        "name": tool_name,
+                    })
+
+                    # 记录步骤
+                    self._steps.append({
+                        "tool": tool_name,
+                        "arguments": tool_args,
+                        "result_summary": result_content[:500],
+                    })
+
+                tool_calls_made += 1
+
+            except Exception as e:
+                error_msg = f"工具 [{tool_name}] 执行异常: {str(e)}"
+                yield {"type": "tool_error", "name": tool_name, "content": error_msg}
+                current_messages.append({
+                    "role": "tool",
+                    "content": error_msg,
+                    "tool_call_id": tool_call.get("id", f"call_{rounds}"),
+                    "name": tool_name,
+                })
+
+
+        # 超轮数限制
+        yield {
+            "type": "done",
+            "full_content": "工具调用已达到最大轮数限制。",
+            "show_summary": tool_calls_made > 0,
+            "stats": {
+                "total_tokens_used": total_tokens,
+                "rounds_executed": rounds,
+                "tools_called": tool_calls_made,
+            },
+        }
+
+    def _extract_text_tool_call(self, content: str) -> Optional[Dict[str, Any]]:
+        """
+        从 LLM 回复文本中提取工具调用（备用方案）
+
+        当 LLM 不支持 API 级 tool_calls 时，
+        尝试从文本中解析 JSON 格式的工具调用。
+        """
+        if not content:
+            return None
+
+        # 格式 1: {"tool": "xxx", "args": {...}}
+        patterns = [
+            r'\{\s*"tool"\s*:\s*"([^"]+)"\s*,\s*"args"\s*:\s*(\{.*?\})\s*\}',
+            r'\{\s*"name"\s*:\s*"([^"]+)"\s*,\s*"arguments"\s*:\s*(\{.*?\})\s*\}',
+        ]
+
+        for pattern in patterns:
+            match = re.search(pattern, content, re.DOTALL)
+            if match:
+                name = match.group(1)
+                try:
+                    args = json.loads(match.group(2))
+                    return {"name": name, "arguments": args}
+                except json.JSONDecodeError:
+                    continue
+
+        # 格式 2: Markdown 代码块中的 JSON
+        json_block_pattern = r'```(?:json)?\s*\n?\{(.*?)\}\n?\s*```'
+        match = re.search(json_block_pattern, content, re.DOTALL)
+        if match:
+            try:
+                data = json.loads("{" + match.group(1) + "}")
+                name = data.get("tool") or data.get("name")
+                args = data.get("args") or data.get("arguments") or {}
+                if name:
+                    return {"name": name, "arguments": args}
+            except (json.JSONDecodeError, KeyError):
+                pass
+
+        return None
+
+
+# 全局单例
+agent_engine = AgentEngine()

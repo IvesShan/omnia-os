@@ -765,7 +765,7 @@ async function sendMessage() {
     const response = await fetch(`${API_BASE}/api/chat/stream`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: text, history: history }),
+      body: JSON.stringify({ message: text, history: history, provider: currentApiProvider }),
       signal: window.currentAbortController?.signal,
     });
 

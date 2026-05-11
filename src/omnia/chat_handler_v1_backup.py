@@ -4,7 +4,6 @@ from __future__ import annotations
 # 新增：神经图谱上下文增强 + 会话历史自动加载
 
 import json
-from core.config import MEMORY_PALACE_DB, OMNIA_HOME
 from typing import Any
 
 def should_require_tool(user_message: str, provider: str = "deepseek") -> str | None:
@@ -90,7 +89,7 @@ def handle_chat(message: str, history: list, api_key: str, provider: str, system
     session_id = session_manager.get_or_create_session()
     
     # 初始化 MemoryPalace（带 Neural Graph Hook）
-    memory_db = MEMORY_PALACE_DB
+    memory_db = settings.memory_palace_db
     
     # 初始化 NeuralGraphUpdater 并设置 hook
     try:
@@ -114,7 +113,7 @@ def handle_chat(message: str, history: list, api_key: str, provider: str, system
         print(f"[Chat] History merged: {len(history)} messages")
     
     # ========== 加载上次上下文（NEW）==========
-    context_manager = ContextManager(OMNIA_HOME)
+    context_manager = ContextManager(settings.omnia_home)
     last_context = context_manager.load_context()
     
     if last_context:

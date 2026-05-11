@@ -7,7 +7,6 @@ from __future__ import annotations
 # 4. 增强错误恢复
 
 import json
-from core.config import MEMORY_PALACE_DB, OMNIA_HOME
 from typing import Any, List, Dict, Optional
 import re
 
@@ -160,7 +159,7 @@ def handle_chat(
     session_manager = get_session_manager()
     session_id = session_manager.get_or_create_session()
     
-    memory_db = MEMORY_PALACE_DB
+    memory_db = settings.memory_palace_db
     
     try:
         graph_updater = NeuralGraphUpdater()
@@ -177,7 +176,7 @@ def handle_chat(
         history = merge_histories(history, db_history, max_total=80)
         print(f"[Chat] History merged: {len(history)} messages")
     
-    context_manager = ContextManager(OMNIA_HOME)
+    context_manager = ContextManager(settings.omnia_home)
     last_context = context_manager.load_context()
     
     # ========== 触发 Hooks ==========
