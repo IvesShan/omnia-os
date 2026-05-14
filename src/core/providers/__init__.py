@@ -200,6 +200,24 @@ MODEL_REGISTRY: dict[str, ModelConfig] = {
         supports_tools=True,
         base_url="https://api.deepseek.com/v1",
     ),
+    "deepseek/deepseek-v4-pro": ModelConfig(
+        provider=ProviderType.DEEPSEEK,
+        model_id="deepseek-v4-pro",
+        display_name="DeepSeek V4 Pro",
+        context_window=128_000,
+        max_output=32_768,
+        supports_tools=True,
+        base_url="https://api.deepseek.com/v1",
+    ),
+    "deepseek/deepseek-v4-flash": ModelConfig(
+        provider=ProviderType.DEEPSEEK,
+        model_id="deepseek-v4-flash",
+        display_name="DeepSeek V4 Flash",
+        context_window=128_000,
+        max_output=32_768,
+        supports_tools=True,
+        base_url="https://api.deepseek.com/v1",
+    ),
     
     # === Xiaomi MiMo (Token Plan + 计费 API) ===
     "xiaomi/mimo-v2.5-pro": ModelConfig(

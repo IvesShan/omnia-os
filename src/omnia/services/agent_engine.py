@@ -39,6 +39,7 @@ from src.omnia.services.context_manager import (
     extract_next_steps,
 )
 
+from src.omnia.interrupt_manager import check_interrupt
 
 class AgentEngine:
     """Agent 执行引擎 — 单例"""
@@ -57,7 +58,7 @@ class AgentEngine:
         self._initialized = True
 
         # 最大工具调用轮数
-        self.max_tool_rounds = 50
+        self.max_tool_rounds = 200
 
         # 是否启用工具注入
         self.tool_injection_enabled = True
@@ -135,6 +136,15 @@ class AgentEngine:
 
         while rounds < self.max_tool_rounds:
             rounds += 1
+            
+            # 检查用户是否请求中断
+            if check_interrupt():
+                return {
+                    "content": "任务已被用户中断。",
+                    "tool_calls": tool_calls_made,
+                    "rounds": rounds,
+                    "interrupted": True,
+                }
 
             result = await llm_client.chat(
                 messages=current_messages,
@@ -194,6 +204,12 @@ class AgentEngine:
             rc = result.get("reasoning_content", "")
             if rc:
                 assistant_msg["reasoning_content"] = rc
+                if not hasattr(self, '_thinking_mode_active'):
+                    self._thinking_mode_active = False
+                self._thinking_mode_active = True  # 思考模式已激活
+            elif hasattr(self, '_thinking_mode_active') and self._thinking_mode_active:
+                # 思考模式已激活，但本轮没有 reasoning_content，必须传回空字符串
+                assistant_msg["reasoning_content"] = ""
             if api_tool_calls:
                 assistant_msg["tool_calls"] = [{
                     "id": tool_call.get("id", f"call_{rounds}"),
@@ -235,9 +251,10 @@ class AgentEngine:
                 })
 
         return {
-            "content": f"工具调用已达到最大轮数限制（{self.max_tool_rounds}轮）。",
+            "content": f"已执行 {self.max_tool_rounds} 轮工具调用。任务已暂停，发送'继续'以恢复执行。",
             "tool_calls": tool_calls_made,
             "rounds": rounds,
+            "paused": True,
         }
 
     async def process_stream_with_tools(
@@ -303,6 +320,15 @@ class AgentEngine:
         # ═══ 5. 工具调用循环 ═══
         while rounds < self.max_tool_rounds:
             rounds += 1
+            
+            # 检查用户是否请求中断
+            if check_interrupt():
+                yield {
+                    "content": "任务已被用户中断。",
+                    "tool_calls": tool_calls_made,
+                    "rounds": rounds,
+                    "interrupted": True,
+                }
 
             full_content = ""
             pending_tool_calls = []
@@ -349,6 +375,15 @@ class AgentEngine:
                 elif event_type == "done":
                     full_content = event.get("full_content", full_content)
                     round_usage = event.get("usage", {})
+                    # Extract reasoning_content for multi-round tool calls
+                    if not hasattr(self, '_reasoning_content'):
+                        self._reasoning_content = ""
+                    if not hasattr(self, '_thinking_mode_active'):
+                        self._thinking_mode_active = False
+                    rc = event.get("reasoning_content", "")
+                    if rc:
+                        self._reasoning_content = rc
+                        self._thinking_mode_active = True  # 思考模式已激活
 
                 elif event_type == "error":
                     yield event
@@ -462,6 +497,14 @@ class AgentEngine:
                 "role": "assistant",
                 "content": full_content or f"我需要调用工具 {tool_name}。",
             }
+            # Pass reasoning_content back to API for thinking mode (MiMo/DeepSeek)
+            # 一旦进入思考模式，所有后续 assistant 消息都必须包含 reasoning_content 字段
+            if hasattr(self, '_reasoning_content') and self._reasoning_content:
+                assistant_msg["reasoning_content"] = self._reasoning_content
+                self._reasoning_content = ""  # Clear after use
+            elif hasattr(self, '_thinking_mode_active') and self._thinking_mode_active:
+                # 思考模式已激活，但本轮没有 reasoning_content，必须传回空字符串
+                assistant_msg["reasoning_content"] = ""
             if has_api_tool_call:
                 assistant_msg["tool_calls"] = [{
                     "id": tool_call.get("id", f"call_{rounds}"),

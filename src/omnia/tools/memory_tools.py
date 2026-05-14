@@ -9,6 +9,24 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 
 
+def _clean_item(item: Dict[str, Any]) -> Dict[str, Any]:
+    """清理字典中的 bytes 类型字段，使其可 JSON 序列化"""
+    cleaned = {}
+    for key, value in item.items():
+        if isinstance(value, bytes):
+            # 跳过 embedding/blob 字段
+            continue
+        elif isinstance(value, dict):
+            cleaned[key] = _clean_item(value)
+        elif isinstance(value, list):
+            cleaned[key] = [
+                _clean_item(v) if isinstance(v, dict) else v for v in value
+            ]
+        else:
+            cleaned[key] = value
+    return cleaned
+
+
 class MemoryTools:
     """记忆系统工具集"""
 
@@ -84,7 +102,7 @@ class MemoryTools:
         elif name == "memory_stats":
             return await self._memory_stats()
         else:
-            return {"error": f"Unknown memory tool: {name}"}
+            return {"error": f"未知的记忆工具: {name}"}
 
     async def _query_memory(self, query: str) -> Dict[str, Any]:
         """查询记忆"""
@@ -95,12 +113,22 @@ class MemoryTools:
             mp = MemoryPalace(db_path=str(settings.memory_palace_db))
             mp.initialize()
             
-            results = mp.search(query, top_k=5)
+            results = mp.search_all_semantic(query, top_k=5)
+            
+            # 展平结果并添加层信息
+            flat_results = []
+            for layer, items in results.items():
+                for item, score in items:
+                    flat_results.append({
+                        "layer": layer,
+                        "content": _clean_item(item),
+                        "score": round(score, 4)
+                    })
             
             return {
                 "query": query,
-                "results": results,
-                "count": len(results)
+                "results": flat_results,
+                "count": len(flat_results)
             }
         except ImportError:
             return {"error": "记忆系统不可用: MemoryPalace 模块未找到", "results": []}

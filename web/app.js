@@ -516,6 +516,12 @@ function appendUserWithImage(text, imageData) {
 
 let typingEl = null;
 function showTyping(message = "正在思考…") {
+  // 显示中止按钮
+  const stopBtnEl = document.getElementById('stop-btn');
+  const sendBtnEl = document.getElementById('send-btn');
+  if (stopBtnEl) stopBtnEl.style.display = 'flex';
+  if (sendBtnEl) sendBtnEl.style.display = 'none';
+  
   typingEl = document.createElement('div');
   typingEl.className = 'msg omnia thinking-indicator';
   typingEl.innerHTML = `
@@ -536,6 +542,12 @@ function updateTypingStatus(message) {
 }
 
 function removeTyping() {
+  // 隐藏中止按钮
+  const stopBtnEl = document.getElementById('stop-btn');
+  const sendBtnEl = document.getElementById('send-btn');
+  if (stopBtnEl) stopBtnEl.style.display = 'none';
+  if (sendBtnEl) sendBtnEl.style.display = 'flex';
+  
   if (typingEl) {
     typingEl.remove();
     typingEl = null;
@@ -761,6 +773,7 @@ async function sendMessage() {
   }));
 
   // 使用 SSE 流式端点
+  let reader = null;
   try {
     const response = await fetch(`${API_BASE}/api/chat/stream`, {
       method: 'POST',
@@ -773,7 +786,7 @@ async function sendMessage() {
       throw new Error(`HTTP ${response.status}`);
     }
 
-    const reader = response.body.getReader();
+    reader = response.body.getReader();
     const decoder = new TextDecoder();
     let currentContent = '';
     let omniaMsg = null;
@@ -922,6 +935,15 @@ async function sendMessage() {
     removeTyping();
     appendOmnia(`[网络错误] ${err.message}`);
   } finally {
+    // 关闭 SSE 连接，防止连接泄漏
+    try {
+      if (reader) {
+        reader.cancel();
+        reader.releaseLock();
+      }
+    } catch (e) {
+      console.error('[Stream] Error closing reader:', e);
+    }
     composer.disabled = false;
     sendBtn.disabled = false;
     attachBtn.disabled = false;
@@ -1742,24 +1764,46 @@ async function loadApiProviders() {
 }
 
 function getProviderName(id) {
+  // 空值检查
+  if (!id) return "未选择";
+  
   // 本地模型特殊处理
-  if (id.startsWith('local-')) {
-    return id.replace('local-', '本地: ');
+  if (id.startsWith("local-")) {
+    return id.replace("local-", "本地: ");
   }
-  if (id === 'local') {
-    return '本地 GPU';
+  if (id === "local") {
+    return "本地 GPU";
   }
   
   const names = {
-    deepseek: 'DeepSeek',
-    qianfan: '百度千帆',
-    kimi: 'Moonshot',
-    openai: 'OpenAI',
-    xiaomi: '小米 MiMo',
-    anthropic: 'Anthropic'
+    deepseek: "DeepSeek",
+    qianfan: "百度千帆",
+    kimi: "Moonshot",
+    openai: "OpenAI",
+    xiaomi: "小米 MiMo",
+    anthropic: "Anthropic"
   };
   return names[id] || id;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 async function selectProvider(providerId, configured) {
   if (!configured) {
@@ -2115,19 +2159,31 @@ function showStopButton(show) {
 
 // 中止按钮点击事件
 if (stopBtn) {
-  stopBtn.addEventListener('click', () => {
+  stopBtn.addEventListener('click', async () => {
     if (window.currentAbortController) {
       console.log('[中止] 用户点击中止按钮');
       window.currentAbortController.abort();
       showStopButton(false);
       removeTyping();
       
+      // 同时通知后端中断任务
+      try {
+        await fetch(`${API_BASE}/api/interrupt/set`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reason: 'user_request' })
+        });
+        console.log('[中止] 后端中断信号已发送');
+      } catch (e) {
+        console.error('[中止] 后端中断信号发送失败:', e);
+      }
+      
       // 在消息中添加中止提示
       const messages = document.getElementById('messages');
       if (messages) {
         const abortMsg = document.createElement('div');
         abortMsg.className = 'message omnia';
-        abortMsg.innerHTML = '<div class="bubble"><p style="color: #f59e0b;">⚠️ 思考已中止</p></div>';
+        abortMsg.innerHTML = '<div class="bubble"><p style="color: #f59e0b;">⚠️ 任务已中止</p></div>';
         messages.appendChild(abortMsg);
         scrollToBottom();
       }
@@ -2135,20 +2191,6 @@ if (stopBtn) {
   });
 }
 
-// 监控流式状态
-const originalShowTyping = showTyping;
-showTyping = function(text) {
-  showStopButton(true);
-  return originalShowTyping(text);
-};
-
-const originalRemoveTyping = removeTyping;
-removeTyping = function() {
-  showStopButton(false);
-  return originalRemoveTyping();
-};
-
-console.log('[中止按钮] 已初始化');
 
 // =========================================
 

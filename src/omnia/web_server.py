@@ -15,8 +15,19 @@ from pathlib import Path
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 
+# Load .env file
+try:
+    from dotenv import load_dotenv
+except ImportError:
+    # dotenv not installed, try manual loading
+    def load_dotenv(*args, **kwargs):
+        pass
+
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
+
+# Load environment variables from .env file
+load_dotenv(PROJECT_ROOT / ".env")
 
 from core.actuator.agent_swarm import SwarmOrchestrator
 from core.actuator.tool_registry import (
@@ -54,8 +65,8 @@ def _cleanup_mcp():
 
 atexit.register(_cleanup_mcp)
 
-# API Provider selection — initialized to None, set dynamically by env or user choice
-_current_provider = None
+# API Provider selection — reads OMNIA_PROVIDER from .env on startup, or set dynamically by user choice
+_current_provider = os.environ.get("OMNIA_PROVIDER") or None
 
 
 
@@ -247,13 +258,13 @@ def _env_snapshot() -> dict:
     # 确定当前使用的模型
     global _current_provider
     
-    # Provider 和模型映射
+    # Provider 和模型映射 (顺序需与 /api/providers 一致)
     provider_models = {
+        "xiaomi": ("MIMO_MODEL", "mimo-v2.5-pro"),
         "deepseek": ("DEEPSEEK_MODEL", "deepseek-v4-flash"),
         "qianfan": ("QIANFAN_MODEL", "qianfan-code-latest"),
         "kimi": ("MOONSHOT_MODEL", "K2.6-code-preview"),
         "openai": ("OPENAI_MODEL", "gpt-4o"),
-        "xiaomi": ("MIMO_MODEL", "mimo-v2.5-pro"),
         "anthropic": ("ANTHROPIC_MODEL", "claude-3-5-sonnet-20241022"),
     }
     
@@ -274,11 +285,11 @@ def _env_snapshot() -> dict:
         
         # Provider → API key env var mapping (handles kimi's MOONSHOT_API_KEY)
         api_key_env_map = {
+            "xiaomi": ("MIMO_API_KEY", "MIMO_API_KEY"),
             "deepseek": ("DEEPSEEK_API_KEY", "DEEPSEEK_ACCESS_KEY"),
             "qianfan": ("QIANFAN_API_KEY", "QIANFAN_ACCESS_KEY"),
             "kimi": ("MOONSHOT_API_KEY", "MOONSHOT_API_KEY"),
             "openai": ("OPENAI_API_KEY", "OPENAI_API_KEY"),
-            "xiaomi": ("MIMO_API_KEY", "MIMO_API_KEY"),
             "anthropic": ("ANTHROPIC_API_KEY", "ANTHROPIC_API_KEY"),
         }
         

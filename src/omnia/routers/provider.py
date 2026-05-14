@@ -15,7 +15,7 @@ router = APIRouter()
 # Provider 配置映射
 PROVIDER_CONFIG = {
     "xiaomi": ("MIMO_API_KEY", "小米 MiMo", "mimo-v2.5-pro"),
-    "deepseek": ("DEEPSEEK_API_KEY", "DeepSeek", "deepseek-chat"),
+    "deepseek": ("DEEPSEEK_API_KEY", "DeepSeek", "deepseek-v4-pro"),
     "qianfan": ("QIANFAN_API_KEY", "百度千帆", "qianfan-code-latest"),
     "kimi": ("MOONSHOT_API_KEY", "Moonshot", "kimi-code"),
     "openai": ("OPENAI_API_KEY", "OpenAI", "gpt-4o"),
@@ -102,7 +102,6 @@ def _load_local_models() -> list[ProviderInfo]:
         import yaml
         with open(local_llm_config, 'r', encoding='utf-8') as f:
             config = yaml.safe_load(f)
-
         for model_id, model_info in config.get('models', {}).items():
             local_models.append(ProviderInfo(
                 id=f"local-{model_id}",
@@ -114,29 +113,29 @@ def _load_local_models() -> list[ProviderInfo]:
                 supports_thinking=model_info.get('supports_thinking', False),
             ))
     except Exception as e:
-        print(f"[providers] Failed to load local_llm.yaml: {e}")
+        print(f"[provider] Failed to load local_llm.yaml: {e}")
 
     return local_models
 
 
-def _detect_active_provider() -> str | None:
-    """检测当前活跃的 Provider"""
-    if settings.current_provider:
-        return settings.current_provider
-
-    # 从 .env 文件检测
+def _get_active_provider() -> Optional[str]:
+    """获取当前活跃的 Provider"""
+    # 优先检查 .env 文件中的 OMNIA_PROVIDER
     env_file = settings.project_root / ".env"
     if env_file.exists():
         for line in env_file.read_text(encoding="utf-8").splitlines():
             line = line.strip()
-            if not line or line.startswith("#"):
-                continue
             if line.startswith("OMNIA_PROVIDER="):
                 provider = line.split("=", 1)[1].strip()
                 if provider:
                     return provider
 
-    # 自动检测：找到第一个配置好的 Provider
+    # 检查环境变量
+    env_provider = os.environ.get("OMNIA_PROVIDER")
+    if env_provider:
+        return env_provider
+
+    # 检查哪个 provider 已配置
     for pid, (env_key, _, _) in PROVIDER_CONFIG.items():
         if _check_provider_configured(env_key):
             return pid
@@ -144,10 +143,12 @@ def _detect_active_provider() -> str | None:
     return None
 
 
-def _collect_providers() -> tuple[list[ProviderInfo], str | None]:
-    """收集所有 Provider 并检测活跃的"""
+@router.get("/providers", response_model=ProviderListResponse)
+async def get_providers():
+    """获取可用的 Provider 列表"""
     providers = []
 
+    # 添加云端 Provider
     for pid, (env_key, name, default_model) in PROVIDER_CONFIG.items():
         configured = _check_provider_configured(env_key)
         model = os.environ.get(f"{pid.upper()}_MODEL", default_model)
@@ -158,64 +159,60 @@ def _collect_providers() -> tuple[list[ProviderInfo], str | None]:
             model=model,
         ))
 
+    # 添加本地模型
     providers.extend(_load_local_models())
-    active = _detect_active_provider()
 
-    return providers, active
+    # 获取当前活跃的 Provider
+    active = _get_active_provider()
 
-
-# ========== 兼容前端的路由 ==========
-
-@router.get("/providers")
-async def get_providers() -> dict:
-    """获取可用的 Provider 列表（兼容 Flask 前端格式）"""
-    providers, active = _collect_providers()
-    return {
-        "providers": [p.model_dump() for p in providers],
-        "active": active,
-    }
+    return ProviderListResponse(providers=providers, active=active)
 
 
-@router.post("/providers")
-async def set_provider(req: SetProviderRequest) -> dict:
-    """
-    切换当前活跃的 Provider（兼容 Flask 前端格式）
-    自动持久化到 .env 文件
-    """
-    provider = req.provider
+@router.post("/providers", response_model=SetProviderResponse)
+async def set_provider(request: SetProviderRequest):
+    """设置活跃的 Provider"""
+    provider = request.provider
 
-    valid_providers = {"deepseek", "qianfan", "kimi", "openai", "anthropic", "xiaomi", "local"}
+    # 验证 Provider 是否有效
+    valid_providers = set(PROVIDER_CONFIG.keys()) | {"local"}
     if not provider.startswith("local-") and provider not in valid_providers:
         raise HTTPException(status_code=400, detail=f"Invalid provider: {provider}")
 
-    # 本地模型：直接设置
-    if provider == "local" or provider.startswith("local-"):
-        settings.current_provider = provider
-        _persist_provider_to_env(provider)
-        return {"ok": True, "provider": provider}
+    # 检查 Provider 是否已配置
+    if provider in PROVIDER_CONFIG:
+        env_key = PROVIDER_CONFIG[provider][0]
+        if not _check_provider_configured(env_key):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Provider {provider} is not configured. Please add {env_key} to .env file."
+            )
 
-    # 云端模型：检查是否已配置
-    env_key = {
-        "deepseek": "DEEPSEEK_API_KEY",
-        "qianfan": "QIANFAN_API_KEY",
-        "kimi": "MOONSHOT_API_KEY",
-        "openai": "OPENAI_API_KEY",
-        "xiaomi": "MIMO_API_KEY",
-        "anthropic": "ANTHROPIC_API_KEY",
-    }.get(provider)
+    # 持久化到 .env 文件
+    _persist_provider_to_env(provider)
 
-    if not env_key or not _check_provider_configured(env_key):
-        raise HTTPException(status_code=400, detail=f"Provider {provider} is not configured")
+    # 更新环境变量
+    os.environ["OMNIA_PROVIDER"] = provider
 
-    settings.current_provider = provider
-    _persist_provider_to_env(provider)  # ✅ 持久化到 .env
-    return {"ok": True, "provider": provider}
+    return SetProviderResponse(ok=True, provider=provider)
 
 
-# ========== 内部使用的路由（保留） ==========
+@router.get("/providers/{provider}/status")
+async def get_provider_status(provider: str):
+    """获取 Provider 状态"""
+    if provider not in PROVIDER_CONFIG and not provider.startswith("local-"):
+        raise HTTPException(status_code=404, detail=f"Provider {provider} not found")
 
-@router.get("/provider/current")
-async def get_current_provider():
-    """获取当前活跃的 Provider"""
-    provider = _detect_active_provider()
-    return {"provider": provider}
+    if provider.startswith("local-"):
+        return {"id": provider, "configured": True, "status": "available"}
+
+    env_key, name, default_model = PROVIDER_CONFIG[provider]
+    configured = _check_provider_configured(env_key)
+    model = os.environ.get(f"{provider.upper()}_MODEL", default_model)
+
+    return {
+        "id": provider,
+        "name": name,
+        "configured": configured,
+        "model": model,
+        "status": "configured" if configured else "not_configured",
+    }

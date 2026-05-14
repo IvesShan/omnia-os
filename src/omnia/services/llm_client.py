@@ -24,7 +24,7 @@ class LLMClient:
     }
     
     PROVIDER_MODELS = {
-        "deepseek": "deepseek-chat",
+        "deepseek": "deepseek-v4-pro",
         "kimi": "kimi-code",
         "xiaomi": "mimo-v2.5-pro",
         "openai": "gpt-4o",
@@ -120,95 +120,124 @@ class LLMClient:
         # 加载 API Key
         api_key = self._load_api_key(provider)
         if not api_key:
-            raise ValueError(f"No API key configured for provider: {provider}")
+            return {"content": f"❌ 未配置 {provider} API Key", "error": "missing_api_key"}
         
-        # 构建请求
+        # 获取 URL 和模型
         url = self.PROVIDER_URLS.get(provider)
-        if not url:
-            raise ValueError(f"Unknown provider: {provider}")
-        
         model = self._get_model(provider)
-        headers = self._build_headers(api_key, provider)
         
-        payload = {
+        if not url:
+            return {"content": f"❌ 不支持的 Provider: {provider}", "error": "unsupported_provider"}
+        
+        # 构建请求体
+        body = {
             "model": model,
             "messages": messages,
-            "temperature": 0.7,
             "stream": False,
         }
         
-        # 添加工具（只有支持 API 级工具调用的 Provider 才传 tools）
+        # 添加工具（如果支持）
         if tools and provider in self.API_TOOL_PROVIDERS:
-            payload["tools"] = tools
+            body["tools"] = tools
         
-        # Kimi 特殊处理：Anthropic 格式
-        if provider == "kimi":
-            payload["max_tokens"] = 8192
+        # 构建请求头
+        headers = self._build_headers(api_key, provider)
         
-        # 发送请求
-        response = await self.client.post(url, headers=headers, json=payload)
-        
-        if response.status_code != 200:
-            raise ValueError(f"API error {response.status_code}: {response.text[:500]}")
-        
-        data = response.json()
-        
-        # 解析响应
-        content = ""
-        usage = {}
-        tool_calls = []
-        reasoning_content = ""
-        
-        # Kimi Anthropic 格式响应
-        if provider == "kimi":
-            if "content" in data and len(data["content"]) > 0:
-                for block in data["content"]:
-                    if block.get("type") == "text":
-                        content += block.get("text", "")
-            if "usage" in data:
-                usage = data["usage"]
-        # OpenAI 格式响应
-        elif "choices" in data and len(data["choices"]) > 0:
-            choice = data["choices"][0]
-            message = choice.get("message", {})
+        try:
+            print(f"[LLMClient] Calling {provider} API: model={model}, url={url}")
+            response = await self.client.post(url, json=body, headers=headers)
+            response.raise_for_status()
             
-            # 文本内容
-            content = message.get("content", "") or ""
+            data = response.json()
             
-            # 解析 API 级工具调用
-            raw_tool_calls = message.get("tool_calls", [])
-            if raw_tool_calls:
-                for tc in raw_tool_calls:
-                    if tc.get("type") == "function":
-                        func = tc.get("function", {})
-                        try:
-                            args = json.loads(func.get("arguments", "{}"))
-                        except json.JSONDecodeError:
-                            args = {}
-                        tool_calls.append({
-                            "id": tc.get("id", ""),
-                            "name": func.get("name", ""),
-                            "arguments": args,
-                        })
+            # 解析响应
+            if provider == "kimi":
+                # Kimi 使用 Anthropic 格式
+                return self._parse_kimi_response(data)
+            else:
+                # OpenAI 格式（DeepSeek、OpenAI、Xiaomi、Qianfan）
+                return self._parse_openai_response(data)
+                
+        except httpx.HTTPStatusError as e:
+            error_detail = ""
+            try:
+                error_detail = e.response.text
+            except:
+                error_detail = str(e)
             
-            # 解析 reasoning_content（DeepSeek V4 特性）
-            reasoning_content = message.get("reasoning_content", "") or ""
-            
-            # 某些 API 在 delta 里传 reasoning_content
-            if not reasoning_content:
-                reasoning_content = choice.get("delta", {}).get("reasoning_content", "") or ""
+            print(f"[LLMClient] HTTP Error: {e.response.status_code} - {error_detail}")
+            return {
+                "content": f"❌ API 调用失败: {e.response.status_code}",
+                "error": error_detail,
+                "status_code": e.response.status_code
+            }
+        except Exception as e:
+            print(f"[LLMClient] Error: {e}")
+            return {"content": f"❌ 请求异常: {str(e)}", "error": str(e)}
+    
+    def _parse_openai_response(self, data: dict) -> dict:
+        """解析 OpenAI 格式响应"""
+        choices = data.get("choices", [])
+        if not choices:
+            return {"content": "", "error": "empty_choices"}
         
-        if "usage" in data:
-            usage = data["usage"]
+        choice = choices[0]
+        message = choice.get("message", {})
         
-        result = {
+        content = message.get("content") or ""
+        tool_calls = message.get("tool_calls") or []
+        reasoning_content = message.get("reasoning_content") or ""
+        
+        # 解析工具调用
+        parsed_tool_calls = []
+        for tc in tool_calls:
+            function = tc.get("function", {})
+            arguments = function.get("arguments", "{}")
+            
+            # 解析参数
+            try:
+                if isinstance(arguments, str):
+                    parsed_args = json.loads(arguments)
+                else:
+                    parsed_args = arguments
+            except json.JSONDecodeError:
+                parsed_args = {}
+            
+            parsed_tool_calls.append({
+                "id": tc.get("id", ""),
+                "name": function.get("name", ""),
+                "arguments": parsed_args
+            })
+        
+        return {
             "content": content,
-            "usage": usage,
-            "tool_calls": tool_calls,
+            "tool_calls": parsed_tool_calls,
             "reasoning_content": reasoning_content,
+            "usage": data.get("usage", {})
         }
+    
+    def _parse_kimi_response(self, data: dict) -> dict:
+        """解析 Kimi (Anthropic 格式) 响应"""
+        content_blocks = data.get("content", [])
+        text_parts = []
+        tool_calls = []
         
-        return result
+        for block in content_blocks:
+            if block.get("type") == "text":
+                text_parts.append(block.get("text", ""))
+            elif block.get("type") == "tool_use":
+                tool_calls.append({
+                    "id": block.get("id", ""),
+                    "name": block.get("name", ""),
+                    "arguments": block.get("input", {})
+                })
+        
+        return {
+            "content": "\n".join(text_parts),
+            "tool_calls": tool_calls,
+            "reasoning_content": "",
+            "usage": data.get("usage", {})
+        }
     
     async def stream_chat(
         self,
@@ -219,137 +248,163 @@ class LLMClient:
         """
         流式聊天
         
+        Args:
+            messages: 消息列表
+            provider: Provider 名称
+            tools: 工具列表
+        
         Yields:
-            {"type": "token", "content": str}
-            {"type": "thinking", "content": str}
-            {"type": "tool_call", ...}
-            {"type": "tool_call_end", "tool_calls": [...]}
-            {"type": "done", "full_content": str}
-            {"type": "error", "message": str}
+            {"type": "token|thinking|tool_call|tool_call_end|error|done", ...}
         """
         # 加载 API Key
         api_key = self._load_api_key(provider)
         if not api_key:
-            yield {"type": "error", "message": f"No API key configured for provider: {provider}"}
+            yield {"type": "error", "data": f"未配置 {provider} API Key"}
             return
         
-        # 构建请求
+        # 获取 URL 和模型
         url = self.PROVIDER_URLS.get(provider)
+        model = self._get_model(provider)
+        
         if not url:
-            yield {"type": "error", "message": f"Unknown provider: {provider}"}
+            yield {"type": "error", "data": f"不支持的 Provider: {provider}"}
             return
         
-        model = self._get_model(provider)
-        headers = self._build_headers(api_key, provider)
-        
-        payload = {
+        # 构建请求体
+        body = {
             "model": model,
             "messages": messages,
-            "temperature": 0.7,
             "stream": True,
         }
         
-        # 添加工具
+        # 添加工具（如果支持）
         if tools and provider in self.API_TOOL_PROVIDERS:
-            payload["tools"] = tools
+            body["tools"] = tools
         
-        # Kimi 特殊处理：Anthropic 格式
-        if provider == "kimi":
-            payload["max_tokens"] = 8192
+        # 构建请求头
+        headers = self._build_headers(api_key, provider)
         
-        # 发送流式请求
-        async with self.client.stream("POST", url, headers=headers, json=payload) as response:
-            if response.status_code != 200:
-                error_text = await response.aread()
-                yield {"type": "error", "message": f"API error {response.status_code}: {error_text[:500]}"}
-                return
+        # 工具调用累积器
+        pending_tool_calls = {}
+        full_content = ""
+        full_reasoning = ""
+        
+        try:
+            print(f"[LLMClient] Streaming {provider} API: model={model}, url={url}")
             
-            # 解析流式响应
-            full_content = ""
-            reasoning_content = ""  # 追踪 reasoning_content
-            pending_tool_calls = []
-            
-            async for line in response.aiter_lines():
-                if not line:
-                    continue
+            async with self.client.stream("POST", url, json=body, headers=headers) as response:
+                response.raise_for_status()
                 
-                if line.startswith("data: "):
-                    data_str = line[6:]
+                buffer = ""
+                async for chunk in response.aiter_text():
+                    buffer += chunk
                     
-                    if data_str == "[DONE]":
-                        break
-                    
-                    try:
-                        data = json.loads(data_str)
+                    # 处理 SSE 数据
+                    while "\n" in buffer:
+                        line, buffer = buffer.split("\n", 1)
+                        line = line.strip()
                         
-                        if "choices" in data and len(data["choices"]) > 0:
-                            delta = data["choices"][0].get("delta", {})
+                        if not line or line.startswith(":"):
+                            continue
+                        
+                        if line.startswith("data: "):
+                            data_str = line[6:]
                             
-                            # 文本内容
-                            if "content" in delta and delta["content"]:
-                                content = delta["content"]
-                                full_content += content
-                                yield {"type": "token", "content": content}
-                            
-                            # 思考内容（DeepSeek V4 / Gemma 3）
-                            if "reasoning_content" in delta and delta["reasoning_content"]:
-                                rc_text = delta["reasoning_content"]
-                                reasoning_content += rc_text
-                                yield {"type": "thinking", "content": rc_text}
-                            
-                            # 流式工具调用
-                            if "tool_calls" in delta and delta["tool_calls"]:
-                                for tc_delta in delta["tool_calls"]:
-                                    # 合并增量
-                                    idx = tc_delta.get("index", 0)
-                                    while len(pending_tool_calls) <= idx:
-                                        pending_tool_calls.append({
-                                            "id": "",
-                                            "type": "function",
-                                            "function": {"name": "", "arguments": ""}
+                            if data_str == "[DONE]":
+                                # 发送累积的工具调用
+                                if pending_tool_calls:
+                                    parsed = []
+                                    for idx in sorted(pending_tool_calls.keys()):
+                                        tc = pending_tool_calls[idx]
+                                        args_str = tc.get("arguments", "")
+                                        try:
+                                            args = json.loads(args_str) if args_str else {}
+                                        except:
+                                            args = {}
+                                        parsed.append({
+                                            "id": tc.get("id", ""),
+                                            "name": tc.get("name", ""),
+                                            "arguments": args,
                                         })
+                                    yield {"type": "tool_call_end", "tool_calls": parsed}
+                                
+                                yield {"type": "done", "full_content": full_content, "reasoning_content": full_reasoning}
+                                return
+                            
+                            try:
+                                data = json.loads(data_str)
+                                choices = data.get("choices", [])
+                                if choices:
+                                    choice = choices[0]
+                                    delta = choice.get("delta", {})
+                                    finish_reason = choice.get("finish_reason")
                                     
-                                    if "id" in tc_delta:
-                                        pending_tool_calls[idx]["id"] = tc_delta["id"]
-                                    if "function" in tc_delta:
-                                        func = tc_delta["function"]
-                                        if "name" in func:
-                                            pending_tool_calls[idx]["function"]["name"] += func["name"]
-                                        if "arguments" in func:
-                                            pending_tool_calls[idx]["function"]["arguments"] += func["arguments"]
-                        
-                    except json.JSONDecodeError:
-                        continue
+                                    # 内容
+                                    content = delta.get("content")
+                                    if content:
+                                        full_content += content
+                                        yield {"type": "token", "content": content}
+                                    
+                                    # 推理内容
+                                    rc = delta.get("reasoning_content")
+                                    if rc:
+                                        full_reasoning += rc
+                                        yield {"type": "thinking", "content": rc}
+                                    
+                                    # 工具调用（增量式，需要累积）
+                                    tool_calls = delta.get("tool_calls")
+                                    if tool_calls:
+                                        for tc in tool_calls:
+                                            idx = tc.get("index", 0)
+                                            if idx not in pending_tool_calls:
+                                                pending_tool_calls[idx] = {"id": "", "name": "", "arguments": ""}
+                                            
+                                            if tc.get("id"):
+                                                pending_tool_calls[idx]["id"] = tc["id"]
+                                            
+                                            func = tc.get("function", {})
+                                            if func.get("name"):
+                                                pending_tool_calls[idx]["name"] = func["name"]
+                                            if func.get("arguments"):
+                                                pending_tool_calls[idx]["arguments"] += func["arguments"]
+                                    
+                                    # 工具调用完成
+                                    if finish_reason == "tool_calls":
+                                        if pending_tool_calls:
+                                            parsed = []
+                                            for idx in sorted(pending_tool_calls.keys()):
+                                                tc = pending_tool_calls[idx]
+                                                args_str = tc.get("arguments", "")
+                                                try:
+                                                    args = json.loads(args_str) if args_str else {}
+                                                except:
+                                                    args = {}
+                                                parsed.append({
+                                                    "id": tc.get("id", ""),
+                                                    "name": tc.get("name", ""),
+                                                    "arguments": args,
+                                                })
+                                            yield {"type": "tool_call_end", "tool_calls": parsed}
+                                            pending_tool_calls = {}
+                                    
+                            except json.JSONDecodeError:
+                                continue
+                                
+        except httpx.HTTPStatusError as e:
+            error_detail = ""
+            try:
+                error_detail = e.response.text
+            except:
+                error_detail = str(e)
             
-            # 处理收集到的工具调用
-            if pending_tool_calls:
-                parsed_tool_calls = []
-                for tc in pending_tool_calls:
-                    func = tc.get("function", {})
-                    name = func.get("name", "")
-                    args_str = func.get("arguments", "{}")
-                    try:
-                        args = json.loads(args_str)
-                    except json.JSONDecodeError:
-                        args = {}
-                    parsed_tool_calls.append({
-                        "id": tc.get("id", ""),
-                        "name": name,
-                        "arguments": args,
-                    })
-                yield {"type": "tool_call_end", "tool_calls": parsed_tool_calls}
-            
-            # 发送完成事件
-            yield {"type": "done", "full_content": full_content, "reasoning_content": reasoning_content}
-
-
-# 全局客户端实例
-_client: Optional[LLMClient] = None
-
-
-async def get_llm_client() -> LLMClient:
-    """获取 LLM 客户端实例（依赖注入）"""
-    global _client
-    if _client is None:
-        _client = LLMClient()
-    return _client
+            print(f"[LLMClient] Stream HTTP Error: {e.response.status_code} - {error_detail}")
+            yield {"type": "error", "data": f"API 调用失败: {e.response.status_code}"}
+        except Exception as e:
+            print(f"[LLMClient] Stream Error: {e}")
+            yield {"type": "error", "data": f"请求异常: {str(e)}"}
+    
+    def _process_stream_chunk(self, data: dict, provider: str):
+        """已废弃：使用 stream_chat 内置处理"""
+        return
+# 全局单例
+llm_client = LLMClient()

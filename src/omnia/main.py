@@ -182,12 +182,18 @@ from src.omnia.routers import confirm, ide, model_status
 from src.omnia.routers import discuss, long_task, fts
 from src.omnia.routers import learner
 from src.omnia.routers import vector, plan, gateway
-from src.omnia.routers import reasoning, capability, reflection
+from src.omnia.routers import reasoning, capability, reflection, progressive
+from src.omnia.routers import performance
 # Progressive Capability 渐进式能力
 # Reflection 反思模块
 app.include_router(reflection.router, tags=["reflection"])
 app.include_router(capability.router, tags=["capability"])
 
+# Reasoning Engine 推理引擎
+app.include_router(reasoning.router, tags=["reasoning"])
+# Progressive Capability 渐进式能力
+app.include_router(progressive.router, tags=["progressive"])
+app.include_router(performance.router, tags=["performance"])
 # Provider 管理
 app.include_router(provider.router, prefix="/api", tags=["provider"])
 

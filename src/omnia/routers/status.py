@@ -169,6 +169,23 @@ def _system_vitals() -> dict:
     return vitals
 
 
+def _get_active_provider_from_env() -> Optional[str]:
+    """从 .env 文件读取 OMNIA_PROVIDER（与 provider.py 逻辑一致）"""
+    env_file = settings.project_root / ".env"
+    if env_file.exists():
+        for line in env_file.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if line.startswith("OMNIA_PROVIDER="):
+                provider = line.split("=", 1)[1].strip()
+                if provider:
+                    return provider
+    # 检查环境变量
+    env_provider = os.environ.get("OMNIA_PROVIDER")
+    if env_provider:
+        return env_provider
+    return None
+
+
 def _env_snapshot() -> dict:
     """获取环境快照（完整版，与 Flask 一致）"""
     import sys
@@ -176,16 +193,17 @@ def _env_snapshot() -> dict:
 
     # 确定当前使用的模型
     provider_models = {
+        "xiaomi": ("MIMO_MODEL", "mimo-v2.5-pro"),
         "deepseek": ("DEEPSEEK_MODEL", "deepseek-v4-flash"),
         "qianfan": ("QIANFAN_MODEL", "qianfan-code-latest"),
         "kimi": ("MOONSHOT_MODEL", "K2.6-code-preview"),
         "openai": ("OPENAI_MODEL", "gpt-4o"),
-        "xiaomi": ("MIMO_MODEL", "mimo-v2.5-pro"),
         "anthropic": ("ANTHROPIC_MODEL", "claude-3-5-sonnet-20241022"),
     }
 
     model = "unknown"
-    provider = settings.current_provider
+    # 使用与 API 提供商面板相同的逻辑获取当前 Provider
+    provider = _get_active_provider_from_env() or settings.current_provider
 
     if provider:
         env_key, default = provider_models.get(provider, ("DEFAULT_MODEL", "unknown"))
@@ -198,11 +216,11 @@ def _env_snapshot() -> dict:
             env_content = env_file.read_text(encoding="utf-8")
 
         api_key_env_map = {
+            "xiaomi": "MIMO_API_KEY",
             "deepseek": "DEEPSEEK_API_KEY",
             "qianfan": "QIANFAN_API_KEY",
             "kimi": "MOONSHOT_API_KEY",
             "openai": "OPENAI_API_KEY",
-            "xiaomi": "MIMO_API_KEY",
             "anthropic": "ANTHROPIC_API_KEY",
         }
 

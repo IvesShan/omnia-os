@@ -688,3 +688,22 @@ class ProgressiveCapabilitySystem:
             "level_distribution": dict(level_distribution),
             "category_distribution": dict(category_distribution)
         }
+
+
+# 全局实例
+_progressive_system: Optional[ProgressiveCapabilitySystem] = None
+
+
+def get_progressive_capability() -> ProgressiveCapabilitySystem:
+    """获取渐进式能力系统实例"""
+    global _progressive_system
+    if _progressive_system is None:
+        _progressive_system = ProgressiveCapabilitySystem()
+    return _progressive_system
+
+
+class CapabilityStatus:
+    """能力状态枚举"""
+    LOCKED = "locked"
+    UNLOCKED = "unlocked"
+    IN_PROGRESS = "in_progress"

@@ -368,7 +368,13 @@ def _stream_chat_unified(
             
             # 没有工具调用但也没完成
             if content.strip():
-                messages.append({"role": "assistant", "content": content})
+                # MiMo/DeepSeek 思考模式修复：必须包含 reasoning_content
+                assistant_msg = {"role": "assistant", "content": content}
+                if reasoning_content:
+                    assistant_msg["reasoning_content"] = reasoning_content
+                elif thinking_mode_active:
+                    assistant_msg["reasoning_content"] = ""
+                messages.append(assistant_msg)
                 # 记录助手回复
                 if session_id and full_content:
                     try:

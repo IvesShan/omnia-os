@@ -97,20 +97,14 @@ class HookRegistry:
                 # 判断是同步还是异步
                 import asyncio
                 if asyncio.iscoroutinefunction(callback):
-                    # 异步回调：使用 asyncio.run() 或检测是否在事件循环中
+                    # 异步回调：检测是否在事件循环中
                     try:
-                        loop = asyncio.get_event_loop()
-                        if loop.is_running():
-                            # 如果已经在事件循环中，创建任务
-                            import concurrent.futures
-                            with concurrent.futures.ThreadPoolExecutor() as executor:
-                                future = executor.submit(asyncio.run, callback(context))
-                                result = future.result()
-                        else:
-                            # 不在事件循环中，直接运行
-                            result = asyncio.run(callback(context))
+                        loop = asyncio.get_running_loop()
+                        # 已在事件循环中：后台调度，不阻塞
+                        loop.create_task(callback(context))
+                        result = None
                     except RuntimeError:
-                        # 没有事件循环，创建新的
+                        # 没有运行中的事件循环，直接运行
                         result = asyncio.run(callback(context))
                 else:
                     # 同步回调：直接调用

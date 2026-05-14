@@ -100,6 +100,7 @@ MODEL_CONTEXT_WINDOWS = {
     "gpt-3.5-turbo": 16000,
     
     # DeepSeek 模型
+    "v4-pro": 128000,
     "deepseek-chat": 64000,
     "deepseek-v4-flash": 128000,
     "deepseek-coder": 16000,

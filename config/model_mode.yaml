@@ -1,7 +1,7 @@
 # Omnia 模型模式配置
 # 当前模式: local (本地)
 
-current_mode: local
+current_mode: cloud
 
 # 本地模型配置
 local:
@@ -13,5 +13,12 @@ local:
 # 云端模型配置
 cloud:
   enabled: true
-  provider: deepseek
-  model: "deepseek-v4-flash"
+  provider: xiaomi
+  model: "mimo-v2.5-pro"
+
+# Xiaomi MiMo 配置
+mimo:
+  enabled: true
+  provider: xiaomi
+  model: "mimo-v2.5-pro"
+  api_key_env: "MIMO_API_KEY"

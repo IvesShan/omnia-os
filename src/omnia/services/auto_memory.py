@@ -38,16 +38,13 @@ class AutoMemory:
 
     def _find_db(self):
         """查找记忆库数据库"""
+        from src.omnia.config import settings
         candidates = [
+            Path(str(settings.memory_palace_db)),
             settings.omnia_home / "memory_palace.db",
             Path.home() / ".openclaw" / "memory_palace.db",
             Path.home() / ".omnia" / "memory_palace.db",
         ]
-        try:
-            from src.omnia.config import settings
-            candidates.insert(0, Path(str(settings.memory_palace_db)))
-        except (ImportError, AttributeError):
-            pass
 
         for p in candidates:
             if p.exists():
