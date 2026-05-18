@@ -532,21 +532,7 @@ class AgentEngine:
             yield {"type": "status", "message": f"正在执行工具: {tool_name}..."}
             
             try:
-                # Execute tool with timeout and heartbeat
-                import asyncio
-                tool_task = asyncio.create_task(tool_registry.execute(tool_name, tool_args))
-                
-                # Send heartbeat every 5 seconds while tool is executing
-                heartbeat_count = 0
-                while not tool_task.done():
-                    try:
-                        await asyncio.wait_for(asyncio.shield(tool_task), timeout=5.0)
-                        break  # Task completed
-                    except asyncio.TimeoutError:
-                        heartbeat_count += 1
-                        yield {"type": "status", "message": f"⏳ 工具 {tool_name} 执行中 ({heartbeat_count * 5}s)..."}
-                
-                exec_result = await tool_task
+                exec_result = await tool_registry.execute(tool_name, tool_args)
                 result_content = json.dumps(exec_result.get("result", exec_result), ensure_ascii=False)
                 if len(result_content) > 80000:
                     result_content = result_content[:80000] + "\n\n[内容已截断，共 " + str(len(result_content)) + " 字符。如需完整内容请分段查看]"

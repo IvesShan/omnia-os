@@ -874,7 +874,6 @@ async function sendMessage() {
     }
 
     const reader = response.body.getReader();
-    window.currentReader = reader;
     const decoder = new TextDecoder();
     let currentContent = '';
     let omniaMsg = null;
@@ -2388,7 +2387,6 @@ sendMessage = async function() {
     }
   } finally {
     window.currentAbortController = null;
-    window.currentReader = null;
   }
 };
 
@@ -2411,10 +2409,6 @@ if (stopBtn) {
     if (window.currentAbortController) {
       console.log('[中止] 用户点击中止按钮');
       window.currentAbortController.abort();
-      // Also cancel reader to prevent stream errors
-      if (window.currentReader) {
-        window.currentReader.cancel('User aborted').catch(() => {});
-      }
       showStopButton(false);
       removeTyping();
       
