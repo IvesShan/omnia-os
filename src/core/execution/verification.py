@@ -368,14 +368,45 @@ class PersonaContinuity:
         try:
             if self.db_path.exists():
                 data = json.loads(self.db_path.read_text())
-                # TODO: 反序列化
+                # 反序列化
+                for persona_id, states_data in data.items():
+                    self._states[persona_id] = []
+                    for s in states_data:
+                        try:
+                            state = PersonaState(
+                                persona_id=s.get("persona_id", persona_id),
+                                emotional_state=s.get("emotional_state", "neutral"),
+                                recent_topics=s.get("recent_topics", []),
+                                working_memory=s.get("working_memory", {}),
+                                confidence=s.get("confidence", 0.5),
+                                timestamp=s.get("timestamp", datetime.now().isoformat()),
+                            )
+                            self._states[persona_id].append(state)
+                        except Exception:
+                            pass
         except Exception:
             self._states = {}
     
     def _save(self):
         """保存人格状态"""
-        # TODO: 序列化
-        pass
+        try:
+            data = {}
+            for persona_id, states in self._states.items():
+                data[persona_id] = [
+                    {
+                        "persona_id": s.persona_id,
+                        "emotional_state": s.emotional_state,
+                        "recent_topics": s.recent_topics,
+                        "working_memory": s.working_memory,
+                        "confidence": s.confidence,
+                        "timestamp": s.timestamp.isoformat() if hasattr(s.timestamp, 'isoformat') else str(s.timestamp),
+                    }
+                    for s in states[-10:]  # 只保留最近10条
+                ]
+            self.db_path.parent.mkdir(parents=True, exist_ok=True)
+            self.db_path.write_text(json.dumps(data, ensure_ascii=False, indent=2))
+        except Exception as e:
+            print(f"[PersonaStore] 保存失败: {e}")
     
     async def save_session_state(
         self,

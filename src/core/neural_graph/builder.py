@@ -260,7 +260,42 @@ class MemoryPalaceGraphBuilder:
         print(f"[GraphBuilder] 增量构建，从 {since}")
         
         # 只处理 created_at > since 的记忆
-        # TODO: 实现增量逻辑
+        new_memories = []
+        try:
+            import sqlite3
+            with sqlite3.connect(self.db_path) as conn:
+                rows = conn.execute('''
+                    SELECT id, content, role, created_at
+                    FROM memories
+                    WHERE created_at > ?
+                    ORDER BY created_at ASC
+                    LIMIT 200
+                ''', (since,)).fetchall()
+                
+                for row in rows:
+                    new_memories.append({
+                        "id": row[0],
+                        "content": row[1],
+                        "role": row[2],
+                        "created_at": row[3],
+                    })
+        except Exception as e:
+            print(f"[GraphBuilder] 增量查询失败: {e}")
+        
+        if not new_memories:
+            print("[GraphBuilder] 没有新记忆需要处理")
+            return self.stats
+        
+        print(f"[GraphBuilder] 处理 {len(new_memories)} 条新记忆")
+        
+        # 处理新记忆
+        for mem in new_memories:
+            try:
+                self._process_memory(mem)
+                self.stats["memories_processed"] += 1
+            except Exception as e:
+                print(f"[GraphBuilder] 处理记忆失败: {e}")
+                self.stats["errors"] += 1
         
         return self.stats
 
@@ -300,9 +335,32 @@ class IdleGraphProcessor:
             pass
         
         # 检查是否有未处理的记忆
-        # TODO: 实现检查逻辑
+        try:
+            import sqlite3
+            if self.builder.db_path:
+                with sqlite3.connect(self.builder.db_path) as conn:
+                    # 获取已处理的最新时间
+                    result = conn.execute('''
+                        SELECT MAX(created_at) FROM neural_nodes
+                    ''').fetchone()
+                    last_processed = result[0] if result and result[0] else None
+                    
+                    # 检查是否有新记忆
+                    if last_processed:
+                        count = conn.execute('''
+                            SELECT COUNT(*) FROM memories WHERE created_at > ?
+                        ''', (last_processed,)).fetchone()
+                        if count and count[0] > 0:
+                            return True
+                    else:
+                        # 没有处理过，需要处理
+                        count = conn.execute('SELECT COUNT(*) FROM memories').fetchone()
+                        if count and count[0] > 0:
+                            return True
+        except Exception as e:
+            print(f"[IdleProcessor] 检查失败: {e}")
         
-        return True
+        return False
     
     def process_batch(self):
         """处理一批记忆"""

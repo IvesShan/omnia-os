@@ -209,7 +209,25 @@ class TopicRecognizer:
             return 'smooth'
         
         # 检查是否是回到之前的话题
-        # TODO: 需要会话历史
+        try:
+            import sqlite3
+            with sqlite3.connect(self.db_path) as conn:
+                rows = conn.execute('''
+                    SELECT from_topic, to_topic, timestamp
+                    FROM topic_shifts
+                    WHERE to_topic = ?
+                    ORDER BY timestamp DESC
+                    LIMIT 5
+                ''', (from_topic,)).fetchall()
+                
+                if rows:
+                    # 如果之前有过从这个主题切换出去的记录，说明是回跳
+                    for row in rows:
+                        if row[1] != to_topic:
+                            return 'jump_back'
+        except Exception:
+            pass
+        
         return 'abrupt'
     
     def get_topic_chain(self, session_id: str) -> List[Dict]:
@@ -277,13 +295,37 @@ class TopicRecognizer:
             ''', (cutoff.isoformat(),)).fetchall()
         
         # 平均主题持续时间
-        # TODO: 需要更复杂的计算
-        
+        avg_duration_seconds = 0
+        try:
+            durations = []
+            # 获取同一会话内的主题切换时间间隔
+            shifts = conn.execute('''
+                SELECT timestamp
+                FROM topic_shifts
+                WHERE timestamp >= ?
+                ORDER BY timestamp ASC
+            ''', (cutoff.isoformat(),)).fetchall()
+            
+            if len(shifts) > 1:
+                from datetime import datetime as dt
+                for i in range(len(shifts) - 1):
+                    try:
+                        t1 = dt.fromisoformat(shifts[i][0])
+                        t2 = dt.fromisoformat(shifts[i+1][0])
+                        durations.append((t2 - t1).total_seconds())
+                    except Exception:
+                        pass
+                
+                if durations:
+                    avg_duration_seconds = sum(durations) / len(durations)
+        except Exception:
+            pass
         
         return {
             'topic_distribution': {row[0]: row[1] for row in topic_dist},
             'shift_types': {row[0]: row[1] for row in shift_types},
-            'total_shifts': sum(row[1] for row in topic_dist)
+            'total_shifts': sum(row[1] for row in topic_dist),
+            'avg_topic_duration_seconds': avg_duration_seconds
         }
     
     def get_hot_topics(self, limit: int = 10) -> List[Dict]:

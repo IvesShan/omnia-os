@@ -1272,8 +1272,22 @@ def create_app() -> Flask:
             # 记录消息
             print(f"[Feishu] {sender.get('sender_id', {}).get('open_id')}: {text[:50]}")
             
-            # TODO: 转发给 Agent 处理
-            # 目前先存储到通知队列
+            # 转发给 Agent 处理
+            try:
+                from src.omnia.services.agent_engine import AgentEngine
+                from src.omnia.services.llm_client import LLMClient
+                from src.omnia.services.session_manager import SessionManager
+                
+                llm = LLMClient()
+                session_mgr = SessionManager()
+                engine = AgentEngine(llm_client=llm, session_manager=session_mgr)
+                
+                import asyncio
+                response = asyncio.create_task(engine.chat(text, session_id=f"feishu_{sender.get('sender_id', {}).get('open_id', 'unknown')}"))
+            except Exception as agent_err:
+                print(f"[Feishu] Agent processing error: {agent_err}")
+            
+            # 同时存储到通知队列作为备份
             try:
                 queue = NotificationQueue()
                 queue.enqueue({
@@ -1595,13 +1609,41 @@ def create_app() -> Flask:
             data = request.get_json()
             device_id = data.get("device_id")
             
-            # TODO: 实现诊断逻辑
+            # 实现诊断逻辑
+            checks = []
+            status = "healthy"
+            
+            # 检查设备连接
+            try:
+                import subprocess
+                result = subprocess.run(["ping", "-c", "1", "-W", "2", device_id], capture_output=True, timeout=5)
+                if result.returncode == 0:
+                    checks.append({"name": "connectivity", "status": "ok", "detail": "设备可达"})
+                else:
+                    checks.append({"name": "connectivity", "status": "warning", "detail": "设备不可达"})
+                    status = "warning"
+            except Exception:
+                checks.append({"name": "connectivity", "status": "unknown", "detail": "无法检测"})
+            
+            # 检查系统资源
+            try:
+                import psutil
+                cpu = psutil.cpu_percent(interval=1)
+                mem = psutil.virtual_memory().percent
+                checks.append({"name": "system_cpu", "status": "ok" if cpu < 80 else "warning", "detail": f"CPU: {cpu}%"})
+                checks.append({"name": "system_memory", "status": "ok" if mem < 80 else "warning", "detail": f"内存: {mem}%"})
+                if cpu > 80 or mem > 80:
+                    status = "warning"
+            except ImportError:
+                checks.append({"name": "system_monitor", "status": "unknown", "detail": "psutil 未安装"})
+            
             return jsonify({
                 "success": True,
                 "report": {
                     "device_id": device_id,
-                    "status": "healthy",
-                    "checks": []
+                    "status": status,
+                    "checks": checks,
+                    "timestamp": __import__("datetime").datetime.now().isoformat()
                 }
             })
         except Exception as e:

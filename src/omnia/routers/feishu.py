@@ -251,14 +251,49 @@ async def send_feishu_message(request: Request):
         if not open_id or not message:
             raise HTTPException(status_code=400, detail="缺少 open_id 或 message")
         
-        # TODO: 实现飞书消息发送 API
-        # 需要先获取 tenant_access_token，然后调用消息发送接口
+        # 获取 tenant_access_token
+        import httpx
         
-        return {
-            "ok": True,
-            "message": "消息发送功能需要配置飞书 API",
-            "note": "请确保 feishu_app_id 和 feishu_app_secret 已配置",
-        }
+        if not settings.feishu_app_id or not settings.feishu_app_secret:
+            return {"ok": False, "message": "飞书 app_id 或 app_secret 未配置"}
+        
+        # 获取 tenant_access_token
+        token_url = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal"
+        async with httpx.AsyncClient() as client:
+            token_resp = await client.post(token_url, json={
+                "app_id": settings.feishu_app_id,
+                "app_secret": settings.feishu_app_secret,
+            })
+            token_data = token_resp.json()
+            tenant_token = token_data.get("tenant_access_token")
+            
+            if not tenant_token:
+                return {"ok": False, "message": f"获取 tenant_access_token 失败: {token_data}"}
+            
+            # 发送消息
+            send_url = "https://open.feishu.cn/open-apis/im/v1/messages"
+            headers = {
+                "Authorization": f"Bearer {tenant_token}",
+                "Content-Type": "application/json; charset=utf-8",
+            }
+            import json as _json
+            payload = {
+                "receive_id": open_id,
+                "msg_type": "text",
+                "content": _json.dumps({"text": message}),
+            }
+            send_resp = await client.post(
+                send_url,
+                headers=headers,
+                params={"receive_id_type": "open_id"},
+                json=payload,
+            )
+            send_data = send_resp.json()
+            
+            if send_data.get("code") == 0:
+                return {"ok": True, "message": "消息发送成功", "message_id": send_data.get("data", {}).get("message_id")}
+            else:
+                return {"ok": False, "message": f"发送失败: {send_data.get('msg', '未知错误')}", "detail": send_data}
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

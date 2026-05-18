@@ -213,8 +213,14 @@ async def start_task(task_id: str, background_tasks: BackgroundTasks) -> dict:
     task["updated_at"] = datetime.now().isoformat()
     _save_task(task_id, task)
     
-    # TODO: 在后台执行任务
-    # background_tasks.add_task(_execute_task, task_id)
+    # 在后台执行任务
+    try:
+        import asyncio
+        asyncio.create_task(_execute_task_async(task_id))
+    except Exception as bg_err:
+        task["status"] = "failed"
+        task["error"] = str(bg_err)
+        _save_task(task_id, task)
     
     return {
         "ok": True,

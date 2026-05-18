@@ -387,9 +387,24 @@ def check_tool_safety(name: str, arguments: Dict[str, Any]) -> SafetyResult:
     """Preview safety classification without executing."""
     # Check if it's an MCP tool (prefixed with server name)
     if _mcp_available and _mcp_registry and name not in TOOL_MAP:
-        # MCP tools are external; trust their own safety for now
-        # TODO: Add MCP-specific safety classification
-        return SafetyResult(allowed=True, level="medium", reason="MCP外部工具")
+        # MCP tools 安全分类
+        # 根据工具名称和参数进行风险评估
+        danger_keywords = ['delete', 'remove', 'exec', 'eval', 'system', 'shell', 'command', 'sudo', 'rm ', 'drop']
+        safe_keywords = ['get', 'list', 'search', 'query', 'read', 'find', 'status', 'info']
+        
+        tool_name_lower = name.lower()
+        args_str = str(arguments).lower()
+        
+        # 检查是否包含危险操作
+        if any(kw in tool_name_lower or kw in args_str for kw in danger_keywords):
+            return SafetyResult(allowed=True, level="high", reason=f"MCP工具 {name} 包含敏感操作")
+        
+        # 检查是否是安全操作
+        if any(kw in tool_name_lower for kw in safe_keywords):
+            return SafetyResult(allowed=True, level="low", reason=f"MCP工具 {name} 为只读操作")
+        
+        # 默认中等风险
+        return SafetyResult(allowed=True, level="medium", reason=f"MCP外部工具 {name}")
     
     if name == "execute_shell":
         return classify_shell_command(arguments.get("command", ""))

@@ -285,8 +285,27 @@ class ConversationMonitor:
             ''').fetchall()
         
         
-        # TODO: 实现主题提取和统计
-        return []
+        # 主题提取和统计
+        topics = {}
+        for row in rows:
+            try:
+                metadata = json.loads(row[0]) if isinstance(row[0], str) else row[0]
+                if isinstance(metadata, dict):
+                    # 从 metadata 中提取主题
+                    topic = metadata.get("topic") or metadata.get("subject") or metadata.get("category")
+                    if topic:
+                        topics[topic] = topics.get(topic, 0) + 1
+                    # 从 keywords 提取
+                    keywords = metadata.get("keywords", [])
+                    if isinstance(keywords, list):
+                        for kw in keywords:
+                            topics[kw] = topics.get(kw, 0) + 1
+            except Exception:
+                continue
+        
+        # 按频次排序
+        sorted_topics = sorted(topics.items(), key=lambda x: x[1], reverse=True)
+        return [{"topic": t, "count": c} for t, c in sorted_topics[:20]]
     
     def export_metrics(self, output_path: str, days: int = 30):
         """导出指标数据"""

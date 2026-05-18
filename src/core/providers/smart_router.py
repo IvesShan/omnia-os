@@ -225,11 +225,26 @@ class SmartModelRouter:
             return response
         else:
             # 使用云端模型（通过现有的 provider 系统）
-            # TODO: 集成到 Omnia 的 provider 系统
-            raise NotImplementedError(
-                f"云端模型 {model_id} 尚未集成。"
-                f"请使用 mode='local_only' 或启动本地服务。"
-            )
+            try:
+                from src.core.providers import get_client_for_model
+                cloud_client = get_client_for_model(model_id)
+                if cloud_client:
+                    response = await cloud_client.chat(messages, **kwargs)
+                    return response
+                else:
+                    # 回退到本地模型
+                    print(f"[SmartRouter] 云端模型 {model_id} 不可用，回退到本地模型")
+                    response = await self.local_client.chat(messages, **kwargs)
+                    return response
+            except ImportError:
+                # provider 系统不可用，回退到本地
+                print(f"[SmartRouter] Provider 系统不可用，使用本地模型")
+                response = await self.local_client.chat(messages, **kwargs)
+                return response
+            except Exception as cloud_err:
+                print(f"[SmartRouter] 云端调用失败: {cloud_err}，回退到本地模型")
+                response = await self.local_client.chat(messages, **kwargs)
+                return response
 
 
 # 全局单例

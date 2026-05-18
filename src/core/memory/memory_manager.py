@@ -205,12 +205,47 @@ class MemoryManager:
         if not self.enable_compression:
             return len(self.memories)
         
-        # TODO: 实现 MLA 压缩
-        # 当前只是简单清理
+        # MLA (Memory-Level Abstraction) 压缩
+        # 将相似的旧记忆聚合为摘要记忆，减少冗余
         if len(self.memories) > self.max_memories * 0.8:
-            # 保留最近 80% 的记忆
-            keep_count = int(self.max_memories * 0.8)
-            self.memories = self.memories[-keep_count:]
+            from datetime import timedelta
+            import hashlib
+            
+            # 按时间分组，将超过 24 小时的记忆按主题聚合
+            cutoff = datetime.now() - timedelta(hours=24)
+            old_memories = [m for m in self.memories if hasattr(m, 'timestamp') and m.timestamp and m.timestamp < cutoff]
+            new_memories = [m for m in self.memories if m not in old_memories]
+            
+            if old_memories:
+                # 按内容相似性聚合旧记忆（简化版：按前20字分组）
+                groups = {}
+                for m in old_memories:
+                    key = m.content[:20] if len(m.content) > 20 else m.content
+                    group_key = hashlib.md5(key.encode()).hexdigest()[:8]
+                    if group_key not in groups:
+                        groups[group_key] = []
+                    groups[group_key].append(m)
+                
+                compressed = []
+                for group_key, group_memories in groups.items():
+                    if len(group_memories) == 1:
+                        compressed.append(group_memories[0])
+                    else:
+                        # 创建摘要记忆
+                        summary_content = group_memories[-1].content  # 取最新的作为代表
+                        if len(group_memories) > 2:
+                            summary_content = f"[摘要] {summary_content} (合并了{len(group_memories)}条相关记忆)"
+                        summary = group_memories[-1]
+                        summary.content = summary_content
+                        compressed.append(summary)
+                
+                # 合并新旧记忆
+                self.memories = compressed + new_memories
+            
+            # 如果仍然超出限制，强制保留最近的
+            if len(self.memories) > self.max_memories:
+                keep_count = int(self.max_memories * 0.8)
+                self.memories = self.memories[-keep_count:]
             
             # 重建索引
             self._rebuild_index()

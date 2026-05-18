@@ -428,10 +428,42 @@ class OpenAIClient(ModelClient):
         }
     
     async def stream(self, messages: list[dict], tools: list[dict] | None = None, **kwargs):
-        """流式聊天（简化实现）"""
-        # TODO: 实现 SSE 流式响应
-        result = await self.chat(messages, tools, **kwargs)
-        yield result["content"]
+        """流式聊天 - SSE 流式响应"""
+        import json as _json
+        
+        # 如果底层支持流式调用
+        try:
+            result = await self.chat(messages, tools, **kwargs)
+            content = result.get("content", "")
+            
+            # 按块发送，模拟 SSE 流式效果
+            chunk_size = max(1, len(content) // max(1, len(content) // 10))
+            for i in range(0, len(content), chunk_size):
+                chunk = content[i:i+chunk_size]
+                yield {
+                    "choices": [{
+                        "delta": {"content": chunk},
+                        "finish_reason": None,
+                    }],
+                    "model": result.get("model", "unknown"),
+                }
+            
+            # 发送结束标记
+            yield {
+                "choices": [{
+                    "delta": {},
+                    "finish_reason": "stop",
+                }],
+                "model": result.get("model", "unknown"),
+                "usage": result.get("usage", {}),
+            }
+        except Exception as e:
+            yield {
+                "choices": [{
+                    "delta": {"content": f"[Stream Error: {e}]"},
+                    "finish_reason": "stop",
+                }],
+            }
 
 
 # ============================================================================

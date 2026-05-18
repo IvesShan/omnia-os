@@ -294,7 +294,16 @@ class GatewayRunner:
                 continue
             
             # 获取该通道的所有活跃会话
-            # TODO: 实现会话列表
+            try:
+                active_sessions = self.session_manager.get_active_sessions(channel_type=channel_type) if hasattr(self, 'session_manager') and self.session_manager else []
+                if active_sessions:
+                    for session in active_sessions:
+                        try:
+                            await adapter.send(session.get("user_id", ""), content)
+                        except Exception as send_err:
+                            print(f"[Gateway] 广播到会话失败: {send_err}")
+            except Exception as e:
+                print(f"[Gateway] 获取会话列表失败: {e}")
             pass
 
 

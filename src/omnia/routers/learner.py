@@ -145,9 +145,36 @@ async def analyze_conversations(request: AnalyzeRequest):
         raise HTTPException(status_code=500, detail="Failed to initialize learner")
     
     try:
-        # TODO: 从记忆系统或数据库获取对话历史
-        # 这里返回模拟数据
+        # 从记忆系统获取对话历史
         patterns_found = 0
+        try:
+            from src.core.memory.memory_manager import MemoryManager
+            memory = MemoryManager()
+            recent = memory.get_recent_memories(request.message_count)
+            if recent:
+                # 提取对话历史用于分析
+                conversations = [{"role": m.role, "content": m.content, "timestamp": m.timestamp.isoformat() if hasattr(m, 'timestamp') and m.timestamp else None} for m in recent]
+                # 尝试分析模式
+                for i, conv in enumerate(conversations):
+                    if i > 0 and conv.get("role") == "assistant":
+                        user_msg = conversations[i-1].get("content", "") if i > 0 else ""
+                        if user_msg:
+                            try:
+                                pattern = TaskPattern.from_conversation([conversations[i-1], conv])
+                                if pattern and pattern.confidence > 0.6:
+                                    patterns_found += 1
+                                    _patterns[pattern.pattern_id] = {
+                                        "pattern_id": pattern.pattern_id,
+                                        "name": pattern.name,
+                                        "description": pattern.description,
+                                        "success_rate": pattern.confidence,
+                                        "usage_count": 1,
+                                        "created_at": datetime.now(),
+                                    }
+                            except Exception:
+                                pass
+        except Exception as mem_err:
+            print(f"[Learner] Memory access error: {mem_err}")
         
         # 更新统计
         _learning_stats["last_analysis"] = datetime.now()
@@ -259,8 +286,18 @@ async def create_skill_from_pattern(request: CreateSkillRequest):
         
         # 自动注册到技能库
         if request.auto_register:
-            # TODO: 注册到 SkillForge
-            pass
+            # 注册到 SkillForge
+            try:
+                from src.core.capability.skill_forge import SkillForge
+                forge = SkillForge()
+                forge.register_skill(skill_data)
+                skill_data["registered"] = True
+            except ImportError:
+                skill_data["registered"] = False
+                skill_data["register_note"] = "SkillForge 模块不可用"
+            except Exception as forge_err:
+                skill_data["registered"] = False
+                skill_data["register_note"] = f"注册失败: {forge_err}"
         
         return SkillResponse(**skill_data)
     except Exception as e:

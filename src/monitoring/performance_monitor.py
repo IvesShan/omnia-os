@@ -161,8 +161,22 @@ class PerformanceMonitor:
             cpu_usage_percent=cpu_percent,
             db_query_time_ms=avg_db_query,
             vector_search_time_ms=avg_vector_search,
-            active_sessions=0  # TODO: 从会话管理器获取
+            active_sessions=self._get_active_session_count()
         )
+    
+    def _get_active_session_count(self) -> int:
+        """获取活跃会话数量"""
+        try:
+            import sqlite3
+            with sqlite3.connect(self.db_path) as conn:
+                result = conn.execute('''
+                    SELECT COUNT(DISTINCT session_id)
+                    FROM performance_metrics
+                    WHERE created_at >= datetime('now', '-5 minutes')
+                ''').fetchone()
+                return result[0] if result else 0
+        except Exception:
+            return 0
     
     def get_stats(self, hours: int = 24) -> PerformanceStats:
         """获取性能统计"""
@@ -187,7 +201,7 @@ class PerformanceMonitor:
             return PerformanceStats(
                 avg_response_time_ms=sum(self.response_times) / len(self.response_times),
                 p95_response_time_ms=p95,
-                avg_memory_usage_mb=0,  # TODO: 从历史数据计算
+                avg_memory_usage_mb=sum(self.memory_usage_history) / len(self.memory_usage_history) if self.memory_usage_history else 0,
                 avg_cpu_usage_percent=0,
                 avg_db_query_time_ms=sum(self.db_query_times) / len(self.db_query_times) if self.db_query_times else 0,
                 avg_vector_search_time_ms=sum(self.vector_search_times) / len(self.vector_search_times) if self.vector_search_times else 0,
