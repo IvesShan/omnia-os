@@ -138,8 +138,17 @@ class ToolRegistry:
                 result = await mt.execute(name, args)
                 return {"name": name, "result": result}
         
-        # 3. 尝试 MCP 工具
-        # TODO: MCP 执行
+        # 3. 尝试 MCP 工具执行
+        if self.mcp_tools:
+            try:
+                from src.core.actuator.mcp_client import MCPClient
+                client = MCPClient()
+                result = await client.call_tool(name, args)
+                return {"name": name, "result": result}
+            except ImportError:
+                pass
+            except Exception as e:
+                return {"name": name, "error": f"MCP执行失败: {e}"}
         
         return {"name": name, "error": f"工具 '{name}' 未注册"}
 

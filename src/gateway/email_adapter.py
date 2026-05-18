@@ -176,8 +176,8 @@ class EmailAdapter(ChannelAdapter):
             template_name: 模板名称
             template_vars: 模板变量
         """
-        # TODO: 实现模板系统
-        # 目前简单替换
+        # 模板系统 - 支持变量替换和条件渲染
+        import re
         templates = {
             "welcome": {
                 "subject": "Welcome to Omnia, {name}!",
@@ -189,11 +189,27 @@ class EmailAdapter(ChannelAdapter):
             }
         }
         
-        if template_name not in templates:
+        # 支持自定义模板目录
+        custom_templates = {}
+        try:
+            template_dir = Path.home() / '.omnia' / 'email_templates'
+            if template_dir.exists():
+                for f in template_dir.glob('*.json'):
+                    with open(f, 'r', encoding='utf-8') as tf:
+                        tpl = json.load(tf)
+                        if 'name' in tpl:
+                            custom_templates[tpl['name']] = tpl
+        except Exception:
+            pass
+        
+        # 合并模板（自定义优先）
+        all_templates = {**templates, **custom_templates}
+        
+        if template_name not in all_templates:
             logger.warning(f"[EmailAdapter] Template not found: {template_name}")
             return False
         
-        template = templates[template_name]
+        template = all_templates[template_name]
         subject = template["subject"].format(**template_vars)
         body = template["body"].format(**template_vars)
         

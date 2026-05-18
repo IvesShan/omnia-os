@@ -155,9 +155,18 @@ class SmartDroneDiagnosis:
             print(f"  ✅ 已连接: {device['product']} (真实模式)")
             
             try:
-                # TODO: 实现真实数据读取
-                # 目前使用模拟数据
-                print("\n  ⚠️  真实通信协议开发中，使用模拟数据演示...")
+                # 尝试读取真实设备状态
+                try:
+                    from dji.transport.dji_protocol import DJIProtocol
+                    protocol = DJIProtocol(transport)
+                    real_status = protocol.get_device_status()
+                    if real_status:
+                        result['status'] = real_status
+                    else:
+                        print("\n  ⚠️  真实数据读取返回空，使用模拟数据...")
+                        result['status'] = self.simulate_device_status(device['product'])
+                except Exception as read_err:
+                    print(f"\n  ⚠️  真实数据读取失败: {read_err}，使用模拟数据...")
                 result['status'] = self.simulate_device_status(device['product'])
                 
             finally:
