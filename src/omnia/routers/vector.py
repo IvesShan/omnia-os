@@ -18,7 +18,7 @@ def _get_vector_store():
     """Get or create VectorStore instance."""
     global _vector_store
     if _vector_store is None:
-        from core.neural_graph.vector_store import VectorStore
+        from src.core.neural_graph.vector_store import VectorStore
         _vector_store = VectorStore()
     return _vector_store
 

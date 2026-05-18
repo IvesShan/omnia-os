@@ -24,7 +24,7 @@ async def get_memory_palace():
     global _memory_palace
     
     if _memory_palace is None:
-        from core.memory_palace.memory_palace import MemoryPalace
+        from src.core.memory_palace.memory_palace import MemoryPalace
         
         _memory_palace = MemoryPalace(db_path=str(settings.memory_palace_db))
         _memory_palace.initialize()
@@ -42,7 +42,7 @@ async def get_neural_graph():
     global _neural_graph
     
     if _neural_graph is None:
-        from core.neural_graph import NeuralGraph
+        from src.core.neural_graph import NeuralGraph
         
         _neural_graph = NeuralGraph()
     

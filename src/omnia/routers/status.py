@@ -12,7 +12,7 @@ import sqlite3
 from pathlib import Path
 
 from src.omnia.config import settings
-from core.config import MEMORY_PALACE_DB, OMNIA_HOME
+from src.core.config import MEMORY_PALACE_DB, OMNIA_HOME
 
 router = APIRouter()
 
@@ -91,7 +91,7 @@ def _skills_summary() -> dict:
 def _notifications() -> list:
     """获取通知列表"""
     try:
-        from core.notification import NotificationQueue
+        from src.core.notification import NotificationQueue
         q = NotificationQueue(OMNIA_HOME / "notifications.jsonl")
         notes = q.pop_pending(limit=5, mark_popped=False)
         return [

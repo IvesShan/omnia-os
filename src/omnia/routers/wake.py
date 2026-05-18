@@ -83,7 +83,7 @@ async def wake_up(request: WakeRequest):
 async def get_wake_context(session_id: Optional[str] = None):
     """获取唤醒上下文（不触发完整唤醒）"""
     try:
-        from core.working_memory import load_working_memory, load_current_task
+        from src.core.working_memory import load_working_memory, load_current_task
         from src.omnia.config import settings
         
         # 加载工作记忆
@@ -162,7 +162,7 @@ async def get_available_skills():
 async def clear_notifications(session_id: str):
     """清除会话通知"""
     try:
-        from core.neuro_center.notification_queue import pop_notifications_for_session
+        from src.core.neuro_center.notification_queue import pop_notifications_for_session
         
         notifications = pop_notifications_for_session(session_id)
         
@@ -180,7 +180,7 @@ async def clear_notifications(session_id: str):
 async def get_current_persona():
     """获取当前人格设定"""
     try:
-        from core.personas import load_persona
+        from src.core.personas import load_persona
         
         persona = load_persona()
         
@@ -201,7 +201,7 @@ async def quick_wake(message: str = ""):
     只加载必要的上下文，快速响应。
     """
     try:
-        from core.memory_palace import MemoryPalace
+        from src.core.memory_palace import MemoryPalace
         from src.omnia.config import settings
         
         # 只加载最近的记忆

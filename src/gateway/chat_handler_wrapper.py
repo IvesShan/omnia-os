@@ -8,13 +8,13 @@ from __future__ import annotations
 import uuid
 from typing import Any, Dict, List, Optional
 
-from core.config import MEMORY_PALACE_DB
-from core.cognition.prompt_builder import PromptContext, get_prompt_builder
-from core.neural_graph.context_enhancer import get_graph_enhancer
-from core.memory_palace.memory_palace_with_graph import MemoryPalace
-from core.neural_graph.updater import NeuralGraphUpdater
+from src.core.config import MEMORY_PALACE_DB
+from src.core.cognition.prompt_builder import PromptContext, get_prompt_builder
+from src.core.neural_graph.context_enhancer import get_graph_enhancer
+from src.core.memory_palace.memory_palace_with_graph import MemoryPalace
+from src.core.neural_graph.updater import NeuralGraphUpdater
 from omnia.chat import _call_model_messages
-from core.actuator.tool_registry import TOOLS_SCHEMA, check_tool_safety, dispatch_tool
+from src.core.actuator.tool_registry import TOOLS_SCHEMA, check_tool_safety, dispatch_tool
 from pathlib import Path
 
 
@@ -84,7 +84,7 @@ class ChatHandlerWrapper:
             print(f"[Gateway] Graph enhancement failed: {e}")
         
         # 构建初始提示
-        from core.cognition.prompt_builder import PromptContext, get_prompt_builder
+        from src.core.cognition.prompt_builder import PromptContext, get_prompt_builder
         prompt_builder = get_prompt_builder()
         prompt_context = PromptContext(mode="normal")
         dynamic_prompt = prompt_builder.build_for_provider(self.provider, prompt_context)

@@ -10,8 +10,8 @@ import json
 from datetime import datetime
 from typing import Any, Callable, Awaitable, Optional, Dict, Set
 
-from core.gateway.runner import ChannelAdapter, ChannelType, MessageEvent
-from core.logging_config import get_logger
+from src.core.gateway.runner import ChannelAdapter, ChannelType, MessageEvent
+from src.core.logging_config import get_logger
 
 logger = get_logger(__name__)
 

@@ -29,8 +29,8 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 # Load environment variables from .env file
 load_dotenv(PROJECT_ROOT / ".env")
 
-from core.actuator.agent_swarm import SwarmOrchestrator
-from core.actuator.tool_registry import (
+from src.core.actuator.agent_swarm import SwarmOrchestrator
+from src.core.actuator.tool_registry import (
     TOOLS_SCHEMA, 
     check_tool_safety, 
     dispatch_tool,
@@ -38,12 +38,12 @@ from core.actuator.tool_registry import (
     shutdown_mcp,
     get_all_tools_schema,
 )
-from core.collaboration import get_collaboration_manager
-from core.cognition.context_compressor import ContextCompressor
-from core.memory_palace.memory_palace import MemoryPalace
-from core.neural_graph import NeuralGraph
-from core.neuro_center.notification_queue import NotificationQueue
-from core.plugin import get_hook_registry  # Auto-register hooks
+from src.core.collaboration import get_collaboration_manager
+from src.core.cognition.context_compressor import ContextCompressor
+from src.core.memory_palace.memory_palace import MemoryPalace
+from src.core.neural_graph import NeuralGraph
+from src.core.neuro_center.notification_queue import NotificationQueue
+from src.core.plugin import get_hook_registry  # Auto-register hooks
 from omnia.chat import _load_api_key, _call_model_messages
 from omnia.wake import assemble_wake_prompt
 from omnia.tool_trigger import check_and_run, should_force_tool_check
@@ -461,7 +461,7 @@ def create_app() -> Flask:
     @app.route("/api/mcp/status", methods=["GET"])
     def mcp_status():
         """Get MCP connection status and available tools."""
-        from core.actuator.mcp_client import get_mcp_registry, MCP_AVAILABLE
+        from src.core.actuator.mcp_client import get_mcp_registry, MCP_AVAILABLE
         
         if not MCP_AVAILABLE:
             return jsonify({
@@ -622,7 +622,7 @@ def create_app() -> Flask:
         batch_size = data.get("batch_size", 100)
         
         try:
-            from core.neural_graph import build_neural_graph
+            from src.core.neural_graph import build_neural_graph
             
             key_name, api_key = _load_api_key(prefer_provider=_current_provider)
             provider = _current_provider or ("deepseek" if "DEEPSEEK" in (key_name or "") else ("qianfan" if "QIANFAN" in (key_name or "") else "kimi"))
@@ -729,7 +729,7 @@ def create_app() -> Flask:
             return jsonify({"error": "start_id and end_id are required"}), 400
         
         try:
-            from core.neural_graph_algorithms import algorithms
+            from src.core.neural_graph_algorithms import algorithms
             path = algorithms.find_path(start_id, end_id, max_depth)
             if path is None:
                 return jsonify({"found": False, "message": "No path found"})
@@ -749,7 +749,7 @@ def create_app() -> Flask:
             return jsonify({"error": "start_id and end_id are required"}), 400
         
         try:
-            from core.neural_graph_algorithms import algorithms
+            from src.core.neural_graph_algorithms import algorithms
             paths = algorithms.find_all_paths(start_id, end_id, max_depth, limit)
             return jsonify({"found": len(paths) > 0, "paths": paths, "count": len(paths)})
         except Exception as e:
@@ -761,7 +761,7 @@ def create_app() -> Flask:
         top_k = request.args.get("top_k", 10, type=int)
         
         try:
-            from core.neural_graph_algorithms import algorithms
+            from src.core.neural_graph_algorithms import algorithms
             results = algorithms.get_degree_centrality(top_k)
             return jsonify({"centrality": results})
         except Exception as e:
@@ -773,7 +773,7 @@ def create_app() -> Flask:
         top_k = request.args.get("top_k", 10, type=int)
         
         try:
-            from core.neural_graph_algorithms import algorithms
+            from src.core.neural_graph_algorithms import algorithms
             results = algorithms.get_pagerank(top_k)
             return jsonify({"pagerank": results})
         except Exception as e:
@@ -785,7 +785,7 @@ def create_app() -> Flask:
         top_k = request.args.get("top_k", 10, type=int)
         
         try:
-            from core.neural_graph_algorithms import algorithms
+            from src.core.neural_graph_algorithms import algorithms
             results = algorithms.get_betweenness_centrality(top_k)
             return jsonify({"betweenness": results})
         except Exception as e:
@@ -795,7 +795,7 @@ def create_app() -> Flask:
     def graph_find_communities():
         """发现图谱中的社区结构"""
         try:
-            from core.neural_graph_algorithms import algorithms
+            from src.core.neural_graph_algorithms import algorithms
             communities = algorithms.find_communities()
             return jsonify({"communities": communities, "count": len(communities)})
         except Exception as e:
@@ -807,7 +807,7 @@ def create_app() -> Flask:
         depth = request.args.get("depth", 1, type=int)
         
         try:
-            from core.neural_graph_algorithms import algorithms
+            from src.core.neural_graph_algorithms import algorithms
             neighbors = algorithms.get_neighbors(node_id, depth)
             return jsonify(neighbors)
         except Exception as e:
@@ -823,7 +823,7 @@ def create_app() -> Flask:
             return jsonify({"error": "Query parameter 'q' is required"}), 400
         
         try:
-            from core.neural_graph_algorithms import algorithms
+            from src.core.neural_graph_algorithms import algorithms
             results = algorithms.search_nodes(query, limit)
             return jsonify({"query": query, "results": results, "count": len(results)})
         except Exception as e:
@@ -1120,7 +1120,7 @@ def create_app() -> Flask:
 
         # PlanExecutor confirmation
         if ctx.get("type") == "plan_executor":
-            from core.actuator.plan_executor import ExecutionPlan, PlanExecutor, Step
+            from src.core.actuator.plan_executor import ExecutionPlan, PlanExecutor, Step
             executor = PlanExecutor(ctx["api_key"], ctx["provider"])
             steps = [
                 Step(
@@ -1348,7 +1348,7 @@ def create_app() -> Flask:
             # 直接模式：使用 chat_handler（带对话记录）
             from omnia.chat import _load_api_key
             from omnia.chat_handler import handle_chat
-            from core.actuator.tool_registry import get_all_tools_schema
+            from src.core.actuator.tool_registry import get_all_tools_schema
             
             # Provider 检测：请求级 provider > 全局设置 > 自动检测
             global _current_provider
@@ -1664,7 +1664,7 @@ def create_app() -> Flask:
     def token_status():
         """检查当前上下文的 Token 状态"""
         try:
-            from core.cognition.token_manager import TokenManager, MODEL_LIMITS
+            from src.core.cognition.token_manager import TokenManager, MODEL_LIMITS
         except ImportError:
             return jsonify({"error": "TokenManager not available", "status": "unavailable"}), 503
         
@@ -1700,7 +1700,7 @@ def create_app() -> Flask:
     def list_models():
         """获取支持的模型列表"""
         try:
-            from core.cognition.token_manager import MODEL_LIMITS
+            from src.core.cognition.token_manager import MODEL_LIMITS
         except ImportError:
             return jsonify({"models": [{"id": "kimi", "max_tokens": 128000, "name": "Kimi"}], "default": "kimi"})
         

@@ -19,7 +19,7 @@ Omnia 的独立网关，支持多种消息通道：
 from __future__ import annotations
 
 # Core Gateway
-from core.gateway.runner import GatewayRunner, MessageEvent, ChannelType
+from src.core.gateway.runner import GatewayRunner, MessageEvent, ChannelType
 
 # Adapters
 from gateway.webchat_adapter import WebChatAdapter

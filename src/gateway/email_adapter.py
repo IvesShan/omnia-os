@@ -12,8 +12,8 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from typing import Any, Callable, Awaitable, Optional, List
 
-from core.gateway.runner import ChannelAdapter, ChannelType, MessageEvent
-from core.logging_config import get_logger
+from src.core.gateway.runner import ChannelAdapter, ChannelType, MessageEvent
+from src.core.logging_config import get_logger
 
 logger = get_logger(__name__)
 

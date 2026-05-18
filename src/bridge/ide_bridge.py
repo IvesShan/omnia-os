@@ -25,7 +25,7 @@ from typing import Optional
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
-from core.config import OMNIA_HOME
+from src.core.config import OMNIA_HOME
 
 IDE_CONTEXT_FILE = OMNIA_HOME / "ide_context.json"
 WORKSPACE_ROOT = PROJECT_ROOT.parent

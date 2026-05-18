@@ -283,7 +283,7 @@ async def mcp_status(request: Request):
     - tools: MCP 工具列表
     """
     try:
-        from core.actuator.mcp_client import MCP_AVAILABLE
+        from src.core.actuator.mcp_client import MCP_AVAILABLE
     except ImportError:
         MCP_AVAILABLE = False
 

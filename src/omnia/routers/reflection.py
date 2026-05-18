@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 
-from core.cognition.reflection import (
+from src.core.cognition.reflection import (
     ReflectionEngine,
     ReflectionInsight,
     ReflectionType,

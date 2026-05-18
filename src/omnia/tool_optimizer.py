@@ -346,7 +346,7 @@ class ToolExecutionOptimizer:
     
     def execute_tool(self, tool_name: str, arguments: Dict[str, Any]) -> ToolResult:
         """执行单个工具，支持缓存和错误恢复"""
-        from core.actuator.tool_registry import dispatch_tool
+        from src.core.actuator.tool_registry import dispatch_tool
         
         # 检查缓存
         if self.cache:

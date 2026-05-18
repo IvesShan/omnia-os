@@ -145,7 +145,7 @@ async def confirm_action(req: ConfirmRequest):
 async def _handle_plan_executor_confirm(ctx: Dict) -> ConfirmResponse:
     """处理 PlanExecutor 确认"""
     try:
-        from core.actuator.plan_executor import ExecutionPlan, PlanExecutor, Step
+        from src.core.actuator.plan_executor import ExecutionPlan, PlanExecutor, Step
 
         executor = PlanExecutor(ctx["api_key"], ctx["provider"])
         steps = [
@@ -195,7 +195,7 @@ async def _handle_single_tool_confirm(ctx: Dict) -> ConfirmResponse:
     result_json = json.dumps(result, ensure_ascii=False)
     if len(result_json) > 1500:
         try:
-            from core.cognition.context_compressor import ContextCompressor
+            from src.core.cognition.context_compressor import ContextCompressor
             result_json = ContextCompressor().compress(result_json).summary
         except Exception:
             result_json = result_json[:1500] + "...(已截断)"

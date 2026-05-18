@@ -42,7 +42,7 @@ class FTSSearchResponse(BaseModel):
 
 def _get_fts_client():
     """获取 FTS 客户端"""
-    from core.memory.fts_search import FTSClient
+    from src.core.memory.fts_search import FTSClient
     return FTSClient(settings.omnia_home / "fts.db")
 
 
@@ -121,7 +121,7 @@ async def fts_index_message(
     try:
         fts = _get_fts_client()
         
-        from core.memory.fts_search import MessageRecord
+        from src.core.memory.fts_search import MessageRecord
         
         record = MessageRecord(
             session_id=session_id,

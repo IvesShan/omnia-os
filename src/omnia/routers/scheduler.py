@@ -17,7 +17,7 @@ router = APIRouter(prefix="/scheduler", tags=["scheduler"])
 
 # 尝试导入 Scheduler 模块
 try:
-    from core.orchestration.scheduler import Scheduler, ScheduledTask
+    from src.core.orchestration.scheduler import Scheduler, ScheduledTask
     SCHEDULER_AVAILABLE = True
 except ImportError as e:
     SCHEDULER_AVAILABLE = False
@@ -175,7 +175,7 @@ async def create_task(request: CreateTaskRequest):
     scheduler = get_scheduler()
     if scheduler and request.enabled:
         # 创建 ScheduledTask 并添加到调度器
-        from core.orchestration.scheduler import ScheduledTask
+        from src.core.orchestration.scheduler import ScheduledTask
         
         async def task_action():
             if task_data["action_type"] == "http_callback":
@@ -186,7 +186,7 @@ async def create_task(request: CreateTaskRequest):
                         async with session.post(url, json=task_data["action_config"].get("payload", {})) as resp:
                             return await resp.text()
             elif task_data["action_type"] == "workflow":
-                from core.orchestration.workflow_engine import WorkflowEngine
+                from src.core.orchestration.workflow_engine import WorkflowEngine
                 engine = WorkflowEngine()
                 workflow_id = task_data["action_config"].get("workflow_id")
                 if workflow_id:

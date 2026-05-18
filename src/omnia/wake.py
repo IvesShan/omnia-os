@@ -10,14 +10,14 @@ from typing import List, Optional, Tuple
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
-from core.cognition.token_budget import TokenBudget, PromptComponent
-from core.cognition.ultraplan import UltraPlan
-from core.memory_palace import MemoryPalace
-from core.neural_graph.context_enhancer import NeuralGraphContextEnhancer
-from core.neuro_center.notification_queue import pop_notifications_for_session
-from core.personas import load_persona
-from core.working_memory import load_working_memory, load_current_task
-from core.context_manager import ContextManager
+from src.core.cognition.token_budget import TokenBudget, PromptComponent
+from src.core.cognition.ultraplan import UltraPlan
+from src.core.memory_palace import MemoryPalace
+from src.core.neural_graph.context_enhancer import NeuralGraphContextEnhancer
+from src.core.neuro_center.notification_queue import pop_notifications_for_session
+from src.core.personas import load_persona
+from src.core.working_memory import load_working_memory, load_current_task
+from src.core.context_manager import ContextManager
 
 
 def _load_ide_context(workspace_root: Path) -> Optional[str]:

@@ -20,8 +20,8 @@ from omnia.wake import assemble_wake_prompt
 from omnia.tool_trigger import check_and_run
 from omnia.chat import _load_api_key, _build_model_config
 from omnia.tool_optimizer import ToolExecutionOptimizer, ParallelToolExecutor
-from core.actuator.tool_registry import TOOLS_SCHEMA
-from core.memory_palace.memory_palace import MemoryPalace
+from src.core.actuator.tool_registry import TOOLS_SCHEMA
+from src.core.memory_palace.memory_palace import MemoryPalace
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 MAX_TOOL_ITERATIONS = 50  # 提高上限，长任务由 LongTaskHandler 处理

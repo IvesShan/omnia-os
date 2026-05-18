@@ -253,7 +253,7 @@ class SimpleEngine:
         self.knowledge_retriever = None
         
         try:
-            from core.memory_palace.memory_palace import MemoryPalace
+            from src.core.memory_palace.memory_palace import MemoryPalace
             self.memory = MemoryPalace(self.workspace_root)
             self.knowledge_retriever = KnowledgeRetriever(self.memory)
         except Exception as e:

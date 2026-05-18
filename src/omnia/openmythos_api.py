@@ -10,8 +10,8 @@ from typing import Dict, Optional, Callable, Tuple
 import json
 import os
 
-from core.openmythos import IntegrationBridge
-from core.memory_palace.memory_palace import MemoryPalace
+from src.core.openmythos import IntegrationBridge
+from src.core.memory_palace.memory_palace import MemoryPalace
 
 # 创建蓝图
 openmythos_bp = Blueprint('openmythos', __name__)

@@ -15,8 +15,8 @@ import uuid
 from typing import Generator, Dict, Any, List
 from dataclasses import dataclass
 
-from core.actuator.plan_store import PlanStore, Plan, Step, StepStatus, get_plan_store
-from core.actuator.tool_registry import dispatch_tool
+from src.core.actuator.plan_store import PlanStore, Plan, Step, StepStatus, get_plan_store
+from src.core.actuator.tool_registry import dispatch_tool
 from omnia.smart_pauser import SmartPauser, get_pauser, PauseReason
 
 

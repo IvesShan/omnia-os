@@ -17,7 +17,7 @@ router = APIRouter(prefix="/learner", tags=["learner"])
 
 # 尝试导入 AutoLearner 模块
 try:
-    from core.capability.auto_learner import AutoSkillLearner, TaskPattern, Skill
+    from src.core.capability.auto_learner import AutoSkillLearner, TaskPattern, Skill
     AUTO_LEARNER_AVAILABLE = True
 except ImportError as e:
     AUTO_LEARNER_AVAILABLE = False

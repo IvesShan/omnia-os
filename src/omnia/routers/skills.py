@@ -17,7 +17,7 @@ router = APIRouter(prefix="/skills", tags=["skills"])
 
 # 尝试导入 SkillForge 模块
 try:
-    from core.skill_forge import (
+    from src.core.skill_forge import (
         PatternDetector,
         SkillGenerator,
         SkillVetter,

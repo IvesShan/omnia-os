@@ -107,7 +107,7 @@ class MemoryTools:
     async def _query_memory(self, query: str) -> Dict[str, Any]:
         """查询记忆"""
         try:
-            from core.memory_palace.memory_palace import MemoryPalace
+            from src.core.memory_palace.memory_palace import MemoryPalace
             from src.omnia.config import settings
             
             mp = MemoryPalace(db_path=str(settings.memory_palace_db))
@@ -142,7 +142,7 @@ class MemoryTools:
             return {"error": f"无效的记忆层: {layer}，可选: {valid_layers}"}
         
         try:
-            from core.memory_palace.memory_palace import MemoryPalace
+            from src.core.memory_palace.memory_palace import MemoryPalace
             from src.omnia.config import settings
             
             mp = MemoryPalace(db_path=str(settings.memory_palace_db))

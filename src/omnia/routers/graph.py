@@ -106,7 +106,7 @@ async def neural_graph_build(request: dict):
     batch_size = request.get("batch_size", 100)
     
     try:
-        from core.neural_graph import build_neural_graph
+        from src.core.neural_graph import build_neural_graph
         from src.omnia.services.llm_client import LLMClient
         
         # 获取 API key

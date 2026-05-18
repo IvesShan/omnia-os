@@ -27,7 +27,7 @@ async def lifespan(app: FastAPI):
 
     # 初始化 MCP 工具（FastAPI 方式：用已有事件循环）
     try:
-        from core.actuator.mcp_client import MCPClientManager
+        from src.core.actuator.mcp_client import MCPClientManager
         mcp_manager = MCPClientManager()
         await mcp_manager.connect_all()
         mcp_tools = mcp_manager.get_all_tools_schema()

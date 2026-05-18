@@ -9,8 +9,8 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
-from core.neuro_center import PersonaDaemon, DaemonConfig
-from core.neuro_center.notification_queue import pop_notifications_for_session
+from src.core.neuro_center import PersonaDaemon, DaemonConfig
+from src.core.neuro_center.notification_queue import pop_notifications_for_session
 from omnia.wake import assemble_wake_prompt
 from omnia.chat import chat
 

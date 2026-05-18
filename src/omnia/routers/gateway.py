@@ -17,7 +17,7 @@ def _get_gateway_runner():
     """Get or create GatewayRunner instance."""
     global _gateway_runner
     if _gateway_runner is None:
-        from core.gateway.runner import GatewayRunner
+        from src.core.gateway.runner import GatewayRunner
         _gateway_runner = GatewayRunner()
     return _gateway_runner
 
@@ -90,7 +90,7 @@ async def list_adapters():
 async def send_message(request: SendMessageRequest):
     """Send a message through a specific channel."""
     try:
-        from core.gateway.runner import ChannelType
+        from src.core.gateway.runner import ChannelType
         
         # 获取适配器
         runner = _get_gateway_runner()
@@ -213,7 +213,7 @@ async def broadcast_message(content: str, message_type: str = "broadcast"):
 @router.get("/channels")
 async def list_channel_types():
     """List supported channel types."""
-    from core.gateway.runner import ChannelType
+    from src.core.gateway.runner import ChannelType
     
     return {
         "channels": [

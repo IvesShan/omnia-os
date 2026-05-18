@@ -18,7 +18,7 @@ def _get_plan_generator():
     """Get or create PlanGenerator instance."""
     global _plan_generator
     if _plan_generator is None:
-        from core.cognition.plan_generator import PlanGenerator
+        from src.core.cognition.plan_generator import PlanGenerator
         _plan_generator = PlanGenerator()
     return _plan_generator
 
@@ -152,7 +152,7 @@ async def generate_plan(request: GeneratePlanRequest):
 async def optimize_plan(request: OptimizeRequest):
     """Optimize a plan for parallel execution."""
     try:
-        from core.cognition.plan_generator import ExecutionPlan, PlanStep, StepType, StepStatus
+        from src.core.cognition.plan_generator import ExecutionPlan, PlanStep, StepType, StepStatus
         
         # Reconstruct plan from dict
         steps = [

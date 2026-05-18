@@ -140,14 +140,14 @@ def handle_chat(
     4. 增强错误恢复
     """
     from omnia.chat import _call_model_messages
-    from core.actuator.tool_registry import TOOLS_SCHEMA, check_tool_safety, dispatch_tool
-    from core.plugin.hooks import HookRegistry, HookType, HookContext, get_hook_registry
-    from core.cognition.prompt_builder import PromptBuilder, PromptContext, get_prompt_builder
-    from core.neural_graph.context_enhancer import get_graph_enhancer
-    from core.memory_palace.memory_palace_with_graph import MemoryPalace
-    from core.neural_graph.updater import NeuralGraphUpdater
-    from core.session_manager import get_session_manager, load_recent_conversations, merge_histories
-    from core.context_manager import ContextManager, save_current_context
+    from src.core.actuator.tool_registry import TOOLS_SCHEMA, check_tool_safety, dispatch_tool
+    from src.core.plugin.hooks import HookRegistry, HookType, HookContext, get_hook_registry
+    from src.core.cognition.prompt_builder import PromptBuilder, PromptContext, get_prompt_builder
+    from src.core.neural_graph.context_enhancer import get_graph_enhancer
+    from src.core.memory_palace.memory_palace_with_graph import MemoryPalace
+    from src.core.neural_graph.updater import NeuralGraphUpdater
+    from src.core.session_manager import get_session_manager, load_recent_conversations, merge_histories
+    from src.core.context_manager import ContextManager, save_current_context
     from omnia.tool_trigger import analyze_message, get_tool_choice_for_provider, get_suggested_tool_prompt
     from omnia.tool_call_validator import validate_tool_execution, build_retry_prompt
     from pathlib import Path

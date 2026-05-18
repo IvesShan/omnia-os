@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 from typing import Optional, Dict, List, Any
 from datetime import datetime
 
-from core.capability.progressive import (
+from src.core.capability.progressive import (
     get_progressive_capability,
     CapabilityStatus
 )
@@ -178,7 +178,7 @@ async def record_usage(request: RecordUsageRequest):
 @router.get("/levels")
 async def get_capability_levels():
     """获取能力等级"""
-    from core.capability.progressive import CapabilityLevel
+    from src.core.capability.progressive import CapabilityLevel
     
     return {
         "levels": [

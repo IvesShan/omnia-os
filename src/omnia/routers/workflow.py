@@ -11,7 +11,7 @@ import asyncio
 import uuid
 
 # 导入 WorkflowEngine
-from core.orchestration import WorkflowEngine, WorkflowStep, WorkflowContext
+from src.core.orchestration import WorkflowEngine, WorkflowStep, WorkflowContext
 
 router = APIRouter()
 

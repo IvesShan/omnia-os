@@ -19,7 +19,7 @@ import asyncio
 from datetime import datetime
 from typing import Any, Callable, Awaitable
 
-from core.gateway.runner import ChannelAdapter, ChannelType, MessageEvent
+from src.core.gateway.runner import ChannelAdapter, ChannelType, MessageEvent
 
 
 class WebChatAdapter(ChannelAdapter):

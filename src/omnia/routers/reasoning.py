@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 from typing import Optional, Dict, List, Any
 from datetime import datetime
 
-from core.cognition.reasoning_engine import (
+from src.core.cognition.reasoning_engine import (
     get_reasoning_engine,
     ReasoningType,
     ReasoningStatus

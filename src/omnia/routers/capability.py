@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 
-from core.capability.progressive import (
+from src.core.capability.progressive import (
     ProgressiveCapabilitySystem,
     Capability,
     CapabilityLevel,
@@ -412,7 +412,7 @@ async def import_progress(user_id: str, progress_data: Dict[str, Any]):
         raise HTTPException(status_code=400, detail="缺少 user_id")
     
     # 导入进度
-    from core.capability.progressive import UserProgress
+    from src.core.capability.progressive import UserProgress
     user = UserProgress.from_dict(progress_data)
     system.user_progress[user_id] = user
     system._save_progress()

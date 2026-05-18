@@ -415,7 +415,7 @@ if __name__ == "__main__":
 # 导入 SmartModelRouter
 import sys
 sys.path.insert(0, str(OMNIA_ROOT / "src"))
-from core.providers.smart_router import SmartModelRouter, ModelMode
+from src.core.providers.smart_router import SmartModelRouter, ModelMode
 
 # 全局路由器实例
 _router_instance = None

@@ -28,6 +28,7 @@ def main():
     # generate
     generate = subparsers.add_parser("generate", help="Generate skill from pattern")
     generate.add_argument("pattern_id", help="Pattern ID to generate from")
+    generate.add_argument("--out-dir", default=".", help="Output directory for skill file")
 
     # run (detect + generate + vet)
     run = subparsers.add_parser("run", help="Full pipeline: detect → generate → vet")
@@ -67,9 +68,46 @@ def cmd_detect(args):
 
 
 def cmd_generate(args):
+    """生成技能文档"""
     print(f"=== Generating skill for {args.pattern_id} ===")
-    # Implementation placeholder
-    print("TODO: Generate skill markdown")
+    
+    # 1. 从检测器获取模式
+    pd = PatternDetector(
+        memory_dir=str(PROJECT_ROOT.parent / "memory"),
+        lookback_days=30,  # 扩大搜索范围
+        min_evidence=1
+    )
+    patterns = pd.detect()
+    
+    # 2. 查找匹配的模式
+    target_pattern = None
+    for p in patterns:
+        if p.pattern_id == args.pattern_id:
+            target_pattern = p
+            break
+    
+    if not target_pattern:
+        print(f"❌ 未找到模式: {args.pattern_id}")
+        print("可用的模式:")
+        for p in patterns:
+            print(f"  - {p.pattern_id}: {p.pattern_name}")
+        return
+    
+    # 3. 生成技能文档
+    try:
+        skill_path = generate_skill(target_pattern)
+        print(f"✅ 技能文档已生成: {skill_path}")
+        
+        # 4. 显示技能内容
+        skill_content = Path(skill_path).read_text(encoding="utf-8")
+        print("\n" + "="*50)
+        print("生成的技能文档:")
+        print("="*50)
+        print(skill_content)
+        
+    except Exception as e:
+        print(f"❌ 生成失败: {e}")
+        logger.error(f"技能生成失败: {e}")
 
 
 def cmd_run(args):
@@ -84,7 +122,19 @@ def cmd_run(args):
     for p in patterns:
         if p.confidence >= 0.7:
             print(f"🛠️  生成技能: {p.suggested_skill_name}")
-    logger.info("\n✅ 流水线完成!")
+            try:
+                skill_path = generate_skill(p)
+                print(f"  ✅ 已生成: {skill_path}")
+                
+                # 验证技能
+                if vet_skill(skill_path):
+                    print(f"  ✅ 验证通过")
+                else:
+                    print(f"  ⚠️  验证失败")
+            except Exception as e:
+                print(f"  ❌ 生成失败: {e}")
+        else:
+            print(f"⏭️  跳过低置信度模式: {p.pattern_name} ({p.confidence:.2f})")
 
 
 if __name__ == "__main__":

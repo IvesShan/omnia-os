@@ -70,7 +70,7 @@ async def decompose_goal(request: DecomposeRequest):
     每个子任务分配给专业角色（frontend/backend/devops/research）。
     """
     try:
-        from core.actuator.agent_swarm import AgentSwarm, SubTask
+        from src.core.actuator.agent_swarm import AgentSwarm, SubTask
         
         swarm = AgentSwarm()
         subtasks = swarm.decompose(request.goal, request.context or None)
@@ -106,7 +106,7 @@ async def execute_parallel(request: ExecuteRequest):
     各 Agent 并行执行，结果聚合后返回。
     """
     try:
-        from core.actuator.agent_swarm import AgentSwarm, SubTask, SubAgentResult
+        from src.core.actuator.agent_swarm import AgentSwarm, SubTask, SubAgentResult
         
         swarm = AgentSwarm()
         
@@ -199,7 +199,7 @@ async def quick_execute(goal: str, context: str = ""):
     简化接口，只需提供目标，自动完成分解和执行。
     """
     try:
-        from core.actuator.agent_swarm import AgentSwarm
+        from src.core.actuator.agent_swarm import AgentSwarm
         
         swarm = AgentSwarm()
         results = swarm.execute(goal, context=context or None)

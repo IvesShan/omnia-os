@@ -69,15 +69,15 @@ def handle_chat(message: str, history: list, api_key: str, provider: str, system
     6. 会话历史自动加载（NEW - 解决对话连续性问题）
     """
     from omnia.chat import _call_model_messages
-    from core.actuator.tool_registry import TOOLS_SCHEMA, check_tool_safety, dispatch_tool
-    from core.cognition.context_compressor import ContextCompressor
-    from core.plugin.hooks import HookRegistry, HookType, HookContext, get_hook_registry
-    from core.cognition.prompt_builder import PromptBuilder, PromptContext, get_prompt_builder
-    from core.neural_graph.context_enhancer import get_graph_enhancer
-    from core.memory_palace.memory_palace_with_graph import MemoryPalace
-    from core.neural_graph.updater import NeuralGraphUpdater
-    from core.session_manager import get_session_manager, load_recent_conversations, merge_histories
-    from core.context_manager import ContextManager, SessionContext, save_current_context
+    from src.core.actuator.tool_registry import TOOLS_SCHEMA, check_tool_safety, dispatch_tool
+    from src.core.cognition.context_compressor import ContextCompressor
+    from src.core.plugin.hooks import HookRegistry, HookType, HookContext, get_hook_registry
+    from src.core.cognition.prompt_builder import PromptBuilder, PromptContext, get_prompt_builder
+    from src.core.neural_graph.context_enhancer import get_graph_enhancer
+    from src.core.memory_palace.memory_palace_with_graph import MemoryPalace
+    from src.core.neural_graph.updater import NeuralGraphUpdater
+    from src.core.session_manager import get_session_manager, load_recent_conversations, merge_histories
+    from src.core.context_manager import ContextManager, SessionContext, save_current_context
     from pathlib import Path
     
 
