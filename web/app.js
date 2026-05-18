@@ -766,11 +766,14 @@ async function sendMessage() {
   sendBtn.disabled = true;
   attachBtn.disabled = true;
   
-  // 构建历史消息
-  const history = chatHistory.slice(-50).map(m => ({
+  // 构建历史消息（带自动压缩）
+  const rawHistory = chatHistory.slice(-200).map(m => ({
     role: m.role,
     content: m.content
   }));
+  
+  // 自动压缩旧消息
+  const history = await buildCompressedHistory(rawHistory);
 
   // 使用 SSE 流式端点
   let reader = null;
@@ -2247,7 +2250,7 @@ function updateTokenDisplay(status) {
 // 检查 Token 状态
 async function checkTokenStatus() {
   // 从 chatHistory 构建消息列表
-  const messages = chatHistory.slice(-50).map(m => ({
+  const messages = chatHistory.slice(-200).map(m => ({
     role: m.role,
     content: m.content
   }));

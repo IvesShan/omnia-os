@@ -181,6 +181,7 @@ from src.omnia.routers import computer, interrupt, wake
 from src.omnia.routers import confirm, ide, model_status
 from src.omnia.routers import discuss, long_task, fts
 from src.omnia.routers import learner
+from src.omnia.routers import summary
 from src.omnia.routers import vector, plan, gateway
 from src.omnia.routers import reasoning, capability, reflection, progressive
 from src.omnia.routers import performance
@@ -334,3 +335,4 @@ if __name__ == "__main__":
         port=settings.port,
         reload=settings.debug
     )
+app.include_router(summary.router, prefix="/api", tags=["summary"])
