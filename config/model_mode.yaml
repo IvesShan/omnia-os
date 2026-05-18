@@ -1,5 +1,5 @@
 # Omnia 模型模式配置
-# 当前模式: local (本地)
+# 当前模式: cloud (云端)
 
 current_mode: cloud
 
@@ -13,12 +13,13 @@ local:
 # 云端模型配置
 cloud:
   enabled: true
-  provider: xiaomi
-  model: "mimo-v2.5-pro"
+  provider: kimi
+  model: "kimi-code"
 
-# Xiaomi MiMo 配置
-mimo:
+# Kimi 配置 (Coding Plan)
+kimi:
   enabled: true
-  provider: xiaomi
-  model: "mimo-v2.5-pro"
-  api_key_env: "MIMO_API_KEY"
+  provider: kimi
+  model: "kimi-code"
+  api_key_env: "MOONSHOT_API_KEY"
+  api_url: "https://api.kimi.com/coding/v1/messages"

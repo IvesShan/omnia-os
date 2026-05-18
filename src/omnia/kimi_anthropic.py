@@ -99,6 +99,7 @@ def call_kimi_anthropic(
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {api_key}",
+        "anthropic-version": "2023-06-01",
         "User-Agent": "Omnia-Agent/1.0"
     }
     

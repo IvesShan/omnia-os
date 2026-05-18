@@ -47,8 +47,14 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 8000) {
     clearTimeout(timer);
     return response;
   } catch (err) {
-    clearTimeout(timer);
-    throw err;
+    removeTyping();
+    if (window.currentAbortController && window.currentAbortController.signal.aborted) {
+      console.log("[Chat] User aborted");
+    } else if (err.name === "AbortError" || (err.message && err.message.includes("aborted"))) {
+      appendOmnia("⏱️ 请求超时，任务已暂停。如需要可重新发送消息继续。");
+    } else {
+      appendOmnia();
+    }
   }
 }
 
@@ -605,12 +611,17 @@ function appendUserWithImage(text, imageData) {
 
 let typingEl = null;
 function showTyping(message = "正在思考…") {
+  // 如果已存在指示器，更新文本而不是重新创建
+  if (typingEl) {
+    updateTypingStatus(message);
+    return;
+  }
   typingEl = document.createElement('div');
   typingEl.className = 'msg omnia thinking-indicator';
   typingEl.innerHTML = `
     <div class="bubble">
       <div class="typing"><span></span><span></span><span></span></div>
-      <div class="thinking-text" style=\"margin-top:8px;font-size:13px;color:var(--text-muted)\">Omnia · ${escapeHtml(message)}</div>
+      <div class="thinking-text" style="margin-top:8px;font-size:13px;color:var(--text-muted)">Omnia · ${escapeHtml(message)}</div>
     </div>
   `;
   messagesEl.appendChild(typingEl);
@@ -868,7 +879,16 @@ async function sendMessage() {
     let omniaMsg = null;
 
     while (true) {
-      const { done, value } = await reader.read();
+      let done, value;
+      try {
+        ({ done, value } = await reader.read());
+      } catch (e) {
+        if (e.name === 'AbortError' || e.message.includes('aborted')) {
+          console.log('[Stream] Aborted by user');
+          break;
+        }
+        throw e;
+      }
       if (done) break;
 
       const chunk = decoder.decode(value, { stream: true });
@@ -1009,7 +1029,13 @@ async function sendMessage() {
 
   } catch (err) {
     removeTyping();
-    appendOmnia(`[网络错误] ${err.message}`);
+    if (window.currentAbortController && window.currentAbortController.signal.aborted) {
+      console.log("[Chat] User aborted");
+    } else if (err.name === "AbortError" || (err.message && err.message.includes("aborted"))) {
+      appendOmnia("⏱️ 请求超时，任务已暂停。如需要可重新发送消息继续。");
+    } else {
+      appendOmnia(`[错误] ${err.message || "未知错误"}`);
+    }
   } finally {
     composer.disabled = false;
     sendBtn.disabled = false;
@@ -1046,6 +1072,9 @@ function updateOmniaMessage(el, content, final = false) {
 
 // 辅助函数：添加工具卡片
 function appendToolCard(name, args, status = 'running') {
+  // 空值保护
+  if (!name) name = 'unknown-tool';
+  if (!args) args = {};
   const icon = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(34,211,238,0.85)" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>`;
   
   const statusColors = {
@@ -1856,7 +1885,13 @@ async function submitConfirm(approved) {
     }
   } catch (err) {
     removeTyping();
-    appendOmnia(`[网络错误] ${err.message}`);
+    if (window.currentAbortController && window.currentAbortController.signal.aborted) {
+      console.log("[Chat] User aborted");
+    } else if (err.name === "AbortError" || (err.message && err.message.includes("aborted"))) {
+      appendOmnia("⏱️ 请求超时，任务已暂停。如需要可重新发送消息继续。");
+    } else {
+      appendOmnia(`[错误] ${err.message || "未知错误"}`);
+    }
   } finally {
     btnAllow.disabled = false;
     btnDeny.disabled = false;
@@ -2338,8 +2373,9 @@ const originalSendMessage = sendMessage;
 
 // 重写 sendMessage，添加 AbortController 支持
 sendMessage = async function() {
-  // 创建 AbortController
+  // 创建 AbortController 并显示停止按钮
   window.currentAbortController = new AbortController();
+  showStopButton(true);
   
   try {
     await originalSendMessage();

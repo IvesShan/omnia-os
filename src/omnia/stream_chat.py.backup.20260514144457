@@ -209,53 +209,10 @@ def _stream_chat_unified(
     # 所有后续 assistant 消息都必须包含 reasoning_content 字段
     thinking_mode_active = False
     
-    # === 执行历史记录（用于循环检测和反思）===
-    execution_history = []  # 记录每次工具调用: [{name, args, result_summary, iteration}]
-    
     # === 工具迭代循环 ===
     iteration = 0
     while iteration < max_iterations:
         iteration += 1
-        
-        # === 循环检测 & 执行摘要注入 ===
-        if execution_history:
-            # 检测严格循环（完全相同参数）
-            if len(execution_history) >= 2:
-                last = execution_history[-1]
-                prev = execution_history[-2]
-                if last['name'] == prev['name'] and last['args'] == prev['args']:
-                    loop_msg = "检测到工具调用循环：工具 {} 以相同参数被连续调用".format(last['name'])
-                    print("[stream_chat] ⚠️ {}".format(loop_msg))
-                    yield "data: " + json.dumps({'type': 'status', 'message': '⚠️ 检测到循环: {} 重复调用'.format(last['name'])}) + "\n\n"
-                    yield "data: " + json.dumps({'type': 'error', 'message': loop_msg}) + "\n\n"
-                    done_msg = full_content + "\n\n⚠️ 执行中断：{}。建议换用其他方法解决问题。".format(loop_msg)
-                    yield "data: " + json.dumps({'type': 'done', 'full_content': done_msg}) + "\n\n"
-                    return
-            
-            # 构建执行摘要，注入到系统提示中
-            summary = "\n\n【执行摘要 - 请仔细阅读并调整策略】\n"
-            summary += "当前进度: 第 {} 轮 / 最多 {} 轮\n".format(iteration, max_iterations)
-            summary += "已执行步骤（最近5次）:\n"
-            for i, entry in enumerate(execution_history[-5:], 1):
-                status = "✅" if entry.get('success', False) else "❌"
-                args_str = json.dumps(entry['args'], ensure_ascii=False)
-                if len(args_str) > 80:
-                    args_str = args_str[:77] + "..."
-                summary += "  {}. {} {}({}) → {}\n".format(i, status, entry['name'], args_str, entry['result_summary'])
-            
-            summary += "\n【策略提示 - 必须遵守】\n"
-            summary += "1. 如果上一步失败了，请分析原因并换用不同方法\n"
-            summary += "2. 不要重复执行已经失败过的相同操作（相同工具+相同参数）\n"
-            summary += "3. 考虑使用其他工具、调整参数，或改变解决思路\n"
-            summary += "4. 如果连续尝试同一方向都失败，请尝试完全不同的方法\n"
-            summary += "【执行摘要结束】\n"
-            
-            # 将摘要注入到系统消息中（messages[0] 是系统消息）
-            if messages and messages[0].get("role") == "system":
-                messages[0]["content"] += summary
-        
-        # 发送当前轮次状态
-        yield "data: " + json.dumps({'type': 'status', 'message': '第 {}/{} 轮思考中...'.format(iteration, max_iterations)}) + "\n\n"
         
         # === 构建请求参数 ===
         headers = _build_headers(api_key, provider)
@@ -487,7 +444,6 @@ def _stream_chat_unified(
             
             for tool_call, result in zip(tool_calls, results):
                 function_name = (tool_call.get("function") or {}).get("name", "unknown")
-                result_summary = str(result.result)[:100] if result.success else "错误:" + str(result.error)[:100]
                 yield f"data: {json.dumps({'type': 'tool_result', 'name': function_name, 'content': str(result.result)[:200] if result.success else str(result.error)[:200]})}\n\n"
                 
                 # 添加工具结果到消息历史
@@ -496,15 +452,6 @@ def _stream_chat_unified(
                     "role": "tool",
                     "tool_call_id": tool_call_id,
                     "content": str(result.result) if result.success else str(result.error)
-                })
-                
-                # 记录执行历史（用于循环检测和反思）
-                execution_history.append({
-                    'name': function_name,
-                    'args': processed_tool_calls[tool_calls.index(tool_call)]['arguments'],
-                    'result_summary': result_summary,
-                    'success': result.success,
-                    'iteration': iteration
                 })
         else:
             # 逐个执行
@@ -524,7 +471,6 @@ def _stream_chat_unified(
                 # 执行工具
                 result = optimizer.execute_tool(tool_name, args)
                 
-                result_summary = str(result.result)[:100] if result.success else "错误:" + str(result.error)[:100]
                 yield f"data: {json.dumps({'type': 'tool_result', 'name': tool_name, 'content': str(result.result)[:200] if result.success else str(result.error)[:200]})}\n\n"
                 
                 # 添加工具结果到消息历史
@@ -533,15 +479,6 @@ def _stream_chat_unified(
                     "role": "tool",
                     "tool_call_id": tool_call_id,
                     "content": str(result.result) if result.success else str(result.error)
-                })
-                
-                # 记录执行历史（用于循环检测和反思）
-                execution_history.append({
-                    'name': tool_name,
-                    'args': args,
-                    'result_summary': result_summary,
-                    'success': result.success,
-                    'iteration': iteration
                 })
         
         # 记录中间步骤

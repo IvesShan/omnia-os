@@ -809,13 +809,7 @@ async function sendMessage() {
 
           if (data.type === 'status') {
             // 显示状态时自动滚动到底部
-            if (typeof typingEl !== 'undefined' && typingEl) {
-              // 已经有状态消息，更新它
-              updateTypingStatus(data.message || '正在思考...');
-            } else {
-              // 没有状态消息，创建新的
-              showTyping(data.message || '正在思考...');
-            }
+            showTyping(data.message || '正在思考...');
             scrollToBottom(true);  // 强制滚动
           }
           

@@ -47,6 +47,7 @@ echo -e "${BLUE}[1/4] 杀死所有 Omnia 后台进程...${NC}"
 PID_FILES=(
     "$OMNIA_HOME/daemon.pid"
     "$OMNIA_HOME/web_server.pid"
+    "$OMNIA_HOME/fastapi_server.pid"
     "$OMNIA_HOME/watchdog.pid"
     "$PROJECT_ROOT/.pids/daemon.pid"
 )
@@ -74,7 +75,7 @@ KILL_PATTERNS=(
     "watchdog.py"
     "omnia/web_server"
     "src.backend.main"
-    "uvicorn"
+    "uvicorn.*src.omnia.main"
 )
 
 for pattern in "${KILL_PATTERNS[@]}"; do
@@ -87,47 +88,41 @@ for pattern in "${KILL_PATTERNS[@]}"; do
     fi
 done
 
-# 1.3 释放端口 5001（兼容 Linux + macOS）
-echo -e "  → 释放端口 ${YELLOW}5001${NC}..."
+# 1.3 释放端口 8765（兼容 Linux + macOS）
+echo -e "  → 释放端口 ${YELLOW}8765${NC}..."
 if [ "$OS_TYPE" = "macos" ]; then
     # macOS: 使用 lsof
-    lsof_pid=$(lsof -ti :5001 2>/dev/null || true)
+    lsof_pid=$(lsof -ti :8765 2>/dev/null || true)
     if [ -n "$lsof_pid" ]; then
-        echo -e "  → 端口 5001 被 PID $lsof_pid 占用"
+        echo -e "  → 端口 8765 被 PID $lsof_pid 占用"
         kill -9 $lsof_pid 2>/dev/null || true
     fi
 else
     # Linux: 使用 fuser
-    fuser -k 5001/tcp 2>/dev/null || true
+    fuser -k 8765/tcp 2>/dev/null || true
 fi
+
+# 等待进程完全退出
 sleep 1
 
-# 1.4 额外清理：清除所有可能残留的 Python omnia 进程
-echo -e "  → 最终清理..."
-for pid in $(pgrep -f "python3.*omnia" 2>/dev/null || true); do
-    kill "$pid" 2>/dev/null || true
-done
-sleep 0.5
-for pid in $(pgrep -f "python3.*omnia" 2>/dev/null || true); do
-    kill -9 "$pid" 2>/dev/null || true
-done
-
-sleep 1
-
-# 验证端口 5001 是否释放
-if command -v lsof &>/dev/null; then
-    if lsof -i :5001 >/dev/null 2>&1; then
-        echo -e "  ${RED}⚠ 端口 5001 仍有残留，强制释放...${NC}"
-        if [ "$OS_TYPE" = "macos" ]; then
-            kill -9 $(lsof -ti :5001) 2>/dev/null || true
-        else
-            fuser -k -9 5001/tcp 2>/dev/null || true
-        fi
-        sleep 1
+# 验证端口 8765 是否释放
+if [ "$OS_TYPE" = "macos" ]; then
+    if lsof -i :8765 >/dev/null 2>&1; then
+        echo -e "  ${RED}⚠ 端口 8765 仍有残留，强制释放...${NC}"
+        kill -9 $(lsof -ti :8765) 2>/dev/null || true
+    else
+        echo -e "  ✓ 端口 8765 已释放"
+    fi
+else
+    if ss -tlnp | grep -q ":8765 " 2>/dev/null; then
+        echo -e "  ${RED}⚠ 端口 8765 仍有残留，强制释放...${NC}"
+        fuser -k -9 8765/tcp 2>/dev/null || true
+    else
+        echo -e "  ✓ 端口 8765 已释放"
     fi
 fi
 
-echo -e "${GREEN}  ✓ 所有进程已清除${NC}"
+echo -e "  ${GREEN}✓ 进程清理完成${NC}"
 echo ""
 
 # ============================================================
@@ -135,77 +130,55 @@ echo ""
 # ============================================================
 echo -e "${BLUE}[2/4] 清理临时文件...${NC}"
 
-# 删除锁文件和运行时标记
-rm -f "$OMNIA_HOME"/*.pid 2>/dev/null || true
-rm -f "$PROJECT_ROOT"/.pids/*.pid 2>/dev/null || true
+# 清理 __pycache__
+find "$PROJECT_ROOT/src" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+echo -e "  ✓ 已清理 __pycache__"
 
-echo -e "${GREEN}  ✓ 临时文件已清理${NC}"
+# 清理 .pyc 文件
+find "$PROJECT_ROOT/src" -type f -name "*.pyc" -delete 2>/dev/null || true
+echo -e "  ✓ 已清理 .pyc 文件"
+
+echo -e "  ${GREEN}✓ 清理完成${NC}"
 echo ""
 
 # ============================================================
-# 第三步：检查环境
+# 第三步：检查依赖
 # ============================================================
-echo -e "${BLUE}[3/4] 检查运行环境...${NC}"
+echo -e "${BLUE}[3/4] 检查 Python 环境...${NC}"
 
-# 3.1 Python 检查
-PYTHON_CMD=""
-for cmd in python3 python; do
-    if command -v "$cmd" &>/dev/null; then
-        PYTHON_CMD="$cmd"
-        break
-    fi
-done
-
-if [ -z "$PYTHON_CMD" ]; then
-    echo -e "${RED}  ✗ 错误：未找到 Python 环境${NC}"
+# 检测 Python 版本
+USE_PYTHON=""
+if command -v python3 &>/dev/null; then
+    USE_PYTHON="python3"
+elif command -v python &>/dev/null; then
+    USE_PYTHON="python"
+else
+    echo -e "  ${RED}✗ 未找到 Python，请先安装 Python 3.8+${NC}"
     exit 1
 fi
 
-PYTHON_VER=$($PYTHON_CMD --version 2>&1)
-echo -e "  ✓ Python: ${GREEN}$PYTHON_VER${NC}"
+PY_VERSION=$($USE_PYTHON --version 2>&1 | grep -oP '\d+\.\d+')
+echo -e "  → Python: ${GREEN}$USE_PYTHON ($PY_VERSION)${NC}"
 
-# 3.2 虚拟环境检测
-VENV_PYTHON=""
-if [ -f "$PROJECT_ROOT/venv/bin/python3" ]; then
-    # 检查 venv 是否为当前系统编译（跨平台兼容性检查）
-    VENV_ARCH=$("$PROJECT_ROOT/venv/bin/python3" -c "import platform; print(platform.machine())" 2>/dev/null || echo "unknown")
-    SYS_ARCH=$($PYTHON_CMD -c "import platform; print(platform.machine())" 2>/dev/null || echo "unknown")
-    VENV_OS=$("$PROJECT_ROOT/venv/bin/python3" -c "import sys; print(sys.platform)" 2>/dev/null || echo "unknown")
-    SYS_OS=$($PYTHON_CMD -c "import sys; print(sys.platform)" 2>/dev/null || echo "unknown")
-
-    if [ "$VENV_ARCH" = "$SYS_ARCH" ] && [ "$VENV_OS" = "$SYS_OS" ]; then
-        VENV_PYTHON="$PROJECT_ROOT/venv/bin/python3"
-        echo -e "  ✓ 虚拟环境: ${GREEN}venv/bin/python3${NC} ($VENV_ARCH)"
-    else
-        echo -e "  ${YELLOW}⚠ venv 不兼容（源: $VENV_OS/$VENV_ARCH, 当前: $SYS_OS/$SYS_ARCH）${NC}"
-        echo -e "  ${YELLOW}  需要重新创建虚拟环境：python3 -m venv venv && venv/bin/pip install -r requirements.txt${NC}"
-        echo -e "  ${YELLOW}  临时使用系统 Python...${NC}"
-    fi
-elif [ -f "$PROJECT_ROOT/.venv/bin/python3" ]; then
-    VENV_PYTHON="$PROJECT_ROOT/.venv/bin/python3"
-    echo -e "  ✓ 虚拟环境: ${GREEN}.venv/bin/python3${NC}"
-else
-    echo -e "  ${YELLOW}⚠ 未检测到虚拟环境，使用系统 Python${NC}"
+# 检测 uvicorn
+if ! $USE_PYTHON -c "import uvicorn" 2>/dev/null; then
+    echo -e "  ${YELLOW}⚠ uvicorn 未安装，正在安装...${NC}"
+    $USE_PYTHON -m pip install uvicorn[standard] fastapi pydantic-settings sse-starlette httpx -q
 fi
+echo -e "  → uvicorn: ${GREEN}✓${NC}"
 
-# 3.3 .env 检查
-if [ -f "$PROJECT_ROOT/.env" ]; then
-    echo -e "  ✓ 配置文件: ${GREEN}.env${NC}"
-else
-    echo -e "  ${YELLOW}⚠ 未找到 .env 文件，部分功能可能受限${NC}"
+# 检测 httpx
+if ! $USE_PYTHON -c "import httpx" 2>/dev/null; then
+    echo -e "  ${YELLOW}⚠ httpx 未安装，正在安装...${NC}"
+    $USE_PYTHON -m pip install httpx -q
 fi
+echo -e "  → httpx: ${GREEN}✓${NC}"
 
-# 3.4 依赖检查
-DEP_MISSING=false
-$PYTHON_CMD -c "import flask" 2>/dev/null || DEP_MISSING=true
-if [ "$DEP_MISSING" = true ]; then
-    echo -e "  ${YELLOW}⚠ 缺少依赖，正在安装...${NC}"
-    if [ -n "$VENV_PYTHON" ]; then
-        "$VENV_PYTHON" -m pip install -r "$PROJECT_ROOT/requirements.txt" -q 2>/dev/null || true
-    else
-        $PYTHON_CMD -m pip install -r "$PROJECT_ROOT/requirements.txt" -q 2>/dev/null || true
-    fi
-    echo -e "${GREEN}  ✓ 依赖安装完成${NC}"
+# 检查 .env 文件
+if [ ! -f "$PROJECT_ROOT/.env" ]; then
+    echo -e "  ${YELLOW}⚠ 未找到 .env 文件，请确保已配置 API Keys${NC}"
+else
+    echo -e "  → .env: ${GREEN}✓${NC}"
 fi
 
 echo ""
@@ -214,65 +187,29 @@ echo ""
 # 第四步：启动所有服务
 # ============================================================
 echo -e "${BLUE}[4/4] 启动 Omnia 服务...${NC}"
-
-# 确定使用哪个 Python
-if [ -n "$VENV_PYTHON" ]; then
-    USE_PYTHON="$VENV_PYTHON"
-else
-    USE_PYTHON="$PYTHON_CMD"
-fi
-
-PYTHON_USED=$($USE_PYTHON --version 2>&1)
-echo -e "  ┌─ 使用: ${GREEN}$USE_PYTHON${NC} ($PYTHON_USED)"
 echo ""
 
-# 4.1 启动 Web Server（Flask，端口 5001）
-echo -e "  ┌─ ${YELLOW}Web Server${NC} (http://localhost:5001)"
-echo -e "  │  端口: 5001"
-nohup "$USE_PYTHON" "$PROJECT_ROOT/src/omnia/web_server.py" \
-    > "$OMNIA_HOME/web_server.log" 2>&1 &
-WEB_PID=$!
-echo "$WEB_PID" > "$OMNIA_HOME/web_server.pid"
-echo -e "  │  PID: ${GREEN}$WEB_PID${NC}"
-echo -e "  │  日志: $OMNIA_HOME/web_server.log"
+# 4.1 启动 FastAPI Server（端口 8765）
+echo -e "  ┌─ ${YELLOW}FastAPI Server${NC} (http://localhost:8765)"
+echo -e "  │  端口: 8765"
+cd "$PROJECT_ROOT"
+nohup $USE_PYTHON -m uvicorn src.omnia.main:app \
+    --host 0.0.0.0 \
+    --port 8765 \
+    --reload \
+    > "$OMNIA_HOME/fastapi_server.log" 2>&1 &
+FASTAPI_PID=$!
+echo "$FASTAPI_PID" > "$OMNIA_HOME/fastapi_server.pid"
+echo -e "  │  PID: ${GREEN}$FASTAPI_PID${NC}"
+echo -e "  │  日志: $OMNIA_HOME/fastapi_server.log"
 echo -e "  └─ ${GREEN}✓ 已启动${NC}"
-
-sleep 2
-
-# 4.2 启动守护进程（Persona Daemon）
-echo -e "  ┌─ ${YELLOW}守护进程${NC} (后台服务)"
-echo -e "  │  功能: 上下文管理 + 记忆服务 + 心跳"
-nohup "$USE_PYTHON" "$PROJECT_ROOT/scripts/start_daemon.py" \
-    > "$OMNIA_HOME/daemon_start.log" 2>&1 &
-sleep 2
-if [ -f "$OMNIA_HOME/daemon.pid" ]; then
-    DAEMON_PID=$(cat "$OMNIA_HOME/daemon.pid")
-    echo -e "  │  PID: ${GREEN}$DAEMON_PID${NC}"
-else
-    echo -e "  │  ${YELLOW}⚠ daemon.pid 未生成，可能启动较慢${NC}"
-fi
-echo -e "  │  日志: $OMNIA_HOME/daemon.log"
-echo -e "  └─ ${GREEN}✓ 已启动${NC}"
-
-sleep 1
-
-# 4.3 启动看门狗（Watchdog）
-echo -e "  ┌─ ${YELLOW}看门狗${NC} (健康监控)"
-echo -e "  │  功能: 自动检测进程状态，异常时重启"
-nohup "$USE_PYTHON" "$PROJECT_ROOT/scripts/watchdog.py" \
-    > "$OMNIA_HOME/watchdog_output.log" 2>&1 &
-WATCHDOG_PID=$!
-echo "$WATCHDOG_PID" > "$OMNIA_HOME/watchdog.pid"
-echo -e "  │  PID: ${GREEN}$WATCHDOG_PID${NC}"
-echo -e "  │  日志: $OMNIA_HOME/watchdog.log"
-echo -e "  └─ ${GREEN}✓ 已启动${NC}"
-
-# 等待 Web Server 就绪
 echo ""
+
+# 等待 FastAPI Server 就绪
 echo -e "${YELLOW}等待服务就绪...${NC}"
-for i in $(seq 1 10); do
-    if curl -s http://localhost:5001/health >/dev/null 2>&1; then
-        echo -e "${GREEN}  ✓ Web Server 响应正常${NC}"
+for i in $(seq 1 15); do
+    if curl -s http://localhost:8765/health >/dev/null 2>&1; then
+        echo -e "${GREEN}  ✓ FastAPI Server 响应正常${NC}"
         break
     fi
     sleep 1
@@ -283,24 +220,20 @@ echo -e "${GREEN}╔════════════════════
 echo -e "${GREEN}║              Omnia 重启完成！                           ║${NC}"
 echo -e "${GREEN}╚══════════════════════════════════════════════════════════╝${NC}"
 echo ""
-echo -e "  ${BLUE}Web 管理界面:${NC}  http://localhost:5001"
-echo -e "  ${BLUE}健康检查:${NC}      http://localhost:5001/health"
-echo -e "  ${BLUE}API 状态:${NC}      http://localhost:5001/api/status"
+echo -e "  ${BLUE}FastAPI Server:${NC}  http://localhost:8765"
+echo -e "  ${BLUE}健康检查:${NC}      http://localhost:8765/health"
+echo -e "  ${BLUE}API 文档:${NC}      http://localhost:8765/docs"
 echo ""
 echo -e "  ${BLUE}进程列表:${NC}"
-echo -e "    Web Server:   $(cat $OMNIA_HOME/web_server.pid 2>/dev/null || echo 'N/A')"
-echo -e "    守护进程:     $(cat $OMNIA_HOME/daemon.pid 2>/dev/null || echo 'N/A')"
-echo -e "    看门狗:       $(cat $OMNIA_HOME/watchdog.pid 2>/dev/null || echo 'N/A')"
+echo -e "    FastAPI Server: $(cat $OMNIA_HOME/fastapi_server.pid 2>/dev/null || echo 'N/A')"
 echo ""
 echo -e "  ${BLUE}日志文件:${NC}"
-echo -e "    Web:          $OMNIA_HOME/web_server.log"
-echo -e "    守护进程:     $OMNIA_HOME/daemon.log"
-echo -e "    看门狗:       $OMNIA_HOME/watchdog.log"
+echo -e "    FastAPI:       $OMNIA_HOME/fastapi_server.log"
 echo ""
 
 # 如果服务未就绪，给出提示
-if ! curl -s http://localhost:5001/health >/dev/null 2>&1; then
+if ! curl -s http://localhost:8765/health >/dev/null 2>&1; then
     echo -e "${YELLOW}  ⚠ 服务仍在启动中，请稍后刷新页面...${NC}"
-    echo -e "  ${YELLOW}  查看启动日志: tail -f $OMNIA_HOME/web_server.log${NC}"
+    echo -e "  ${YELLOW}  查看启动日志: tail -f $OMNIA_HOME/fastapi_server.log${NC}"
 fi
 echo ""
