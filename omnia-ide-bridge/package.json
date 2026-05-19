@@ -1,22 +1,123 @@
 {
   "name": "omnia-ide-bridge",
-  "displayName": "Omnia IDE Bridge",
-  "description": "Send active file and cursor context to Omnia",
-  "version": "0.1.0",
+  "displayName": "Omnia AI Assistant",
+  "description": "AI-powered coding assistant with chat panel, inline edit, and context awareness",
+  "version": "0.2.0",
   "publisher": "origin",
   "engines": {
     "vscode": "^1.80.0"
   },
   "categories": [
-    "Other"
+    "Other",
+    "AI"
   ],
   "activationEvents": [
     "onStartupFinished"
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "omnia-ai",
+          "title": "Omnia AI",
+          "icon": "resources/omnia-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "omnia-ai": [
+        {
+          "type": "webview",
+          "id": "omnia.chatPanel",
+          "name": "AI Chat"
+        },
+        {
+          "type": "tree",
+          "id": "omnia.contextPanel",
+          "name": "Context"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "omnia.openChat",
+        "title": "Omnia: Open AI Chat",
+        "icon": "$(comment-discussion)"
+      },
+      {
+        "command": "omnia.explainCode",
+        "title": "Omnia: Explain Code",
+        "icon": "$(info)"
+      },
+      {
+        "command": "omnia.fixCode",
+        "title": "Omnia: Fix Code",
+        "icon": "$(wrench)"
+      },
+      {
+        "command": "omnia.inlineEdit",
+        "title": "Omnia: Edit with AI",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "omnia.commitChanges",
+        "title": "Omnia: Generate Commit Message",
+        "icon": "$(git-commit)"
+      },
+      {
+        "command": "omnia.sendToChat",
+        "title": "Omnia: Send to Chat",
+        "icon": "$(send)"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "omnia.explainCode",
+          "when": "editorHasSelection",
+          "group": "omnia@1"
+        },
+        {
+          "command": "omnia.fixCode",
+          "when": "editorHasSelection",
+          "group": "omnia@2"
+        },
+        {
+          "command": "omnia.inlineEdit",
+          "when": "editorHasSelection",
+          "group": "omnia@3"
+        },
+        {
+          "command": "omnia.sendToChat",
+          "when": "editorHasSelection",
+          "group": "omnia@4"
+        }
+      ],
+      "commandPalette": [
+        { "command": "omnia.openChat" },
+        { "command": "omnia.explainCode", "when": "editorHasSelection" },
+        { "command": "omnia.fixCode", "when": "editorHasSelection" },
+        { "command": "omnia.inlineEdit", "when": "editorHasSelection" },
+        { "command": "omnia.commitChanges" },
+        { "command": "omnia.sendToChat", "when": "editorHasSelection" }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "omnia.openChat",
+        "key": "ctrl+shift+o",
+        "mac": "cmd+shift+o"
+      },
+      {
+        "command": "omnia.sendToChat",
+        "key": "ctrl+shift+enter",
+        "mac": "cmd+shift+enter",
+        "when": "editorHasSelection"
+      }
+    ],
     "configuration": {
-      "title": "Omnia IDE Bridge",
+      "title": "Omnia AI Assistant",
       "properties": {
         "omnia.ideBridge.enabled": {
           "type": "boolean",
@@ -25,20 +126,32 @@
         },
         "omnia.ideBridge.endpoint": {
           "type": "string",
-          "default": "http://127.0.0.1:5001/ide-context",
-          "description": "Omnia daemon endpoint"
+          "default": "http://127.0.0.1:8765",
+          "description": "Omnia backend endpoint"
         },
         "omnia.ideBridge.debounceMs": {
           "type": "number",
           "default": 300,
           "description": "Debounce delay for selection changes"
+        },
+        "omnia.ai.autoInjectContext": {
+          "type": "boolean",
+          "default": true,
+          "description": "Auto-inject current file context into chat"
+        },
+        "omnia.ai.maxContextLength": {
+          "type": "number",
+          "default": 4000,
+          "description": "Maximum context length to send (characters)"
         }
       }
     }
   },
   "scripts": {
     "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./"
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package",
+    "lint": "eslint src --ext ts"
   },
   "devDependencies": {
     "@types/node": "^25.6.0",
