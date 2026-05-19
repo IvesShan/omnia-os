@@ -1,8 +1,8 @@
 {
   "name": "omnia-ide-bridge",
-  "displayName": "Omnia AI Assistant",
-  "description": "AI-powered coding assistant: chat (@omnia), inline edit with diff, CodeLens, code completion",
-  "version": "0.4.0",
+  "displayName": "Omnia AI 助手",
+  "description": "AI 编程助手：Agent 模式、聊天、内联编辑、终端命令、多文件修改、Git 操作、项目生成",
+  "version": "0.9.0",
   "publisher": "origin",
   "engines": {
     "vscode": "^1.90.0"
@@ -16,46 +16,94 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "omnia-chat",
+          "title": "Omnia AI",
+          "icon": "$(comment-discussion)"
+        }
+      ]
+    },
+    "views": {
+      "omnia-chat": [
+        {
+          "type": "webview",
+          "id": "omnia.chatView",
+          "name": "聊天"
+        }
+      ]
+    },
     "commands": [
       {
+        "command": "omnia.openChat",
+        "title": "Omnia: 打开聊天",
+        "icon": "$(comment-discussion)"
+      },
+      {
         "command": "omnia.explainCode",
-        "title": "Omnia: Explain Code",
+        "title": "Omnia: 解释代码",
         "icon": "$(info)"
       },
       {
         "command": "omnia.fixCode",
-        "title": "Omnia: Fix Code",
+        "title": "Omnia: 修复代码",
         "icon": "$(wrench)"
       },
       {
         "command": "omnia.inlineEdit",
-        "title": "Omnia: Edit with AI (Diff Preview)",
+        "title": "Omnia: AI 编辑（差异预览）",
         "icon": "$(edit)"
       },
       {
         "command": "omnia.quickEdit",
-        "title": "Omnia: Quick Edit",
+        "title": "Omnia: 快速编辑",
         "icon": "$(zap)"
       },
       {
         "command": "omnia.commitChanges",
-        "title": "Omnia: Generate Commit Message",
+        "title": "Omnia: 生成提交信息",
         "icon": "$(git-commit)"
       },
       {
         "command": "omnia.sendToChat",
-        "title": "Omnia: Send to Chat",
+        "title": "Omnia: 发送到聊天",
         "icon": "$(send)"
       },
       {
         "command": "omnia.generateTests",
-        "title": "Omnia: Generate Tests",
+        "title": "Omnia: 生成测试用例",
         "icon": "$(beaker)"
       },
       {
         "command": "omnia.clearHistory",
-        "title": "Omnia: Clear Chat History",
+        "title": "Omnia: 清空聊天记录",
         "icon": "$(trash)"
+      },
+      {
+        "command": "omnia.executeTerminal",
+        "title": "Omnia: AI 执行终端命令",
+        "icon": "$(terminal)"
+      },
+      {
+        "command": "omnia.applyWorkspaceEdit",
+        "title": "Omnia: AI 多文件批量编辑",
+        "icon": "$(files)"
+      },
+      {
+        "command": "omnia.gitCommit",
+        "title": "Omnia: AI Git 提交",
+        "icon": "$(git-commit)"
+      },
+      {
+        "command": "omnia.gitDiff",
+        "title": "Omnia: 查看 Git 差异",
+        "icon": "$(diff)"
+      },
+      {
+        "command": "omnia.createProject",
+        "title": "Omnia: 创建项目（Builder Mode）",
+        "icon": "$(project)"
       }
     ],
     "menus": {
@@ -83,9 +131,15 @@
           "command": "omnia.sendToChat",
           "when": "editorHasSelection",
           "group": "omnia@5"
+        },
+        {
+          "command": "omnia.applyWorkspaceEdit",
+          "when": "editorHasSelection",
+          "group": "omnia@6"
         }
       ],
       "commandPalette": [
+        { "command": "omnia.openChat" },
         { "command": "omnia.explainCode", "when": "editorHasSelection" },
         { "command": "omnia.fixCode", "when": "editorHasSelection" },
         { "command": "omnia.inlineEdit", "when": "editorHasSelection" },
@@ -93,10 +147,20 @@
         { "command": "omnia.commitChanges" },
         { "command": "omnia.sendToChat", "when": "editorHasSelection" },
         { "command": "omnia.generateTests" },
-        { "command": "omnia.clearHistory" }
+        { "command": "omnia.clearHistory" },
+        { "command": "omnia.executeTerminal" },
+        { "command": "omnia.applyWorkspaceEdit" },
+        { "command": "omnia.gitCommit" },
+        { "command": "omnia.gitDiff" },
+        { "command": "omnia.createProject" }
       ]
     },
     "keybindings": [
+      {
+        "command": "omnia.openChat",
+        "key": "ctrl+shift+o",
+        "mac": "cmd+shift+o"
+      },
       {
         "command": "omnia.inlineEdit",
         "key": "ctrl+shift+i",
@@ -113,35 +177,56 @@
         "key": "ctrl+shift+enter",
         "mac": "cmd+shift+enter",
         "when": "editorHasSelection"
+      },
+      {
+        "command": "omnia.executeTerminal",
+        "key": "ctrl+shift+t",
+        "mac": "cmd+shift+t"
+      },
+      {
+        "command": "omnia.gitCommit",
+        "key": "ctrl+shift+g",
+        "mac": "cmd+shift+g"
+      },
+      {
+        "command": "omnia.createProject",
+        "key": "ctrl+shift+p",
+        "mac": "cmd+shift+p",
+        "when": "false"
       }
     ],
     "configuration": {
-      "title": "Omnia AI Assistant",
+      "title": "Omnia AI 助手",
       "properties": {
         "omnia.ideBridge.enabled": {
           "type": "boolean",
           "default": true,
-          "description": "Enable sending context to Omnia"
+          "description": "启用向 Omnia 发送上下文信息"
         },
         "omnia.ideBridge.endpoint": {
           "type": "string",
           "default": "http://127.0.0.1:8765",
-          "description": "Omnia backend endpoint"
+          "description": "Omnia 后端服务地址"
         },
         "omnia.ideBridge.debounceMs": {
           "type": "number",
           "default": 300,
-          "description": "Debounce delay for selection changes"
+          "description": "选择变更的防抖延迟（毫秒）"
         },
         "omnia.ai.autoInjectContext": {
           "type": "boolean",
           "default": true,
-          "description": "Auto-inject current file context into chat"
+          "description": "自动在聊天中注入当前文件的上下文"
         },
         "omnia.ai.maxContextLength": {
           "type": "number",
           "default": 4000,
-          "description": "Maximum context length to send (characters)"
+          "description": "发送的最大上下文长度（字符数）"
+        },
+        "omnia.ai.terminal.autoConfirm": {
+          "type": "boolean",
+          "default": false,
+          "description": "自动确认终端命令执行（危险 - 不建议开启）"
         }
       }
     }
