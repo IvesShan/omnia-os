@@ -1,8 +1,8 @@
 {
   "name": "omnia-ide-bridge",
   "displayName": "Omnia AI Assistant",
-  "description": "AI-powered coding assistant with chat panel, inline edit, and context awareness",
-  "version": "0.2.0",
+  "description": "AI-powered coding assistant with chat panel, inline edit, diff preview, CodeLens, and context awareness",
+  "version": "0.3.0",
   "publisher": "origin",
   "engines": {
     "vscode": "^1.80.0"
@@ -57,8 +57,13 @@
       },
       {
         "command": "omnia.inlineEdit",
-        "title": "Omnia: Edit with AI",
+        "title": "Omnia: Edit with AI (Diff Preview)",
         "icon": "$(edit)"
+      },
+      {
+        "command": "omnia.quickEdit",
+        "title": "Omnia: Quick Edit",
+        "icon": "$(zap)"
       },
       {
         "command": "omnia.commitChanges",
@@ -69,6 +74,11 @@
         "command": "omnia.sendToChat",
         "title": "Omnia: Send to Chat",
         "icon": "$(send)"
+      },
+      {
+        "command": "omnia.generateTests",
+        "title": "Omnia: Generate Tests",
+        "icon": "$(beaker)"
       }
     ],
     "menus": {
@@ -89,9 +99,13 @@
           "group": "omnia@3"
         },
         {
+          "command": "omnia.quickEdit",
+          "group": "omnia@4"
+        },
+        {
           "command": "omnia.sendToChat",
           "when": "editorHasSelection",
-          "group": "omnia@4"
+          "group": "omnia@5"
         }
       ],
       "commandPalette": [
@@ -99,8 +113,10 @@
         { "command": "omnia.explainCode", "when": "editorHasSelection" },
         { "command": "omnia.fixCode", "when": "editorHasSelection" },
         { "command": "omnia.inlineEdit", "when": "editorHasSelection" },
+        { "command": "omnia.quickEdit" },
         { "command": "omnia.commitChanges" },
-        { "command": "omnia.sendToChat", "when": "editorHasSelection" }
+        { "command": "omnia.sendToChat", "when": "editorHasSelection" },
+        { "command": "omnia.generateTests" }
       ]
     },
     "keybindings": [
@@ -108,6 +124,17 @@
         "command": "omnia.openChat",
         "key": "ctrl+shift+o",
         "mac": "cmd+shift+o"
+      },
+      {
+        "command": "omnia.inlineEdit",
+        "key": "ctrl+shift+i",
+        "mac": "cmd+shift+i",
+        "when": "editorHasSelection"
+      },
+      {
+        "command": "omnia.quickEdit",
+        "key": "ctrl+shift+e",
+        "mac": "cmd+shift+e"
       },
       {
         "command": "omnia.sendToChat",

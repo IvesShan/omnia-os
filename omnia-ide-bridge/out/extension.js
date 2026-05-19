@@ -4,6 +4,7 @@ exports.activate = activate;
 exports.deactivate = deactivate;
 const vscode = require("vscode");
 const http = require("http");
+const fs = require("fs");
 const path = require("path");
 // ============================================================
 // Global State
@@ -101,6 +102,300 @@ function sendContext(editor, immediate = false) {
     debounceTimer = setTimeout(() => pushContext(currentContext), debounceMs);
 }
 // ============================================================
+// Omnia API Helper
+// ============================================================
+async function callOmniaChat(prompt) {
+    const endpoint = getEndpoint();
+    const url = new URL('/api/chat', endpoint);
+    return new Promise((resolve, reject) => {
+        const postData = JSON.stringify({ message: prompt, history: [] });
+        const options = {
+            hostname: url.hostname,
+            port: parseInt(url.port || '8765'),
+            path: url.pathname,
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Content-Length': Buffer.byteLength(postData),
+            },
+        };
+        const req = http.request(options, (res) => {
+            let data = '';
+            res.on('data', (chunk) => { data += chunk.toString(); });
+            res.on('end', () => {
+                try {
+                    const parsed = JSON.parse(data);
+                    resolve(parsed.response || parsed.content || data);
+                }
+                catch {
+                    resolve(data);
+                }
+            });
+        });
+        req.on('error', (err) => reject(err));
+        req.write(postData);
+        req.end();
+    });
+}
+async function callOmniaChatStream(prompt, onChunk) {
+    const endpoint = getEndpoint();
+    const url = new URL('/api/chat/stream', endpoint);
+    return new Promise((resolve, reject) => {
+        const postData = JSON.stringify({ message: prompt, history: [] });
+        const options = {
+            hostname: url.hostname,
+            port: parseInt(url.port || '8765'),
+            path: url.pathname,
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Content-Length': Buffer.byteLength(postData),
+            },
+        };
+        const req = http.request(options, (res) => {
+            let buffer = '';
+            res.on('data', (chunk) => {
+                buffer += chunk.toString();
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || '';
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        const data = line.slice(6);
+                        if (data === '[DONE]') {
+                            resolve();
+                            return;
+                        }
+                        try {
+                            const parsed = JSON.parse(data);
+                            if (parsed.content) {
+                                onChunk(parsed.content);
+                            }
+                        }
+                        catch { }
+                    }
+                }
+            });
+            res.on('end', () => resolve());
+        });
+        req.on('error', (err) => reject(err));
+        req.write(postData);
+        req.end();
+    });
+}
+// ============================================================
+// Diff Preview Provider
+// ============================================================
+class DiffContentProvider {
+    constructor() {
+        this._onDidChange = new vscode.EventEmitter();
+        this.contents = new Map();
+        this.onDidChange = this._onDidChange.event;
+    }
+    setContent(uri, content) {
+        this.contents.set(uri, content);
+    }
+    provideTextDocumentContent(uri) {
+        return this.contents.get(uri.toString()) || '';
+    }
+}
+const diffProvider = new DiffContentProvider();
+// ============================================================
+// Inline Edit with Diff Preview
+// ============================================================
+async function performInlineEdit(editor, instruction) {
+    const selected = editor.document.getText(editor.selection);
+    if (!selected)
+        return;
+    const language = editor.document.languageId;
+    // Show progress
+    await vscode.window.withProgress({
+        location: vscode.ProgressLocation.Notification,
+        title: 'Omnia AI: Generating edit...',
+        cancellable: false,
+    }, async (progress) => {
+        progress.report({ message: 'Thinking...' });
+        const prompt = `你是一个代码编辑助手。请根据以下指令修改代码。
+
+**重要规则：**
+1. 只输出修改后的完整代码，不要包含任何解释
+2. 不要添加 markdown 代码块标记
+3. 保持原有的代码风格和缩进
+
+指令: ${instruction}
+
+原始代码:
+\`\`\`${language}
+${selected}
+\`\`\`
+
+请直接输出修改后的代码:`;
+        try {
+            let modified = '';
+            await callOmniaChatStream(prompt, (chunk) => {
+                modified += chunk;
+            });
+            // Clean up the response - remove markdown code blocks if present
+            modified = cleanCodeResponse(modified, language);
+            // Show diff preview
+            await showDiffPreview(editor, selected, modified, instruction);
+        }
+        catch (err) {
+            vscode.window.showErrorMessage(`Omnia AI Error: ${err.message}`);
+        }
+    });
+}
+function cleanCodeResponse(code, language) {
+    // Remove markdown code blocks
+    let cleaned = code.trim();
+    const patterns = [
+        new RegExp(`^\`\`\`${language}\\n?`, 'i'),
+        /^```\w*\n?/,
+        /\n?```$/,
+    ];
+    for (const pattern of patterns) {
+        cleaned = cleaned.replace(pattern, '');
+    }
+    return cleaned.trim();
+}
+async function showDiffPreview(editor, original, modified, instruction) {
+    // Create temporary files for diff
+    const originalUri = vscode.Uri.parse(`omnia-diff:original_${Date.now()}.txt`);
+    const modifiedUri = vscode.Uri.parse(`omnia-diff:modified_${Date.now()}.txt`);
+    diffProvider.setContent(originalUri.toString(), original);
+    diffProvider.setContent(modifiedUri.toString(), modified);
+    // Show diff
+    const diffTitle = `Omnia Edit: ${instruction.slice(0, 50)}`;
+    await vscode.commands.executeCommand('vscode.diff', originalUri, modifiedUri, diffTitle);
+    // Show accept/reject dialog
+    const action = await vscode.window.showInformationMessage('Apply this edit?', { modal: true }, '✅ Apply', '❌ Reject', '📋 Copy');
+    if (action === '✅ Apply') {
+        await editor.edit((editBuilder) => {
+            editBuilder.replace(editor.selection, modified);
+        });
+        vscode.window.showInformationMessage('✅ Edit applied!');
+    }
+    else if (action === '📋 Copy') {
+        await vscode.env.clipboard.writeText(modified);
+        vscode.window.showInformationMessage('📋 Copied to clipboard!');
+    }
+}
+// ============================================================
+// CodeLens Provider
+// ============================================================
+class OmniaCodeLensProvider {
+    constructor() {
+        this._onDidChangeCodeLenses = new vscode.EventEmitter();
+        this.onDidChangeCodeLenses = this._onDidChangeCodeLenses.event;
+    }
+    provideCodeLenses(document) {
+        const lenses = [];
+        // Add CodeLens at the top of the file
+        const topRange = new vscode.Range(0, 0, 0, 0);
+        lenses.push(new vscode.CodeLens(topRange, {
+            title: '✨ Ask Omnia',
+            command: 'omnia.openChat',
+            tooltip: 'Open Omnia AI Chat'
+        }));
+        // Find functions and classes
+        for (let i = 0; i < document.lineCount; i++) {
+            const line = document.lineAt(i);
+            const text = line.text.trim();
+            // Function definitions
+            if (text.match(/^(function|def|async function|const \w+ = |class |public |private |protected )/)) {
+                const range = new vscode.Range(i, 0, i, 0);
+                lenses.push(new vscode.CodeLens(range, {
+                    title: '📝 Explain',
+                    command: 'omnia.explainCode',
+                    arguments: [document, range],
+                    tooltip: 'Ask Omnia to explain this'
+                }));
+            }
+        }
+        return lenses;
+    }
+}
+// ============================================================
+// Completion Provider
+// ============================================================
+class OmniaCompletionProvider {
+    constructor() {
+        this.lastRequest = 0;
+        this.cache = new Map();
+    }
+    async provideInlineCompletionItems(document, position, context, token) {
+        // Only trigger on explicit request or specific triggers
+        if (context.triggerKind === vscode.InlineCompletionTriggerKind.Automatic) {
+            return [];
+        }
+        const line = document.lineAt(position);
+        const textBefore = document.getText(new vscode.Range(Math.max(0, position.line - 10), 0, position.line, position.character));
+        // Don't trigger on empty lines
+        if (line.text.trim().length === 0) {
+            return [];
+        }
+        // Debounce
+        const now = Date.now();
+        if (now - this.lastRequest < 500) {
+            return [];
+        }
+        this.lastRequest = now;
+        const prompt = `Continue this code (only output the continuation, no explanations):
+\`\`\`${document.languageId}
+${textBefore}
+\`\`\`
+
+Continue from where it left off:`;
+        try {
+            let completion = '';
+            await callOmniaChatStream(prompt, (chunk) => {
+                completion += chunk;
+            });
+            completion = cleanCodeResponse(completion, document.languageId);
+            if (completion && completion.length > 0) {
+                return [new vscode.InlineCompletionItem(completion)];
+            }
+        }
+        catch (err) {
+            log(`Completion error: ${err}`);
+        }
+        return [];
+    }
+}
+// ============================================================
+// @file Reference Provider
+// ============================================================
+async function resolveFileReference(ref) {
+    // Remove @ prefix
+    const fileName = ref.slice(1);
+    // Search workspace for matching files
+    const files = await vscode.workspace.findFiles(`**/${fileName}*`, null, 5);
+    if (files.length === 0) {
+        return null;
+    }
+    // Read the first matching file
+    try {
+        const content = fs.readFileSync(files[0].fsPath, 'utf-8');
+        const maxLen = 2000;
+        return content.length > maxLen ? content.slice(0, maxLen) + '\n... (truncated)' : content;
+    }
+    catch {
+        return null;
+    }
+}
+async function processAtReferences(text) {
+    const fileRefs = text.match(/@[\w\-\.]+/g);
+    if (!fileRefs)
+        return text;
+    let processed = text;
+    for (const ref of fileRefs) {
+        const content = await resolveFileReference(ref);
+        if (content) {
+            processed = processed.replace(ref, `\n[File: ${ref.slice(1)}]\n\`\`\`\n${content}\n\`\`\`\n`);
+        }
+    }
+    return processed;
+}
+// ============================================================
 // Webview Chat Panel
 // ============================================================
 function getWebviewContent(webview, extensionUri) {
@@ -137,7 +432,7 @@ function getWebviewContent(webview, extensionUri) {
         
         <div class="input-area">
             <div class="input-wrapper">
-                <textarea id="input" placeholder="Ask Omnia anything... (Shift+Enter for new line)" rows="1"></textarea>
+                <textarea id="input" placeholder="Ask Omnia anything... (@file to reference files)" rows="1"></textarea>
                 <button id="sendBtn" class="send-btn">
                     <span>▶</span>
                 </button>
@@ -146,6 +441,7 @@ function getWebviewContent(webview, extensionUri) {
                 <span class="hint">/explain</span>
                 <span class="hint">/fix</span>
                 <span class="hint">/commit</span>
+                <span class="hint">/test</span>
                 <span class="hint">@file</span>
             </div>
         </div>
@@ -201,7 +497,8 @@ function updateContextBar() {
 async function handleChatMessage(text, includeContext) {
     if (!chatPanel)
         return;
-    let prompt = text;
+    // Process @file references
+    let prompt = await processAtReferences(text);
     if (includeContext && currentContext) {
         prompt += formatContextForPrompt(currentContext);
     }
@@ -215,55 +512,10 @@ async function handleChatMessage(text, includeContext) {
     // Send to Omnia backend via streaming
     chatPanel.webview.postMessage({ command: 'startResponse' });
     try {
-        const endpoint = getEndpoint();
-        const url = new URL('/api/chat/stream', endpoint);
-        const postData = JSON.stringify({
-            message: prompt,
-            history: [],
+        await callOmniaChatStream(prompt, (chunk) => {
+            chatPanel?.webview.postMessage({ command: 'appendResponse', text: chunk });
         });
-        const options = {
-            hostname: url.hostname,
-            port: parseInt(url.port || '8765'),
-            path: url.pathname,
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Content-Length': Buffer.byteLength(postData),
-            },
-        };
-        const req = http.request(options, (res) => {
-            let buffer = '';
-            res.on('data', (chunk) => {
-                buffer += chunk.toString();
-                const lines = buffer.split('\n');
-                buffer = lines.pop() || '';
-                for (const line of lines) {
-                    if (line.startsWith('data: ')) {
-                        const data = line.slice(6);
-                        if (data === '[DONE]') {
-                            chatPanel?.webview.postMessage({ command: 'endResponse' });
-                            return;
-                        }
-                        try {
-                            const parsed = JSON.parse(data);
-                            if (parsed.content) {
-                                chatPanel?.webview.postMessage({ command: 'appendResponse', text: parsed.content });
-                            }
-                        }
-                        catch { }
-                    }
-                }
-            });
-            res.on('end', () => {
-                chatPanel?.webview.postMessage({ command: 'endResponse' });
-            });
-        });
-        req.on('error', (err) => {
-            log(`Chat error: ${err.message}`);
-            chatPanel?.webview.postMessage({ command: 'error', text: `Error: ${err.message}` });
-        });
-        req.write(postData);
-        req.end();
+        chatPanel?.webview.postMessage({ command: 'endResponse' });
     }
     catch (err) {
         log(`Chat error: ${err.message}`);
@@ -326,7 +578,7 @@ function registerCommands(context) {
             chatPanel?.webview.postMessage({ command: 'autoSend', text: `/fix ${selected}` });
         }, 500);
     }));
-    // Inline edit
+    // Inline edit with diff preview
     context.subscriptions.push(vscode.commands.registerCommand('omnia.inlineEdit', async () => {
         const editor = vscode.window.activeTextEditor;
         if (!editor)
@@ -338,16 +590,29 @@ function registerCommands(context) {
         }
         const instruction = await vscode.window.showInputBox({
             prompt: 'How should I edit this code?',
-            placeHolder: 'e.g., Add error handling, Optimize performance...',
+            placeHolder: 'e.g., Add error handling, Optimize performance, Add types...',
         });
         if (instruction) {
-            createChatPanel(context);
-            setTimeout(() => {
-                chatPanel?.webview.postMessage({
-                    command: 'autoSend',
-                    text: `请根据以下指令修改代码:\n指令: ${instruction}\n代码:\n\`\`\`\n${selected}\n\`\`\``
-                });
-            }, 500);
+            await performInlineEdit(editor, instruction);
+        }
+    }));
+    // Quick edit (no dialog, just ask for instruction)
+    context.subscriptions.push(vscode.commands.registerCommand('omnia.quickEdit', async () => {
+        const editor = vscode.window.activeTextEditor;
+        if (!editor)
+            return;
+        // If no selection, select current line
+        if (editor.selection.isEmpty) {
+            const line = editor.document.lineAt(editor.selection.active.line);
+            editor.selection = new vscode.Selection(line.range.start, line.range.end);
+        }
+        const selected = editor.document.getText(editor.selection);
+        const instruction = await vscode.window.showInputBox({
+            prompt: 'Edit instruction',
+            placeHolder: 'What should I change?',
+        });
+        if (instruction) {
+            await performInlineEdit(editor, instruction);
         }
     }));
     // Send to chat
@@ -372,6 +637,21 @@ function registerCommands(context) {
             chatPanel?.webview.postMessage({ command: 'autoSend', text: '/commit' });
         }, 500);
     }));
+    // Generate tests for current file
+    context.subscriptions.push(vscode.commands.registerCommand('omnia.generateTests', async () => {
+        const editor = vscode.window.activeTextEditor;
+        if (!editor)
+            return;
+        const doc = editor.document;
+        const content = doc.getText();
+        createChatPanel(context);
+        setTimeout(() => {
+            chatPanel?.webview.postMessage({
+                command: 'autoSend',
+                text: `/test \`\`\`${doc.languageId}\n${content}\n\`\`\``
+            });
+        }, 500);
+    }));
 }
 // ============================================================
 // Activation
@@ -379,6 +659,12 @@ function registerCommands(context) {
 function activate(context) {
     omniaChannel = vscode.window.createOutputChannel('Omnia AI');
     log('Omnia AI Assistant activated');
+    // Register diff content provider
+    context.subscriptions.push(vscode.workspace.registerTextDocumentContentProvider('omnia-diff', diffProvider));
+    // Register CodeLens provider
+    context.subscriptions.push(vscode.languages.registerCodeLensProvider('*', new OmniaCodeLensProvider()));
+    // Register inline completion provider
+    context.subscriptions.push(vscode.languages.registerInlineCompletionItemProvider('*', new OmniaCompletionProvider()));
     // Register all commands
     registerCommands(context);
     // Listen for editor changes
