@@ -1,11 +1,11 @@
 {
   "name": "omnia-ide-bridge",
   "displayName": "Omnia AI Assistant",
-  "description": "AI-powered coding assistant with chat panel, inline edit, diff preview, CodeLens, and context awareness",
-  "version": "0.3.0",
+  "description": "AI-powered coding assistant: chat (@omnia), inline edit with diff, CodeLens, code completion",
+  "version": "0.4.0",
   "publisher": "origin",
   "engines": {
-    "vscode": "^1.80.0"
+    "vscode": "^1.90.0"
   },
   "categories": [
     "Other",
@@ -16,35 +16,7 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
-    "viewsContainers": {
-      "activitybar": [
-        {
-          "id": "omnia-ai",
-          "title": "Omnia AI",
-          "icon": "resources/omnia-icon.svg"
-        }
-      ]
-    },
-    "views": {
-      "omnia-ai": [
-        {
-          "type": "webview",
-          "id": "omnia.chatPanel",
-          "name": "AI Chat"
-        },
-        {
-          "type": "tree",
-          "id": "omnia.contextPanel",
-          "name": "Context"
-        }
-      ]
-    },
     "commands": [
-      {
-        "command": "omnia.openChat",
-        "title": "Omnia: Open AI Chat",
-        "icon": "$(comment-discussion)"
-      },
       {
         "command": "omnia.explainCode",
         "title": "Omnia: Explain Code",
@@ -79,6 +51,11 @@
         "command": "omnia.generateTests",
         "title": "Omnia: Generate Tests",
         "icon": "$(beaker)"
+      },
+      {
+        "command": "omnia.clearHistory",
+        "title": "Omnia: Clear Chat History",
+        "icon": "$(trash)"
       }
     ],
     "menus": {
@@ -109,22 +86,17 @@
         }
       ],
       "commandPalette": [
-        { "command": "omnia.openChat" },
         { "command": "omnia.explainCode", "when": "editorHasSelection" },
         { "command": "omnia.fixCode", "when": "editorHasSelection" },
         { "command": "omnia.inlineEdit", "when": "editorHasSelection" },
         { "command": "omnia.quickEdit" },
         { "command": "omnia.commitChanges" },
         { "command": "omnia.sendToChat", "when": "editorHasSelection" },
-        { "command": "omnia.generateTests" }
+        { "command": "omnia.generateTests" },
+        { "command": "omnia.clearHistory" }
       ]
     },
     "keybindings": [
-      {
-        "command": "omnia.openChat",
-        "key": "ctrl+shift+o",
-        "mac": "cmd+shift+o"
-      },
       {
         "command": "omnia.inlineEdit",
         "key": "ctrl+shift+i",
@@ -182,7 +154,7 @@
   },
   "devDependencies": {
     "@types/node": "^25.6.0",
-    "@types/vscode": "^1.80.0",
+    "@types/vscode": "^1.90.0",
     "typescript": "^5.0.0"
   }
 }
