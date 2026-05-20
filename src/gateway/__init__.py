@@ -25,9 +25,9 @@ from src.core.gateway.runner import GatewayRunner, MessageEvent, ChannelType
 from gateway.webchat_adapter import WebChatAdapter
 from gateway.integration import (
     handle_chat_unified,
-    handle_chat_via_gateway,
-    handle_chat_direct,
-    should_use_gateway,
+    check_gateway_health,
+    send_to_gateway,
+    is_gateway_available,
 )
 from gateway.chat_handler_wrapper import ChatHandlerWrapper
 
@@ -40,9 +40,9 @@ __all__ = [
     "WebChatAdapter",
     # Integration
     "handle_chat_unified",
-    "handle_chat_via_gateway",
-    "handle_chat_direct",
-    "should_use_gateway",
+    "check_gateway_health",
+    "send_to_gateway",
+    "is_gateway_available",
     # Handler
     "ChatHandlerWrapper",
 ]

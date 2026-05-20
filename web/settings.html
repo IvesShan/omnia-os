@@ -40,10 +40,16 @@
     .log-line.info { color: #22d3ee; }
     .log-line.warn { color: #f59e0b; }
     .btn-group { display: flex; gap: 12px; margin-top: 20px; }
+    .toast { position: fixed; bottom: 20px; right: 20px; padding: 12px 24px; border-radius: 8px; font-size: 14px; background: #22c55e; color: #000; opacity: 0; transition: opacity 0.3s; z-index: 999; }
+    .toast.show { opacity: 1; }
+    .toast.error { background: #ef4444; color: #fff; }
+    .back-link { display: inline-flex; align-items: center; gap: 8px; color: #22d3ee; text-decoration: none; font-size: 14px; margin-bottom: 24px; }
+    .back-link:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
   <div class="container">
+    <a class="back-link" href="/">← 返回聊天</a>
     <h1>⚙️ Omnia 设置</h1>
     
     <div class="section">
@@ -53,10 +59,15 @@
         <span class="status-label">后端服务</span>
         <span class="status-value" id="backend-pid">—</span>
       </div>
-      <div class="btn-group">
-        <button class="btn btn-primary" id="btn-start">启动后端</button>
-        <button class="btn btn-secondary" id="btn-stop">停止后端</button>
-        <button class="btn btn-secondary" id="btn-restart">重启后端</button>
+      <div class="status-row">
+        <div class="status-dot" id="llm-status"></div>
+        <span class="status-label">LLM 连接</span>
+        <span class="status-value" id="llm-provider">—</span>
+      </div>
+      <div class="status-row">
+        <div class="status-dot" id="memory-status"></div>
+        <span class="status-label">记忆宫殿</span>
+        <span class="status-value" id="memory-count">—</span>
       </div>
     </div>
     
@@ -68,6 +79,8 @@
           <option value="kimi">Kimi (Moonshot)</option>
           <option value="baidu">百度千帆</option>
           <option value="openai">OpenAI</option>
+          <option value="deepseek">DeepSeek</option>
+          <option value="qwen">通义千问</option>
         </select>
       </div>
       <div class="form-group">
@@ -76,11 +89,7 @@
       </div>
       <div class="form-group">
         <label class="form-label">模型</label>
-        <select class="form-select" id="model-name">
-          <option value="moonshot-v1-8k">Moonshot V1 8K</option>
-          <option value="moonshot-v1-32k">Moonshot V1 32K</option>
-          <option value="moonshot-v1-128k">Moonshot V1 128K</option>
-        </select>
+        <input type="text" class="form-input" id="model-name" placeholder="moonshot-v1-8k">
       </div>
     </div>
     
@@ -88,56 +97,98 @@
       <div class="section-title">后端配置</div>
       <div class="form-group">
         <label class="form-label">端口</label>
-        <input type="number" class="form-input" id="backend-port" value="5001">
+        <input type="number" class="form-input" id="backend-port" value="8765" readonly>
       </div>
       <div class="form-group">
         <label class="form-label">日志级别</label>
         <select class="form-select" id="log-level">
           <option value="debug">Debug</option>
           <option value="info" selected>Info</option>
-          <option value="warn">Warn</option>
+          <option value="warning">Warning</option>
           <option value="error">Error</option>
         </select>
-      </div>
-      <div class="form-group">
-        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-          <input type="checkbox" id="auto-start" checked>
-          <span>启动时自动运行后端</span>
-        </label>
       </div>
     </div>
     
     <div class="section">
       <div class="section-title">日志查看</div>
       <div class="log-viewer" id="log-viewer">
-        <div class="log-line">等待日志...</div>
+        <div class="log-line">正在加载日志...</div>
       </div>
       <div class="btn-group">
-        <button class="btn btn-secondary" id="btn-refresh-logs">刷新日志</button>
-        <button class="btn btn-secondary" id="btn-clear-logs">清空日志</button>
+        <button class="btn btn-secondary" id="btn-refresh-logs">🔄 刷新日志</button>
+        <button class="btn btn-secondary" id="btn-clear-logs">🗑️ 清空显示</button>
       </div>
     </div>
     
     <div class="btn-group" style="justify-content: flex-end;">
       <button class="btn btn-secondary" id="btn-cancel">取消</button>
-      <button class="btn btn-primary" id="btn-save">保存配置</button>
+      <button class="btn btn-primary" id="btn-save">💾 保存配置</button>
     </div>
   </div>
   
+  <div class="toast" id="toast"></div>
+  
   <script>
-    const { invoke } = window.__TAURI__;
+    const API_BASE = window.location.origin;
+    
+    function showToast(msg, isError = false) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.className = 'toast show' + (isError ? ' error' : '');
+      setTimeout(() => t.className = 'toast', 3000);
+    }
+    
+    async function loadStatus() {
+      try {
+        const res = await fetch(API_BASE + '/api/status');
+        const data = await res.json();
+        
+        // Backend status
+        const bsDot = document.getElementById('backend-status');
+        const bsPid = document.getElementById('backend-pid');
+        bsDot.className = 'status-dot online';
+        bsPid.textContent = 'PID: ' + (data.pid || '运行中');
+        
+        // LLM status
+        const lsDot = document.getElementById('llm-status');
+        const lsProv = document.getElementById('llm-provider');
+        if (data.llm_provider) {
+          lsDot.className = 'status-dot online';
+          lsProv.textContent = data.llm_provider + ' / ' + (data.model || '默认');
+        } else {
+          lsDot.className = 'status-dot offline';
+          lsProv.textContent = '未配置';
+        }
+        
+        // Memory status
+        const msDot = document.getElementById('memory-status');
+        const msCount = document.getElementById('memory-count');
+        if (data.memories !== undefined) {
+          msDot.className = 'status-dot online';
+          msCount.textContent = data.memories + ' 条记忆';
+        } else {
+          msDot.className = 'status-dot offline';
+          msCount.textContent = '未知';
+        }
+      } catch (e) {
+        document.getElementById('backend-status').className = 'status-dot offline';
+        document.getElementById('backend-pid').textContent = '连接失败';
+      }
+    }
     
     async function loadConfig() {
       try {
-        const config = await invoke('read_config');
-        document.getElementById('api-provider').value = config.api_provider || 'kimi';
-        document.getElementById('api-key').value = config.api_key || '';
-        document.getElementById('model-name').value = config.model_name || 'moonshot-v1-8k';
-        document.getElementById('backend-port').value = config.backend_port || 5001;
-        document.getElementById('log-level').value = config.log_level || 'info';
-        document.getElementById('auto-start').checked = config.auto_start_backend !== false;
+        const res = await fetch(API_BASE + '/api/config');
+        if (res.ok) {
+          const config = await res.json();
+          if (config.api_provider) document.getElementById('api-provider').value = config.api_provider;
+          if (config.api_key) document.getElementById('api-key').value = config.api_key;
+          if (config.model_name) document.getElementById('model-name').value = config.model_name;
+          if (config.log_level) document.getElementById('log-level').value = config.log_level;
+        }
       } catch (e) {
-        console.error('Failed to load config:', e);
+        console.warn('Config API not available, using defaults');
       }
     }
     
@@ -146,85 +197,59 @@
         api_provider: document.getElementById('api-provider').value,
         api_key: document.getElementById('api-key').value,
         model_name: document.getElementById('model-name').value,
-        backend_port: parseInt(document.getElementById('backend-port').value),
-        log_level: document.getElementById('log-level').value,
-        auto_start_backend: document.getElementById('auto-start').checked
+        log_level: document.getElementById('log-level').value
       };
       
       try {
-        await invoke('save_config', { config });
-        alert('配置已保存');
-      } catch (e) {
-        alert('保存失败: ' + e);
-      }
-    }
-    
-    async function checkBackendStatus() {
-      try {
-        const status = await invoke('get_backend_status');
-        const dot = document.getElementById('backend-status');
-        const pid = document.getElementById('backend-pid');
-        
-        if (status.running) {
-          dot.className = 'status-dot online';
-          pid.textContent = 'PID: ' + status.pid;
+        const res = await fetch(API_BASE + '/api/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(config)
+        });
+        if (res.ok) {
+          showToast('✅ 配置已保存');
         } else {
-          dot.className = 'status-dot offline';
-          pid.textContent = '未运行';
+          showToast('❌ 保存失败: ' + (await res.text()), true);
         }
       } catch (e) {
-        console.error('Failed to check status:', e);
-      }
-    }
-    
-    async function startBackend() {
-      try {
-        await invoke('start_backend');
-        setTimeout(checkBackendStatus, 2000);
-      } catch (e) {
-        alert('启动失败: ' + e);
-      }
-    }
-    
-    async function stopBackend() {
-      try {
-        await invoke('stop_backend');
-        setTimeout(checkBackendStatus, 500);
-      } catch (e) {
-        alert('停止失败: ' + e);
+        showToast('❌ 保存失败: ' + e.message, true);
       }
     }
     
     async function loadLogs() {
       try {
-        const logs = await invoke('read_logs', { lines: 100 });
-        const viewer = document.getElementById('log-viewer');
-        viewer.innerHTML = logs.map(line => {
-          let cls = 'log-line';
-          if (line.includes('ERROR')) cls += ' error';
-          else if (line.includes('WARN')) cls += ' warn';
-          else if (line.includes('INFO')) cls += ' info';
-          return '<div class="' + cls + '">' + line + '</div>';
-        }).join('');
-        viewer.scrollTop = viewer.scrollHeight;
+        const res = await fetch(API_BASE + '/api/logs?lines=100');
+        if (res.ok) {
+          const data = await res.json();
+          const viewer = document.getElementById('log-viewer');
+          const lines = data.lines || data;
+          if (Array.isArray(lines)) {
+            viewer.innerHTML = lines.map(line => {
+              let cls = 'log-line';
+              if (line.includes('ERROR') || line.includes('error')) cls += ' error';
+              else if (line.includes('WARN') || line.includes('warning')) cls += ' warn';
+              else if (line.includes('INFO') || line.includes('info')) cls += ' info';
+              return '<div class="' + cls + '">' + line + '</div>';
+            }).join('');
+            viewer.scrollTop = viewer.scrollHeight;
+          }
+        }
       } catch (e) {
-        console.error('Failed to load logs:', e);
+        document.getElementById('log-viewer').innerHTML = '<div class="log-line error">无法加载日志</div>';
       }
     }
     
     document.getElementById('btn-save').addEventListener('click', saveConfig);
-    document.getElementById('btn-start').addEventListener('click', startBackend);
-    document.getElementById('btn-stop').addEventListener('click', stopBackend);
-    document.getElementById('btn-restart').addEventListener('click', async () => {
-      await stopBackend();
-      await startBackend();
-    });
+    document.getElementById('btn-cancel').addEventListener('click', () => window.location.href = '/');
     document.getElementById('btn-refresh-logs').addEventListener('click', loadLogs);
+    document.getElementById('btn-clear-logs').addEventListener('click', () => {
+      document.getElementById('log-viewer').innerHTML = '<div class="log-line">已清空</div>';
+    });
     
     loadConfig();
-    checkBackendStatus();
+    loadStatus();
     loadLogs();
-    setInterval(checkBackendStatus, 5000);
+    setInterval(loadStatus, 10000);
   </script>
 </body>
 </html>

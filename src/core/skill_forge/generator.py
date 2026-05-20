@@ -259,3 +259,13 @@ if __name__ == "__main__":
         logger.info("=" * 60)
         logger.info(md)
         logger.info("=" * 60)
+
+
+# 便捷函数，供 cli.py 导入
+def generate_skill(pattern: DetectedPattern, out_dir: str = None) -> str:
+    """Convenience function: generate and optionally write a skill from a pattern."""
+    sg = SkillGenerator()
+    if out_dir is None:
+        import tempfile
+        out_dir = tempfile.mkdtemp(prefix="omnia_skill_")
+    return sg.write(pattern, out_dir)

@@ -8,6 +8,7 @@ from typing import Optional, Dict, Any, List
 from datetime import datetime
 import os
 import subprocess
+import asyncio
 import sqlite3
 from pathlib import Path
 
@@ -123,7 +124,7 @@ def _ide_context() -> dict | None:
 
 
 def _git_snapshot() -> dict | None:
-    """获取 Git 状态"""
+    """获取 Git 状态（在线程池中执行，避免阻塞事件循环）"""
     try:
         result = subprocess.run(
             ["git", "status", "--porcelain"],
@@ -155,6 +156,12 @@ def _git_snapshot() -> dict | None:
     except Exception:
         return None
 
+
+
+
+async def _git_snapshot_async() -> dict | None:
+    """异步获取 Git 状态"""
+    return await asyncio.to_thread(_git_snapshot)
 
 def _system_vitals() -> SystemVitals:
     """获取系统状态"""
@@ -189,8 +196,8 @@ def _env_snapshot() -> dict:
         return {"error": "failed to get env info"}
 
 
-def _cron_schedule() -> list:
-    """获取 cron 计划"""
+def _cron_schedule_sync() -> list:
+    """获取 cron 计划（同步版本）"""
     try:
         result = subprocess.run(
             ["crontab", "-l"],
@@ -205,6 +212,12 @@ def _cron_schedule() -> list:
     except Exception:
         return []
 
+
+
+
+async def _cron_schedule() -> list:
+    """获取 cron 计划（异步版本）"""
+    return await asyncio.to_thread(_cron_schedule_sync)
 
 def _project_wings() -> list:
     """获取项目 wings（副项目）"""
@@ -295,14 +308,14 @@ async def get_status(request: Request):
         "skills": _skills_summary(),
         "notifications": _notifications(),
         "ide_context": _ide_context(),
-        "git": _git_snapshot(),
+        "git": await _git_snapshot_async(),
         "system": {
             "cpu_percent": _system_vitals().cpu_percent,
             "memory_percent": _system_vitals().memory_percent,
             "disk_percent": _system_vitals().disk_percent,
         },
         "env": _env_snapshot(),
-        "cron": _cron_schedule(),
+        "cron": await _cron_schedule(),
         "wings": _project_wings(),
         "mcp": _mcp_status(request.app),
         "current_provider": provider_val,
