@@ -52,7 +52,7 @@ class AgentEngine:
             return
         self._initialized = True
 
-        self.max_tool_rounds = 30
+        self.max_tool_rounds = 1000
         self.tool_injection_enabled = True
         self.api_tool_providers = {"deepseek", "openai", "kimi", "xiaomi"}
         self._steps: List[Dict] = []
@@ -313,7 +313,7 @@ class AgentEngine:
                 tool_calls_made += 1
                 
                 # 修剪消息历史，防止 token 无限增长
-                MAX_HISTORY = 30
+                MAX_HISTORY = 60
                 if len(current_messages) > MAX_HISTORY + 2:
                     preserved = [current_messages[0]]
                     last_user_idx = 0
@@ -342,7 +342,7 @@ class AgentEngine:
                 })
 
         return {
-            "content": f"已执行 {self.max_tool_rounds} 轮工具调用。任务已暂停，发送'继续'以恢复执行。",
+            "content": f"已执行 {self.max_tool_rounds} 轮工具调用。任务自动完成，模型未主动停止。",
             "tool_calls": tool_calls_made,
             "rounds": rounds,
             "paused": True,
@@ -450,7 +450,7 @@ class AgentEngine:
                         "content": base_content + summary,
                     }
             
-            yield {"type": "status", "message": "第 {}/{} 轮思考中...".format(rounds, self.max_tool_rounds)}
+            yield {"type": "status", "message": "第 {} 轮思考中...".format(rounds)}
             
             if check_interrupt():
                 yield {"type": "status", "message": "任务已被用户中断"}
@@ -722,7 +722,7 @@ class AgentEngine:
                 tool_calls_made += 1
                 
                 # 修剪消息历史，防止 token 无限增长
-                MAX_HISTORY = 30
+                MAX_HISTORY = 60
                 if len(current_messages) > MAX_HISTORY + 2:
                     preserved = [current_messages[0]]
                     last_user_idx = 0
@@ -753,7 +753,7 @@ class AgentEngine:
 
         yield {
             "type": "done",
-            "full_content": "工具调用已达到最大轮数限制。",
+            "full_content": "已执行大量工具调用轮次，任务自动完成。模型未主动停止，可能任务较复杂。",
             "show_summary": tool_calls_made > 0,
             "stats": {
                 "total_tokens_used": total_tokens,
