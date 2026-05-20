@@ -5,13 +5,14 @@ const vscode = require("vscode");
 const http = require("http");
 const path = require("path");
 // ============================================================
-// Chat Panel — Agent Mode (v0.9.0)
+// Chat Panel — Agent Mode (v1.0.0)
 // ============================================================
 class OmniaChatPanel {
     constructor(panel, extensionUri) {
         this._disposables = [];
         this._chatHistory = [];
         this._currentContext = null;
+        this._isProcessing = false;
         this._panel = panel;
         this._panel.webview.html = this._getHtmlContent();
         this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
@@ -52,63 +53,133 @@ class OmniaChatPanel {
                 d.dispose();
         }
     }
+    _resetWebviewState() {
+        try {
+            this._panel.webview.postMessage({
+                command: 'endAssistant',
+                fullContent: '',
+                toolCalls: 0,
+                rounds: 0,
+            });
+        }
+        catch {
+            // webview may have been disposed
+        }
+    }
+    _buildIdeContextPrefix() {
+        // Build a rich context prefix that tells Omnia about the VSCode environment
+        const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+        const projectName = workspaceFolder ? path.basename(workspaceFolder.uri.fsPath) : '未知项目';
+        const workspacePath = workspaceFolder?.uri.fsPath || '未知路径';
+        const editor = vscode.window.activeTextEditor;
+        let prefix = '---\n';
+        prefix += '[系统提示] 以下消息来自 VSCode IDE 扩展 (Omnia IDE Bridge)\n';
+        prefix += `当前项目: ${projectName}\n`;
+        prefix += `项目路径: ${workspacePath}\n`;
+        prefix += `操作系统: ${process.platform}\n`;
+        if (editor) {
+            const doc = editor.document;
+            const pos = editor.selection.active;
+            const selected = editor.selection.isEmpty ? '' : doc.getText(editor.selection);
+            prefix += `当前文件: ${path.basename(doc.fileName)}\n`;
+            prefix += `文件路径: ${doc.fileName}\n`;
+            prefix += `语言: ${doc.languageId}\n`;
+            prefix += `光标位置: 第${pos.line + 1}行, 第${pos.character + 1}列\n`;
+            if (selected) {
+                const maxLen = 500;
+                const truncated = selected.length > maxLen ? selected.slice(0, maxLen) + '...' : selected;
+                prefix += `\n用户选中的代码:\n\`\`\`${doc.languageId}\n${truncated}\n\`\`\`\n`;
+            }
+        }
+        // Also include IDE context from extension.ts if available
+        if (this._currentContext) {
+            const ctx = this._currentContext;
+            if (ctx.file) {
+                prefix += `IDE上下文文件: ${path.basename(ctx.file)}\n`;
+            }
+            if (ctx.fullContent && ctx.fullContent.length > 0) {
+                const maxLen = 3000;
+                const content = ctx.fullContent.length > maxLen ? ctx.fullContent.slice(0, maxLen) + '\n... (已截断)' : ctx.fullContent;
+                prefix += `\n当前文件完整内容:\n\`\`\`${ctx.language || ''}\n${content}\n\`\`\`\n`;
+            }
+        }
+        prefix += '---\n\n';
+        return prefix;
+    }
     async _handleUserMessage(text) {
+        if (this._isProcessing) {
+            return;
+        }
+        this._isProcessing = true;
         this._chatHistory.push({ role: 'user', content: text });
         this._panel.webview.postMessage({ command: 'addMessage', role: 'user', content: text });
         this._panel.webview.postMessage({ command: 'startAssistant' });
-        // Build prompt with context
-        let fullPrompt = text;
-        if (this._currentContext) {
-            fullPrompt += this._formatContextForPrompt(this._currentContext);
-        }
+        // Build the full prompt with IDE context
+        const ideContextPrefix = this._buildIdeContextPrefix();
+        const fullPrompt = ideContextPrefix + text;
         let fullResponse = '';
         let toolCallsCount = 0;
         let roundsCount = 0;
+        const timeoutId = setTimeout(() => {
+            if (this._isProcessing) {
+                this._isProcessing = false;
+                this._resetWebviewState();
+            }
+        }, 90000);
         try {
-            await this._callOmniaAgentStream(fullPrompt, {
-                onToken: (chunk) => {
-                    fullResponse += chunk;
-                    this._panel.webview.postMessage({ command: 'streamToken', content: chunk });
-                },
-                onStatus: (msg) => {
-                    this._panel.webview.postMessage({ command: 'agentStatus', message: msg });
-                },
-                onToolCall: (name, args) => {
-                    toolCallsCount++;
-                    this._panel.webview.postMessage({
-                        command: 'toolCall',
-                        name,
-                        args: JSON.stringify(args),
-                    });
-                },
-                onToolResult: (name, result) => {
-                    this._panel.webview.postMessage({
-                        command: 'toolResult',
-                        name,
-                        content: result,
-                        success: true,
-                    });
-                },
-                onToolError: (name, error) => {
-                    this._panel.webview.postMessage({
-                        command: 'toolResult',
-                        name,
-                        content: error,
-                        success: false,
-                    });
-                },
-                onDone: (content, stats) => {
-                    if (content) {
-                        fullResponse = content;
-                    }
-                    roundsCount = stats?.rounds_executed || 0;
-                },
-            });
+            const streamSupported = await this._checkStreamSupport();
+            if (streamSupported) {
+                await this._callOmniaAgentStream(fullPrompt, {
+                    onToken: (chunk) => {
+                        fullResponse += chunk;
+                        this._panel.webview.postMessage({ command: 'streamToken', content: chunk });
+                    },
+                    onStatus: (msg) => {
+                        this._panel.webview.postMessage({ command: 'agentStatus', message: msg });
+                    },
+                    onToolCall: (name, args) => {
+                        toolCallsCount++;
+                        this._panel.webview.postMessage({
+                            command: 'toolCall',
+                            name,
+                            args: JSON.stringify(args),
+                        });
+                    },
+                    onToolResult: (name, result) => {
+                        this._panel.webview.postMessage({
+                            command: 'toolResult',
+                            name,
+                            content: result,
+                            success: true,
+                        });
+                    },
+                    onToolError: (name, error) => {
+                        this._panel.webview.postMessage({
+                            command: 'toolResult',
+                            name,
+                            content: error,
+                            success: false,
+                        });
+                    },
+                    onDone: (content, stats) => {
+                        if (content) {
+                            fullResponse = content;
+                        }
+                        roundsCount = stats?.rounds_executed || 0;
+                    },
+                });
+            }
+            else {
+                fullResponse = await this._callOmniaChatNormal(fullPrompt);
+            }
         }
         catch (err) {
-            fullResponse = '❌ 错误: ' + err.message;
+            fullResponse = '❌ 错误: ' + (err.message || String(err));
         }
-        // Send final state
+        finally {
+            clearTimeout(timeoutId);
+            this._isProcessing = false;
+        }
         this._panel.webview.postMessage({
             command: 'endAssistant',
             fullContent: fullResponse,
@@ -116,75 +187,162 @@ class OmniaChatPanel {
             rounds: roundsCount,
         });
         this._chatHistory.push({ role: 'assistant', content: fullResponse });
-        // Keep history manageable
         if (this._chatHistory.length > 40) {
             this._chatHistory = this._chatHistory.slice(-40);
         }
     }
-    _formatContextForPrompt(ctx) {
-        let prompt = '\n[当前 IDE 上下文]\n';
-        prompt += '文件: ' + path.basename(ctx.file || '') + '\n';
-        prompt += '路径: ' + (ctx.file || '') + '\n';
-        prompt += '语言: ' + ctx.language + '\n';
-        prompt += '位置: 第 ' + ctx.line + ' 行, 第 ' + ctx.column + ' 列\n';
-        if (ctx.selectedText) {
-            prompt += '\n选中的代码:\n```' + ctx.language + '\n' + ctx.selectedText + '\n```\n';
-        }
-        if (ctx.fullContent && ctx.fullContent.length > 0) {
-            prompt += '\n完整文件内容:\n```' + ctx.language + '\n' + ctx.fullContent + '\n```\n';
-        }
-        return prompt;
+    async _checkStreamSupport() {
+        const config = vscode.workspace.getConfiguration('omnia.ideBridge');
+        const endpoint = config.get('endpoint', 'http://127.0.0.1:8765');
+        return new Promise((resolve) => {
+            try {
+                const url = new URL('/api/chat/stream', endpoint);
+                const options = {
+                    hostname: url.hostname,
+                    port: parseInt(url.port || '8765'),
+                    path: url.pathname,
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    timeout: 3000,
+                };
+                const req = http.request(options, (res) => {
+                    resolve(res.statusCode === 200);
+                });
+                req.on('error', () => resolve(false));
+                req.on('timeout', () => {
+                    req.destroy();
+                    resolve(false);
+                });
+                req.write(JSON.stringify({ message: 'test' }));
+                req.end();
+            }
+            catch {
+                resolve(false);
+            }
+        });
     }
-    // ============================================================
-    // Agent Stream — 处理后端的全部 SSE 事件类型
-    // ============================================================
+    async _callOmniaChatNormal(prompt) {
+        const config = vscode.workspace.getConfiguration('omnia.ideBridge');
+        const endpoint = config.get('endpoint', 'http://127.0.0.1:8765');
+        return new Promise((resolve, reject) => {
+            try {
+                const url = new URL('/api/chat', endpoint);
+                const postData = JSON.stringify({
+                    message: prompt,
+                    history: this._chatHistory,
+                });
+                const options = {
+                    hostname: url.hostname,
+                    port: parseInt(url.port || '8765'),
+                    path: url.pathname,
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Content-Length': Buffer.byteLength(postData),
+                    },
+                    timeout: 60000,
+                };
+                const req = http.request(options, (res) => {
+                    let data = '';
+                    res.on('data', (chunk) => {
+                        data += chunk.toString();
+                    });
+                    res.on('end', () => {
+                        try {
+                            const json = JSON.parse(data);
+                            resolve(json.response || json.message || data);
+                        }
+                        catch {
+                            resolve(data);
+                        }
+                    });
+                });
+                req.on('error', (err) => reject(err));
+                req.on('timeout', () => {
+                    req.destroy();
+                    reject(new Error('请求超时'));
+                });
+                req.write(postData);
+                req.end();
+            }
+            catch (err) {
+                reject(err);
+            }
+        });
+    }
     async _callOmniaAgentStream(prompt, callbacks) {
         const config = vscode.workspace.getConfiguration('omnia.ideBridge');
         const endpoint = config.get('endpoint', 'http://127.0.0.1:8765');
-        const url = new URL('/api/chat/stream', endpoint);
         return new Promise((resolve, reject) => {
-            const postData = JSON.stringify({
-                message: prompt,
-                history: this._chatHistory,
-            });
-            const options = {
-                hostname: url.hostname,
-                port: parseInt(url.port || '8765'),
-                path: url.pathname,
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Content-Length': Buffer.byteLength(postData),
-                },
-            };
-            const req = http.request(options, (res) => {
-                let buffer = '';
-                res.on('data', (chunk) => {
-                    buffer += chunk.toString();
-                    const lines = buffer.split('\n');
-                    buffer = lines.pop() || '';
-                    for (const line of lines) {
-                        if (!line.startsWith('data: '))
-                            continue;
-                        const data = line.slice(6).trim();
-                        if (data === '[DONE]') {
-                            resolve();
-                            return;
-                        }
-                        try {
-                            const event = JSON.parse(data);
-                            this._handleAgentEvent(event, callbacks);
-                        }
-                        catch {
-                            // ignore parse errors
-                        }
-                    }
+            try {
+                const url = new URL('/api/chat/stream', endpoint);
+                const postData = JSON.stringify({
+                    message: prompt,
+                    history: this._chatHistory,
                 });
-                res.on('end', () => resolve());
-            });
-            req.on('error', (err) => reject(err));
-            req.write(postData);
-            req.end();
+                const options = {
+                    hostname: url.hostname,
+                    port: parseInt(url.port || '8765'),
+                    path: url.pathname,
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Content-Length': Buffer.byteLength(postData),
+                    },
+                    timeout: 60000,
+                };
+                let resolved = false;
+                const safeResolve = () => {
+                    if (!resolved) {
+                        resolved = true;
+                        resolve();
+                    }
+                };
+                const safeReject = (err) => {
+                    if (!resolved) {
+                        resolved = true;
+                        reject(err);
+                    }
+                };
+                const req = http.request(options, (res) => {
+                    let buffer = '';
+                    res.on('data', (chunk) => {
+                        buffer += chunk.toString();
+                        const lines = buffer.split('\n');
+                        buffer = lines.pop() || '';
+                        for (const line of lines) {
+                            if (!line.startsWith('data: '))
+                                continue;
+                            const data = line.slice(6).trim();
+                            if (data === '[DONE]') {
+                                safeResolve();
+                                return;
+                            }
+                            try {
+                                const event = JSON.parse(data);
+                                this._handleAgentEvent(event, callbacks);
+                            }
+                            catch {
+                                // ignore parse errors
+                            }
+                        }
+                    });
+                    res.on('end', () => safeResolve());
+                    res.on('error', (err) => safeReject(err));
+                });
+                req.on('error', (err) => safeReject(err));
+                req.on('timeout', () => {
+                    req.destroy();
+                    safeReject(new Error('流式请求超时'));
+                });
+                req.write(postData);
+                req.end();
+            }
+            catch (err) {
+                reject(err);
+            }
         });
     }
     _handleAgentEvent(event, callbacks) {
@@ -210,24 +368,23 @@ class OmniaChatPanel {
                 callbacks.onToolError(event.name || '', event.content || '');
                 break;
             case 'safety_warning':
-                callbacks.onStatus(`⚠️ 安全警告 [${event.name}]: ${event.reason}`);
+                callbacks.onStatus('⚠️ 安全警告 [' + event.name + ']: ' + event.reason);
                 break;
             case 'validation_failed':
-                callbacks.onStatus(`⚠️ 验证失败: ${event.reason}`);
+                callbacks.onStatus('⚠️ 验证失败: ' + event.reason);
                 break;
             case 'preroll':
                 if (event.content) {
-                    callbacks.onStatus(`📋 ${event.content}`);
+                    callbacks.onStatus('📋 ' + event.content);
                 }
                 break;
             case 'done':
                 callbacks.onDone(event.full_content || '', event.stats || {});
                 break;
             case 'error':
-                callbacks.onStatus(`❌ ${event.message || '未知错误'}`);
+                callbacks.onStatus('❌ ' + (event.message || '未知错误'));
                 break;
             case 'thinking':
-                // 推理内容，暂时不展示
                 break;
             default:
                 break;
@@ -235,15 +392,72 @@ class OmniaChatPanel {
     }
     // ============================================================
     // HTML Content — Agent UI
+    // Build the HTML by generating the JS code as a string
+    // to avoid template literal escaping issues
     // ============================================================
     _getHtmlContent() {
-        return `<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Omnia AI</title>
-    <style>
+        // Build the JavaScript code as a separate string to avoid
+        // backtick escaping issues inside template literals
+        const jsCode = this._buildWebviewScript();
+        return '<!DOCTYPE html>\n' +
+            '<html lang="zh-CN">\n' +
+            '<head>\n' +
+            '    <meta charset="UTF-8">\n' +
+            '    <meta name="viewport" content="width=device-width, initial-scale=1.0">\n' +
+            '    <title>Omnia AI</title>\n' +
+            '    <style>\n' +
+            this._getStyles() +
+            '    </style>\n' +
+            '</head>\n' +
+            '<body>\n' +
+            '    <div class="header">\n' +
+            '        <h2>🤖 Omnia AI Agent</h2>\n' +
+            '        <div class="header-actions">\n' +
+            '            <button id="clearBtn">清空</button>\n' +
+            '        </div>\n' +
+            '    </div>\n' +
+            '\n' +
+            '    <div class="context-info" id="contextInfo"></div>\n' +
+            '\n' +
+            '    <div class="messages" id="messages">\n' +
+            '        <div class="welcome">\n' +
+            '            <h3>👋 你好！我是 Omnia AI</h3>\n' +
+            '            <p>我可以帮你写代码、修改文件、执行命令、管理 Git。</p>\n' +
+            '\n' +
+            '            <div class="features">\n' +
+            '                <div class="feature-title">🧠 Agent 模式 — 我能直接操作你的项目</div>\n' +
+            '                <div class="feature-item"><span class="icon">📂</span> 读取和修改文件</div>\n' +
+            '                <div class="feature-item"><span class="icon">⚡</span> 执行终端命令</div>\n' +
+            '                <div class="feature-item"><span class="icon">🔍</span> 搜索代码和文件</div>\n' +
+            '                <div class="feature-item"><span class="icon">🔀</span> Git 操作</div>\n' +
+            '            </div>\n' +
+            '\n' +
+            '            <div class="shortcuts">\n' +
+            '                <div class="shortcut-item">\n' +
+            '                    <kbd>Enter</kbd>\n' +
+            '                    <span>发送消息</span>\n' +
+            '                </div>\n' +
+            '                <div class="shortcut-item">\n' +
+            '                    <kbd>Shift+Enter</kbd>\n' +
+            '                    <span>换行</span>\n' +
+            '                </div>\n' +
+            '            </div>\n' +
+            '        </div>\n' +
+            '    </div>\n' +
+            '\n' +
+            '    <div class="input-area">\n' +
+            '        <textarea id="input" placeholder="告诉我你想做什么..." rows="1"></textarea>\n' +
+            '        <button id="sendBtn">发送</button>\n' +
+            '    </div>\n' +
+            '\n' +
+            '    <script>\n' +
+            jsCode + '\n' +
+            '    </script>\n' +
+            '</body>\n' +
+            '</html>';
+    }
+    _getStyles() {
+        return `
         * {
             box-sizing: border-box;
             margin: 0;
@@ -259,7 +473,6 @@ class OmniaChatPanel {
             flex-direction: column;
         }
 
-        /* ===== Header ===== */
         .header {
             padding: 12px 16px;
             background: var(--vscode-sideBar-background);
@@ -294,7 +507,6 @@ class OmniaChatPanel {
             background: var(--vscode-button-secondaryHoverBackground);
         }
 
-        /* ===== Messages ===== */
         .messages {
             flex: 1;
             overflow-y: auto;
@@ -329,7 +541,6 @@ class OmniaChatPanel {
             border-radius: 2px 12px 12px 12px;
         }
 
-        /* ===== Agent Activity Bar ===== */
         .agent-activity {
             margin-bottom: 12px;
         }
@@ -368,7 +579,6 @@ class OmniaChatPanel {
             display: none;
         }
 
-        /* ===== Tool Call Card ===== */
         .tool-card {
             background: var(--vscode-textBlockQuote-background);
             border: 1px solid var(--vscode-input-border);
@@ -464,7 +674,6 @@ class OmniaChatPanel {
             margin-top: 10px;
         }
 
-        /* ===== Summary Bar ===== */
         .agent-summary {
             display: flex;
             gap: 12px;
@@ -487,7 +696,6 @@ class OmniaChatPanel {
             color: var(--vscode-textLink-foreground);
         }
 
-        /* ===== Markdown Styles ===== */
         .msg-content h1 {
             font-size: 18px;
             font-weight: 600;
@@ -647,7 +855,6 @@ class OmniaChatPanel {
             text-decoration: underline;
         }
 
-        /* ===== Streaming cursor ===== */
         .streaming-cursor {
             display: inline;
             animation: blink 1s step-end infinite;
@@ -660,7 +867,6 @@ class OmniaChatPanel {
             50% { opacity: 0; }
         }
 
-        /* ===== Welcome ===== */
         .welcome {
             text-align: center;
             padding: 40px 20px;
@@ -732,7 +938,6 @@ class OmniaChatPanel {
             text-align: center;
         }
 
-        /* ===== Input Area ===== */
         .input-area {
             padding: 12px 16px;
             background: var(--vscode-sideBar-background);
@@ -792,448 +997,421 @@ class OmniaChatPanel {
         .context-info.show {
             display: block;
         }
-    </style>
-</head>
-<body>
-    <div class="header">
-        <h2>🤖 Omnia AI Agent</h2>
-        <div class="header-actions">
-            <button onclick="clearChat()">清空</button>
-        </div>
-    </div>
+        `;
+    }
+    _buildWebviewScript() {
+        // Build the JS as plain string to avoid template literal escaping issues
+        // Use String.fromCharCode(96) for backtick in regex patterns
+        const BACKTICK = String.fromCharCode(96);
+        return `
+        (function() {
+            'use strict';
 
-    <div class="context-info" id="contextInfo"></div>
+            var vscode = acquireVsCodeApi();
+            var messagesContainer = document.getElementById('messages');
+            var input = document.getElementById('input');
+            var sendBtn = document.getElementById('sendBtn');
+            var contextInfo = document.getElementById('contextInfo');
+            var clearBtn = document.getElementById('clearBtn');
 
-    <div class="messages" id="messages">
-        <div class="welcome">
-            <h3>👋 你好！我是 Omnia AI</h3>
-            <p>我可以帮你写代码、修改文件、执行命令、管理 Git。</p>
+            var welcomeShown = true;
+            var currentAssistantBlock = null;
+            var currentActivityBlock = null;
+            var streamingContent = '';
+            var isStreaming = false;
 
-            <div class="features">
-                <div class="feature-title">🧠 Agent 模式 — 我能直接操作你的项目</div>
-                <div class="feature-item"><span class="icon">📂</span> 读取和修改文件</div>
-                <div class="feature-item"><span class="icon">⚡</span> 执行终端命令</div>
-                <div class="feature-item"><span class="icon">🔍</span> 搜索代码和文件</div>
-                <div class="feature-item"><span class="icon">🔀</span> Git 操作</div>
-            </div>
+            console.log('[Omnia] Webview script loaded');
 
-            <div class="shortcuts">
-                <div class="shortcut-item">
-                    <kbd>Enter</kbd>
-                    <span>发送消息</span>
-                </div>
-                <div class="shortcut-item">
-                    <kbd>Shift+Enter</kbd>
-                    <span>换行</span>
-                </div>
-            </div>
-        </div>
-    </div>
+            // Auto-resize textarea
+            input.addEventListener('input', function() {
+                this.style.height = 'auto';
+                this.style.height = Math.min(this.scrollHeight, 150) + 'px';
+            });
 
-    <div class="input-area">
-        <textarea id="input" placeholder="告诉我你想做什么..." rows="1"></textarea>
-        <button id="sendBtn" onclick="sendMessage()">发送</button>
-    </div>
+            // Enter to send, Shift+Enter for newline
+            input.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    doSendMessage();
+                    return false;
+                }
+            });
 
-    <script>
-        const vscode = acquireVsCodeApi();
-        const messagesContainer = document.getElementById('messages');
-        const input = document.getElementById('input');
-        const sendBtn = document.getElementById('sendBtn');
-        const contextInfo = document.getElementById('contextInfo');
-
-        let welcomeShown = true;
-        let currentAssistantBlock = null;
-        let currentActivityBlock = null;
-        let streamingContent = '';
-        let isStreaming = false;
-
-        // ===== Auto-resize textarea =====
-        input.addEventListener('input', function() {
-            this.style.height = 'auto';
-            this.style.height = Math.min(this.scrollHeight, 150) + 'px';
-        });
-
-        input.addEventListener('keydown', function(e) {
-            if (e.key === 'Enter' && !e.shiftKey) {
+            // Send button click
+            sendBtn.addEventListener('click', function(e) {
                 e.preventDefault();
-                sendMessage();
-            }
-        });
+                e.stopPropagation();
+                doSendMessage();
+            });
 
-        function sendMessage() {
-            const text = input.value.trim();
-            if (!text || isStreaming) return;
+            // Clear button
+            clearBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                vscode.postMessage({ command: 'clearHistory' });
+            });
 
-            if (welcomeShown) {
-                const welcome = messagesContainer.querySelector('.welcome');
-                if (welcome) welcome.remove();
-                welcomeShown = false;
-            }
-
-            vscode.postMessage({ command: 'sendMessage', text: text });
-            input.value = '';
-            input.style.height = 'auto';
-            isStreaming = true;
-            sendBtn.disabled = true;
-        }
-
-        function clearChat() {
-            vscode.postMessage({ command: 'clearHistory' });
-        }
-
-        // ===== Message rendering =====
-
-        function addMessage(role, content) {
-            const div = document.createElement('div');
-            div.className = 'message ' + role;
-            if (role === 'user') {
-                div.textContent = content;
-            } else {
-                const inner = document.createElement('div');
-                inner.className = 'msg-content';
-                inner.innerHTML = renderMarkdown(content);
-                div.appendChild(inner);
-            }
-            messagesContainer.appendChild(div);
-            scrollToBottom();
-        }
-
-        // ===== Agent UI helpers =====
-
-        function startAssistantMessage() {
-            streamingContent = '';
-
-            // Activity block (for tool calls & status)
-            currentActivityBlock = document.createElement('div');
-            currentActivityBlock.className = 'agent-activity';
-            messagesContainer.appendChild(currentActivityBlock);
-
-            // Content block (for AI text response)
-            currentAssistantBlock = document.createElement('div');
-            currentAssistantBlock.className = 'message assistant';
-            const inner = document.createElement('div');
-            inner.className = 'msg-content';
-            inner.innerHTML = '<span class="streaming-cursor">▊</span>';
-            currentAssistantBlock.appendChild(inner);
-            messagesContainer.appendChild(currentAssistantBlock);
-        }
-
-        function appendStreamToken(text) {
-            if (!currentAssistantBlock) return;
-            streamingContent += text;
-            const inner = currentAssistantBlock.querySelector('.msg-content');
-            if (streamingContent.trim()) {
-                inner.innerHTML = renderMarkdown(streamingContent) + '<span class="streaming-cursor">▊</span>';
-            }
-            scrollToBottom();
-        }
-
-        function addAgentStatus(message) {
-            if (!currentActivityBlock) return;
-            const statusDiv = document.createElement('div');
-            statusDiv.className = 'agent-status';
-            statusDiv.innerHTML = '<div class="spinner"></div><span>' + escapeHtml(message) + '</span>';
-            currentActivityBlock.appendChild(statusDiv);
-            scrollToBottom();
-        }
-
-        function addToolCallCard(name, args) {
-            if (!currentActivityBlock) return;
-
-            const card = document.createElement('div');
-            card.className = 'tool-card';
-            card.id = 'tool-' + name + '-' + Date.now();
-
-            const toolIcon = getToolIcon(name);
-
-            card.innerHTML =
-                '<div class="tool-card-header" onclick="toggleToolCard(this)">' +
-                    '<span class="tool-name"><span class="tool-icon">' + toolIcon + '</span>' + escapeHtml(name) + '</span>' +
-                    '<span class="tool-status running">⏳ 执行中</span>' +
-                '</div>' +
-                '<div class="tool-card-body">' +
-                    '<div class="tool-args-label">参数</div>' +
-                    '<pre>' + escapeHtml(formatJson(args)) + '</pre>' +
-                '</div>';
-
-            currentActivityBlock.appendChild(card);
-            scrollToBottom();
-        }
-
-        function updateToolResult(name, content, success) {
-            if (!currentActivityBlock) return;
-
-            // Find the last tool card with this name
-            const cards = currentActivityBlock.querySelectorAll('.tool-card');
-            let targetCard = null;
-            for (let i = cards.length - 1; i >= 0; i--) {
-                const header = cards[i].querySelector('.tool-name');
-                if (header && header.textContent.trim() === name) {
-                    targetCard = cards[i];
-                    break;
+            // Tool card toggle
+            messagesContainer.addEventListener('click', function(e) {
+                var header = e.target.closest('.tool-card-header');
+                if (header) {
+                    var body = header.nextElementSibling;
+                    if (body) body.classList.toggle('expanded');
+                    return;
                 }
-            }
-
-            if (!targetCard) return;
-
-            // Update status
-            const statusEl = targetCard.querySelector('.tool-status');
-            if (statusEl) {
-                statusEl.className = 'tool-status ' + (success ? 'success' : 'error');
-                statusEl.textContent = success ? '✅ 完成' : '❌ 失败';
-            }
-
-            // Add result to body
-            const body = targetCard.querySelector('.tool-card-body');
-            if (body) {
-                const resultHtml =
-                    '<div class="tool-result-label">' + (success ? '结果' : '错误') + '</div>' +
-                    '<pre>' + escapeHtml(truncateText(content, 2000)) + '</pre>';
-                body.innerHTML += resultHtml;
-            }
-        }
-
-        function showAgentSummary(toolCalls, rounds) {
-            if (!currentActivityBlock) return;
-            if (toolCalls === 0 && rounds <= 1) return;
-
-            const summary = document.createElement('div');
-            summary.className = 'agent-summary';
-            summary.innerHTML =
-                '<span class="stat">🔄 轮次: <span class="stat-value">' + rounds + '</span></span>' +
-                '<span class="stat">🔧 工具调用: <span class="stat-value">' + toolCalls + '</span></span>';
-            currentActivityBlock.insertBefore(summary, currentActivityBlock.firstChild);
-        }
-
-        function endAssistantMessage(fullContent) {
-            if (currentAssistantBlock) {
-                const inner = currentAssistantBlock.querySelector('.msg-content');
-                if (fullContent && fullContent.trim()) {
-                    inner.innerHTML = renderMarkdown(fullContent);
-                } else if (streamingContent.trim()) {
-                    inner.innerHTML = renderMarkdown(streamingContent);
-                } else {
-                    inner.innerHTML = '<em style="color: var(--vscode-descriptionLabel-foreground);">（无文字回复）</em>';
+                var copyBtn = e.target.closest('.copy-btn');
+                if (copyBtn) {
+                    doCopyCode(copyBtn);
+                    return;
                 }
-            }
-
-            // Mark all status items as done
-            if (currentActivityBlock) {
-                const spinners = currentActivityBlock.querySelectorAll('.agent-status .spinner');
-                spinners.forEach(function(s) { s.parentElement.classList.add('done'); });
-            }
-
-            currentAssistantBlock = null;
-            currentActivityBlock = null;
-            streamingContent = '';
-            isStreaming = false;
-            sendBtn.disabled = false;
-            input.focus();
-            scrollToBottom();
-        }
-
-        function toggleToolCard(header) {
-            const body = header.nextElementSibling;
-            if (body) {
-                body.classList.toggle('expanded');
-            }
-        }
-
-        // ===== Utilities =====
-
-        function getToolIcon(name) {
-            const icons = {
-                'read_file': '📖', 'write_file': '✏️', 'execute_shell': '⚡',
-                'list_directory': '📂', 'web_search': '🔍', 'query_memory': '🧠',
-                'save_memory': '💾', 'memory_stats': '📊',
-            };
-            return icons[name] || '🔧';
-        }
-
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
-
-        function formatJson(str) {
-            try {
-                if (typeof str === 'string') {
-                    return JSON.stringify(JSON.parse(str), null, 2);
-                }
-                return JSON.stringify(str, null, 2);
-            } catch {
-                return str;
-            }
-        }
-
-        function truncateText(text, maxLen) {
-            if (text.length <= maxLen) return text;
-            return text.slice(0, maxLen) + '...\\n[已截断，共 ' + text.length + ' 字符]';
-        }
-
-        function scrollToBottom() {
-            requestAnimationFrame(function() {
-                messagesContainer.scrollTop = messagesContainer.scrollHeight;
-            });
-        }
-
-        // ===== Markdown Renderer =====
-
-        function renderMarkdown(text) {
-            if (!text) return '';
-
-            let result = text;
-
-            // Save code blocks
-            const codeBlocks = [];
-            result = result.replace(/\`\`\`(\w*)\n([\s\S]*?)\`\`\`/g, function(match, lang, code) {
-                const index = codeBlocks.length;
-                codeBlocks.push({ lang: lang || 'plaintext', code: code });
-                return '%%CODEBLOCK_' + index + '%%';
             });
 
-            // Save inline code
-            const inlineCodes = [];
-            result = result.replace(/\`([^\`]+)\`/g, function(match, code) {
-                const index = inlineCodes.length;
-                inlineCodes.push(code);
-                return '%%INLINE_' + index + '%%';
-            });
+            function doSendMessage() {
+                console.log('[Omnia] doSendMessage called, isStreaming:', isStreaming);
+                if (isStreaming) return;
 
-            // Headers
-            result = result.replace(/^### (.+)$/gm, '<h3>$1</h3>');
-            result = result.replace(/^## (.+)$/gm, '<h2>$1</h2>');
-            result = result.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+                var text = input.value;
+                if (typeof text === 'string') text = text.trim();
+                if (!text) return;
 
-            // Bold & italic
-            result = result.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-            result = result.replace(/\*(.+?)\*/g, '<em>$1</em>');
-
-            // Blockquote
-            result = result.replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>');
-
-            // HR
-            result = result.replace(/^---$/gm, '<hr>');
-
-            // Table rows
-            result = result.replace(/^\|(.+)\|$/gm, function(match, content) {
-                return '%%TABLE_ROW%%' + content + '%%/TABLE_ROW%%';
-            });
-
-            // Unordered list
-            result = result.replace(/^[-*] (.+)$/gm, '<li>$1</li>');
-            result = result.replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>');
-
-            // Ordered list
-            result = result.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
-
-            // Checkbox
-            result = result.replace(/\[ \]/g, '<span class="checkbox"></span>');
-            result = result.replace(/\[x\]/g, '<span class="checkbox checked">✓</span>');
-
-            // Links
-            result = result.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
-
-            // Paragraphs
-            result = result.replace(/\n\n/g, '</p><p>');
-            result = '<p>' + result + '</p>';
-            result = result.replace(/<p><\/p>/g, '');
-            result = result.replace(/<p>(<h[1-3]>)/g, '$1');
-            result = result.replace(/(<\/h[1-3]>)<\/p>/g, '$1');
-            result = result.replace(/<p>(<ul>)/g, '$1');
-            result = result.replace(/(<\/ul>)<\/p>/g, '$1');
-            result = result.replace(/<p>(<blockquote>)/g, '$1');
-            result = result.replace(/(<\/blockquote>)<\/p>/g, '$1');
-            result = result.replace(/<p>(<hr>)<\/p>/g, '$1');
-
-            // Restore tables
-            result = result.replace(/(<p>)?%%TABLE_ROW%%(.+)%%\/TABLE_ROW%%(<\/p>)?/gm, function(match, p1, content, p2) {
-                const cells = content.split('|').map(function(c) { return c.trim(); });
-                const isHeader = cells.every(function(c) { return /^[-:]+$/.test(c); });
-                if (isHeader) return '';
-                return '<tr>' + cells.map(function(c) { return '<td>' + c + '</td>'; }).join('') + '</tr>';
-            });
-
-            // Restore code blocks
-            codeBlocks.forEach(function(block, index) {
-                const langLabel = block.lang || 'code';
-                const escapedCode = escapeHtml(block.code.trim());
-                const codeBlockHtml = '<pre><div class="code-header"><span>' + langLabel + '</span><button class="copy-btn" onclick="copyCode(this)">复制</button></div><code>' + escapedCode + '</code></pre>';
-                result = result.replace('%%CODEBLOCK_' + index + '%%', codeBlockHtml);
-            });
-
-            // Restore inline code
-            inlineCodes.forEach(function(code, index) {
-                result = result.replace('%%INLINE_' + index + '%%', '<code>' + escapeHtml(code) + '</code>');
-            });
-
-            // Clean empty p
-            result = result.replace(/<p>\s*<\/p>/g, '');
-
-            return result;
-        }
-
-        function copyCode(btn) {
-            const codeBlock = btn.closest('pre').querySelector('code');
-            const text = codeBlock.textContent;
-            navigator.clipboard.writeText(text).then(function() {
-                btn.textContent = '已复制!';
-                btn.classList.add('copied');
-                setTimeout(function() {
-                    btn.textContent = '复制';
-                    btn.classList.remove('copied');
-                }, 2000);
-            });
-        }
-
-        // ===== Message handler =====
-
-        window.addEventListener('message', function(event) {
-            const msg = event.data;
-            switch (msg.command) {
-                case 'addMessage':
-                    addMessage(msg.role, msg.content);
-                    break;
-                case 'startAssistant':
-                    startAssistantMessage();
-                    break;
-                case 'streamToken':
-                    appendStreamToken(msg.content);
-                    break;
-                case 'agentStatus':
-                    addAgentStatus(msg.message);
-                    break;
-                case 'toolCall':
-                    addToolCallCard(msg.name, msg.args);
-                    break;
-                case 'toolResult':
-                    updateToolResult(msg.name, msg.content, msg.success);
-                    break;
-                case 'endAssistant':
-                    showAgentSummary(msg.toolCalls || 0, msg.rounds || 0);
-                    endAssistantMessage(msg.fullContent);
-                    break;
-                case 'clearMessages':
-                    messagesContainer.innerHTML = '';
+                if (welcomeShown) {
+                    var welcome = messagesContainer.querySelector('.welcome');
+                    if (welcome) welcome.remove();
                     welcomeShown = false;
-                    break;
-                case 'updateContext':
-                    if (msg.context) {
-                        contextInfo.textContent = '📄 ' + msg.context.file + ' (第' + msg.context.line + '行)';
-                        contextInfo.classList.add('show');
-                    } else {
-                        contextInfo.classList.remove('show');
-                    }
-                    break;
-            }
-        });
+                }
 
-        input.focus();
-    </script>
-</body>
-</html>`;
+                console.log('[Omnia] Sending message:', text.substring(0, 50));
+                vscode.postMessage({ command: 'sendMessage', text: text });
+                input.value = '';
+                input.style.height = 'auto';
+                isStreaming = true;
+                sendBtn.disabled = true;
+            }
+
+            function doAddMessage(role, content) {
+                var div = document.createElement('div');
+                div.className = 'message ' + role;
+                if (role === 'user') {
+                    div.textContent = content;
+                } else {
+                    var inner = document.createElement('div');
+                    inner.className = 'msg-content';
+                    inner.innerHTML = doRenderMarkdown(content);
+                    div.appendChild(inner);
+                }
+                messagesContainer.appendChild(div);
+                doScrollToBottom();
+            }
+
+            function doStartAssistantMessage() {
+                streamingContent = '';
+                currentActivityBlock = document.createElement('div');
+                currentActivityBlock.className = 'agent-activity';
+                messagesContainer.appendChild(currentActivityBlock);
+                currentAssistantBlock = document.createElement('div');
+                currentAssistantBlock.className = 'message assistant';
+                var inner = document.createElement('div');
+                inner.className = 'msg-content';
+                inner.innerHTML = '<span class="streaming-cursor">&#9608;</span>';
+                currentAssistantBlock.appendChild(inner);
+                messagesContainer.appendChild(currentAssistantBlock);
+            }
+
+            function doAppendStreamToken(text) {
+                if (!currentAssistantBlock) return;
+                streamingContent += text;
+                var inner = currentAssistantBlock.querySelector('.msg-content');
+                if (streamingContent.trim()) {
+                    inner.innerHTML = doRenderMarkdown(streamingContent) + '<span class="streaming-cursor">&#9608;</span>';
+                }
+                doScrollToBottom();
+            }
+
+            function doAddAgentStatus(message) {
+                if (!currentActivityBlock) return;
+                var statusDiv = document.createElement('div');
+                statusDiv.className = 'agent-status';
+                statusDiv.innerHTML = '<div class="spinner"></div><span>' + doEscapeHtml(message) + '</span>';
+                currentActivityBlock.appendChild(statusDiv);
+                doScrollToBottom();
+            }
+
+            function doAddToolCallCard(name, args) {
+                if (!currentActivityBlock) return;
+                var card = document.createElement('div');
+                card.className = 'tool-card';
+                card.id = 'tool-' + name + '-' + Date.now();
+                var toolIcon = doGetToolIcon(name);
+                card.innerHTML =
+                    '<div class="tool-card-header">' +
+                        '<span class="tool-name"><span class="tool-icon">' + toolIcon + '</span>' + doEscapeHtml(name) + '</span>' +
+                        '<span class="tool-status running">⏳ 执行中</span>' +
+                    '</div>' +
+                    '<div class="tool-card-body">' +
+                        '<div class="tool-args-label">参数</div>' +
+                        '<pre>' + doEscapeHtml(doFormatJson(args)) + '</pre>' +
+                    '</div>';
+                currentActivityBlock.appendChild(card);
+                doScrollToBottom();
+            }
+
+            function doUpdateToolResult(name, content, success) {
+                if (!currentActivityBlock) return;
+                var cards = currentActivityBlock.querySelectorAll('.tool-card');
+                var targetCard = null;
+                for (var i = cards.length - 1; i >= 0; i--) {
+                    var header = cards[i].querySelector('.tool-name');
+                    if (header && header.textContent.trim() === name) {
+                        targetCard = cards[i];
+                        break;
+                    }
+                }
+                if (!targetCard) return;
+                var statusEl = targetCard.querySelector('.tool-status');
+                if (statusEl) {
+                    statusEl.className = 'tool-status ' + (success ? 'success' : 'error');
+                    statusEl.textContent = success ? '✅ 完成' : '❌ 失败';
+                }
+                var body = targetCard.querySelector('.tool-card-body');
+                if (body) {
+                    var resultHtml =
+                        '<div class="tool-result-label">' + (success ? '结果' : '错误') + '</div>' +
+                        '<pre>' + doEscapeHtml(doTruncateText(content, 2000)) + '</pre>';
+                    body.innerHTML += resultHtml;
+                }
+            }
+
+            function doShowAgentSummary(toolCalls, rounds) {
+                if (!currentActivityBlock) return;
+                if (toolCalls === 0 && rounds <= 1) return;
+                var summary = document.createElement('div');
+                summary.className = 'agent-summary';
+                summary.innerHTML =
+                    '<span class="stat">🔄 轮次: <span class="stat-value">' + rounds + '</span></span>' +
+                    '<span class="stat">🔧 工具调用: <span class="stat-value">' + toolCalls + '</span></span>';
+                currentActivityBlock.insertBefore(summary, currentActivityBlock.firstChild);
+            }
+
+            function doEndAssistantMessage(fullContent) {
+                if (currentAssistantBlock) {
+                    var inner = currentAssistantBlock.querySelector('.msg-content');
+                    if (fullContent && fullContent.trim()) {
+                        inner.innerHTML = doRenderMarkdown(fullContent);
+                    } else if (streamingContent.trim()) {
+                        inner.innerHTML = doRenderMarkdown(streamingContent);
+                    } else {
+                        inner.innerHTML = '<em style="color: var(--vscode-descriptionLabel-foreground);">（无文字回复）</em>';
+                    }
+                }
+                if (currentActivityBlock) {
+                    var spinners = currentActivityBlock.querySelectorAll('.agent-status .spinner');
+                    for (var i = 0; i < spinners.length; i++) {
+                        spinners[i].parentElement.classList.add('done');
+                    }
+                }
+                currentAssistantBlock = null;
+                currentActivityBlock = null;
+                streamingContent = '';
+                isStreaming = false;
+                sendBtn.disabled = false;
+                input.focus();
+                doScrollToBottom();
+            }
+
+            // Utilities
+            function doEscapeHtml(text) {
+                var div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
+
+            function doFormatJson(str) {
+                try {
+                    if (typeof str === 'string') return JSON.stringify(JSON.parse(str), null, 2);
+                    return JSON.stringify(str, null, 2);
+                } catch (e) { return str; }
+            }
+
+            function doTruncateText(text, maxLen) {
+                if (text.length <= maxLen) return text;
+                return text.slice(0, maxLen) + '...\\n[已截断，共 ' + text.length + ' 字符]';
+            }
+
+            function doScrollToBottom() {
+                requestAnimationFrame(function() {
+                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                });
+            }
+
+            function doGetToolIcon(name) {
+                var icons = {
+                    'read_file': '📖', 'write_file': '✏️', 'execute_shell': '⚡',
+                    'list_directory': '📂', 'web_search': '🔍', 'query_memory': '🧠',
+                    'save_memory': '💾', 'memory_stats': '📊'
+                };
+                return icons[name] || '🔧';
+            }
+
+            function doCopyCode(btn) {
+                var codeBlock = btn.closest('pre').querySelector('code');
+                var text = codeBlock.textContent;
+                navigator.clipboard.writeText(text).then(function() {
+                    btn.textContent = '已复制!';
+                    btn.classList.add('copied');
+                    setTimeout(function() {
+                        btn.textContent = '复制';
+                        btn.classList.remove('copied');
+                    }, 2000);
+                });
+            }
+
+            // ===== Markdown Renderer =====
+            // Using String.fromCharCode(96) for backtick to avoid escaping issues
+            var BK = String.fromCharCode(96);
+
+            function doRenderMarkdown(text) {
+                if (!text) return '';
+
+                var result = text;
+
+                // Save code blocks (using BK for backtick)
+                var codeBlocks = [];
+                var tripleBkRe = new RegExp(BK + BK + BK + '(\\\\w*)\\\\n([\\\\s\\\\S]*?)' + BK + BK + BK, 'g');
+                result = result.replace(tripleBkRe, function(match, lang, code) {
+                    var index = codeBlocks.length;
+                    codeBlocks.push({ lang: lang || 'plaintext', code: code });
+                    return '%%CODEBLOCK_' + index + '%%';
+                });
+
+                // Save inline code
+                var inlineCodes = [];
+                var inlineBkRe = new RegExp(BK + '([^' + BK + ']+)' + BK, 'g');
+                result = result.replace(inlineBkRe, function(match, code) {
+                    var index = inlineCodes.length;
+                    inlineCodes.push(code);
+                    return '%%INLINE_' + index + '%%';
+                });
+
+                // Headers
+                result = result.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+                result = result.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+                result = result.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+
+                // Bold & italic
+                result = result.replace(/\\*\\*(.+?)\\*\\*/g, '<strong>$1</strong>');
+                result = result.replace(/\\*(.+?)\\*/g, '<em>$1</em>');
+
+                // Blockquote
+                result = result.replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>');
+
+                // HR
+                result = result.replace(/^---$/gm, '<hr>');
+
+                // Table rows
+                result = result.replace(/^\\|(.+)\\|$/gm, function(match, content) {
+                    return '%%TABLE_ROW%%' + content + '%%/TABLE_ROW%%';
+                });
+
+                // Unordered list
+                result = result.replace(/^[-*] (.+)$/gm, '<li>$1</li>');
+                result = result.replace(/(<li>.*<\\/li>\\n?)+/g, '<ul>$&</ul>');
+
+                // Ordered list
+                result = result.replace(/^\\d+\\. (.+)$/gm, '<li>$1</li>');
+
+                // Checkbox
+                result = result.replace(/\\[ \\]/g, '<span class="checkbox"></span>');
+                result = result.replace(/\\[x\\]/g, '<span class="checkbox checked">✓</span>');
+
+                // Links
+                result = result.replace(/\\[([^\\]]+)\\]\\(([^)]+)\\)/g, '<a href="$2" target="_blank">$1</a>');
+
+                // Paragraphs
+                result = result.replace(/\\n\\n/g, '</p><p>');
+                result = '<p>' + result + '</p>';
+                result = result.replace(/<p><\\/p>/g, '');
+                result = result.replace(/<p>(<h[1-3]>)/g, '$1');
+                result = result.replace(/(<\\/h[1-3]>)<\\/p>/g, '$1');
+                result = result.replace(/<p>(<ul>)/g, '$1');
+                result = result.replace(/(<\\/ul>)<\\/p>/g, '$1');
+                result = result.replace(/<p>(<blockquote>)/g, '$1');
+                result = result.replace(/(<\\/blockquote>)<\\/p>/g, '$1');
+                result = result.replace(/<p>(<hr>)<\\/p>/g, '$1');
+
+                // Restore tables
+                result = result.replace(/(<p>)?%%TABLE_ROW%%(.+)%%\\/TABLE_ROW%%(<\\/p>)?/gm, function(match, p1, content, p2) {
+                    var cells = content.split('|').map(function(c) { return c.trim(); });
+                    var isHeader = cells.every(function(c) { return /^[-:]+$/.test(c); });
+                    if (isHeader) return '';
+                    return '<tr>' + cells.map(function(c) { return '<td>' + c + '</td>'; }).join('') + '</tr>';
+                });
+
+                // Restore code blocks
+                for (var idx = 0; idx < codeBlocks.length; idx++) {
+                    var langLabel = codeBlocks[idx].lang || 'code';
+                    var escapedCode = doEscapeHtml(codeBlocks[idx].code.trim());
+                    var codeBlockHtml = '<pre><div class="code-header"><span>' + langLabel + '</span><button class="copy-btn">复制</button></div><code>' + escapedCode + '</code></pre>';
+                    result = result.replace('%%CODEBLOCK_' + idx + '%%', codeBlockHtml);
+                }
+
+                // Restore inline code
+                for (var idx2 = 0; idx2 < inlineCodes.length; idx2++) {
+                    result = result.replace('%%INLINE_' + idx2 + '%%', '<code>' + doEscapeHtml(inlineCodes[idx2]) + '</code>');
+                }
+
+                // Clean empty p
+                result = result.replace(/<p>\\s*<\\/p>/g, '');
+
+                return result;
+            }
+
+            // ===== Message handler =====
+            window.addEventListener('message', function(event) {
+                var msg = event.data;
+                console.log('[Omnia] Received message:', msg.command);
+                switch (msg.command) {
+                    case 'addMessage':
+                        doAddMessage(msg.role, msg.content);
+                        break;
+                    case 'startAssistant':
+                        doStartAssistantMessage();
+                        break;
+                    case 'streamToken':
+                        doAppendStreamToken(msg.content);
+                        break;
+                    case 'agentStatus':
+                        doAddAgentStatus(msg.message);
+                        break;
+                    case 'toolCall':
+                        doAddToolCallCard(msg.name, msg.args);
+                        break;
+                    case 'toolResult':
+                        doUpdateToolResult(msg.name, msg.content, msg.success);
+                        break;
+                    case 'endAssistant':
+                        doShowAgentSummary(msg.toolCalls || 0, msg.rounds || 0);
+                        doEndAssistantMessage(msg.fullContent);
+                        break;
+                    case 'clearMessages':
+                        messagesContainer.innerHTML = '';
+                        welcomeShown = false;
+                        break;
+                    case 'updateContext':
+                        if (msg.context) {
+                            contextInfo.textContent = '📄 ' + msg.context.file + ' (第' + msg.context.line + '行)';
+                            contextInfo.classList.add('show');
+                        } else {
+                            contextInfo.classList.remove('show');
+                        }
+                        break;
+                }
+            });
+
+            console.log('[Omnia] Script initialization complete');
+            input.focus();
+        })();
+        `;
     }
 }
 exports.OmniaChatPanel = OmniaChatPanel;

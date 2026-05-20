@@ -52,7 +52,7 @@ class AgentEngine:
             return
         self._initialized = True
 
-        self.max_tool_rounds = 30
+        self.max_tool_rounds = 200
         self.tool_injection_enabled = True
         self.api_tool_providers = {"deepseek", "openai", "kimi", "xiaomi"}
         self._steps: List[Dict] = []
@@ -266,18 +266,13 @@ class AgentEngine:
 
             try:
                 exec_result = await tool_registry.execute(tool_name, tool_args)
-                # 工具结果返回：支持大文件完整读取（参考 OpenClaw 做法）
+                # 安全截断：先截断原始内容，再 JSON 序列化
                 raw_result = exec_result.get("result", exec_result)
                 if isinstance(raw_result, dict) and "content" in raw_result:
                     raw_content = raw_result["content"]
-                    if isinstance(raw_content, str) and len(raw_content) > 2000000:
-                        # 仅当超过200万字符才截断（Kimi支持200万上下文）
-                        total_lines = raw_content.count(chr(10))
+                    if isinstance(raw_content, str) and len(raw_content) > 60000:
                         raw_result = dict(raw_result)
-                        raw_result["content"] = raw_content[:2000000] + (
-                            "\n\n[文件过大已截断：共 " + str(len(raw_content)) + " 字符，" + str(total_lines) + " 行。"
-                            "当前显示前 200 万字符。如需查看特定范围，请使用 offset 和 limit 参数]"
-                        )
+                        raw_result["content"] = raw_content[:60000] + "\n\n[内容已截断，共 " + str(len(raw_content)) + " 字符。如需完整内容请分段查看]"
                 result_content = json.dumps(raw_result, ensure_ascii=False)
                 error = exec_result.get("error")
 
@@ -311,20 +306,6 @@ class AgentEngine:
                     })
 
                 tool_calls_made += 1
-                
-                # 修剪消息历史，防止 token 无限增长
-                MAX_HISTORY = 30
-                if len(current_messages) > MAX_HISTORY + 2:
-                    preserved = [current_messages[0]]
-                    last_user_idx = 0
-                    for i in range(len(current_messages) - 1, -1, -1):
-                        if current_messages[i].get("role") == "user":
-                            last_user_idx = i
-                            break
-                    tail = current_messages[-MAX_HISTORY:]
-                    if last_user_idx > 0 and current_messages[last_user_idx] not in tail:
-                        tail.insert(0, current_messages[last_user_idx])
-                    current_messages = preserved + tail
 
             except Exception as e:
                 error_msg = f"工具 [{tool_name}] 执行异常: {str(e)}"
@@ -401,53 +382,38 @@ class AgentEngine:
             
             # ═══ 循环检测 ═══
             if execution_history:
-                # 2次重复 = 警告，3次重复 = 终止
-                if len(execution_history) >= 2:
+                if len(execution_history) >= 3:
                     last = execution_history[-1]
                     prev = execution_history[-2]
-                    if last['name'] == prev['name'] and last['args'] == prev['args']:
-                        # 已有2次重复，注入强力警告
-                        loop_warning = "\n\n⚠️【关键警告】你已经连续2次调用工具 '{}' 且参数完全相同。".format(last['name'])
-                        loop_warning += "这是循环行为。如果再次调用相同工具，任务将被强制终止。"
-                        loop_warning += "请立即改变策略，使用不同方法或直接回复用户。"
-                        if original_system_idx is not None:
-                            current_messages[original_system_idx]["content"] += loop_warning
-                    
-                    if len(execution_history) >= 3:
-                        prev2 = execution_history[-3]
-                        if (last['name'] == prev['name'] == prev2['name'] and 
-                            last['args'] == prev['args'] == prev2['args']):
-                            loop_msg = "检测到工具调用循环：工具 {} 以相同参数连续调用3次，已强制终止".format(last['name'])
-                            yield {"type": "status", "message": "⚠️ 检测到循环，已终止"}
-                            yield {"type": "error", "message": loop_msg}
-                            yield {
-                                "type": "done",
-                                "full_content": "⚠️ 执行中断：{}。工具在重复执行相同操作，可能是：1) 文件太大需要分段查看 2) 路径不存在 3) 请尝试用不同方法解决。".format(loop_msg),
-                                "show_summary": tool_calls_made > 0,
-                                "stats": {"rounds_executed": rounds, "tools_called": tool_calls_made},
-                            }
-                            return
+                    prev2 = execution_history[-3]
+                    if (last['name'] == prev['name'] == prev2['name'] and 
+                        last['args'] == prev['args'] == prev2['args']):
+                        loop_msg = "检测到工具调用循环：工具 {} 以相同参数连续调用3次".format(last['name'])
+                        yield {"type": "status", "message": "⚠️ 检测到循环"}
+                        yield {"type": "error", "message": loop_msg}
+                        yield {
+                            "type": "done",
+                            "full_content": "⚠️ 执行中断：{}。建议换用其他方法解决问题。".format(loop_msg),
+                            "show_summary": tool_calls_made > 0,
+                            "stats": {"rounds_executed": rounds, "tools_called": tool_calls_made},
+                        }
+                        return
                 
-                # 注入执行摘要到 system message（限制长度）
-                MAX_SUMMARY_LEN = 2000
-                summary = "\n\n【执行摘要 - 最近3步】\n"
+                # 注入执行摘要到 system message
+                summary = "\n\n【执行摘要】\n"
                 for i, entry in enumerate(execution_history[-3:], 1):
                     status = "✅" if entry.get('success', False) else "❌"
-                    result = entry['result_summary'][:60]
-                    summary += "  {}. {} {} → {}\n".format(i, status, entry['name'], result)
+                    summary += "  {}. {} {} → {}\n".format(i, status, entry['name'], entry['result_summary'])
                 
                 if execution_history[-1].get('success', False):
-                    summary += "\n💡 上一步成功。请继续下一步或总结结果回复用户。"
+                    summary += "\n上一步成功完成。"
                 else:
-                    summary += "\n💡 上一步失败。请换方法，不要重复相同操作。"
+                    summary += "\n上一步失败，请换方法。"
                 
                 if original_system_idx is not None:
-                    base_content = original_system_content
-                    if len(base_content) > 4000:
-                        base_content = base_content[:4000] + "\n...[截断]"
                     current_messages[original_system_idx] = {
                         "role": "system",
-                        "content": base_content + summary,
+                        "content": original_system_content + summary,
                     }
             
             yield {"type": "status", "message": "第 {}/{} 轮思考中...".format(rounds, self.max_tool_rounds)}
@@ -549,27 +515,6 @@ class AgentEngine:
                         }
 
             if not tool_call:
-                # Safety net: detect pseudo-tool-calls like "I need to call xxx" without actual call
-                pseudo_patterns = [
-                    r'我需要调用\s+(\w+)',
-                    r'I need to call\s+(\w+)',
-                    r'让我调用\s+(\w+)',
-                    r'Let me call\s+(\w+)',
-                ]
-                for pattern in pseudo_patterns:
-                    match = re.search(pattern, full_content, re.IGNORECASE)
-                    if match:
-                        pseudo_tool = match.group(1)
-                        loop_msg = "检测到伪工具调用：模型声称要调用 '{}' 但没有真正调用。可能是模型不支持function calling格式。".format(pseudo_tool)
-                        yield {"type": "status", "message": "⚠️ " + loop_msg}
-                        yield {
-                            "type": "done",
-                            "full_content": full_content + "\n\n⚠️ " + loop_msg + "\n\n请直接回答用户问题，或尝试使用其他模型（如 DeepSeek/Xiaomi 对工具支持更好）。",
-                            "show_summary": False,
-                            "stats": {"rounds_executed": rounds, "tools_called": tool_calls_made},
-                        }
-                        return
-
                 validation = validate_tool_execution(
                     response=full_content,
                     tool_calls=[],
@@ -673,18 +618,13 @@ class AgentEngine:
                         yield {"type": "status", "message": f"⏳ 工具 {tool_name} 执行中 ({heartbeat_count * 5}s)..."}
                 
                 exec_result = await tool_task
-                # 工具结果返回：支持大文件完整读取（参考 OpenClaw 做法）
+                # 安全截断：先截断原始内容，再 JSON 序列化
                 raw_result = exec_result.get("result", exec_result)
                 if isinstance(raw_result, dict) and "content" in raw_result:
                     raw_content = raw_result["content"]
-                    if isinstance(raw_content, str) and len(raw_content) > 2000000:
-                        # 仅当超过200万字符才截断（Kimi支持200万上下文）
-                        total_lines = raw_content.count(chr(10))
+                    if isinstance(raw_content, str) and len(raw_content) > 60000:
                         raw_result = dict(raw_result)
-                        raw_result["content"] = raw_content[:2000000] + (
-                            "\n\n[文件过大已截断：共 " + str(len(raw_content)) + " 字符，" + str(total_lines) + " 行。"
-                            "当前显示前 200 万字符。如需查看特定范围，请使用 offset 和 limit 参数]"
-                        )
+                        raw_result["content"] = raw_content[:60000] + "\n\n[内容已截断，共 " + str(len(raw_content)) + " 字符。如需完整内容请分段查看]"
                 result_content = json.dumps(raw_result, ensure_ascii=False)
                 error = exec_result.get("error")
 
@@ -720,20 +660,6 @@ class AgentEngine:
                     })
 
                 tool_calls_made += 1
-                
-                # 修剪消息历史，防止 token 无限增长
-                MAX_HISTORY = 30
-                if len(current_messages) > MAX_HISTORY + 2:
-                    preserved = [current_messages[0]]
-                    last_user_idx = 0
-                    for i in range(len(current_messages) - 1, -1, -1):
-                        if current_messages[i].get("role") == "user":
-                            last_user_idx = i
-                            break
-                    tail = current_messages[-MAX_HISTORY:]
-                    if last_user_idx > 0 and current_messages[last_user_idx] not in tail:
-                        tail.insert(0, current_messages[last_user_idx])
-                    current_messages = preserved + tail
 
             except Exception as e:
                 error_msg = f"工具 [{tool_name}] 执行异常: {str(e)}"
@@ -763,15 +689,15 @@ class AgentEngine:
         }
 
     def _extract_text_tool_call(self, content: str) -> Optional[Dict[str, Any]]:
-        """从 LLM 回复文本中提取工具调用（增强版，支持多种伪格式）"""
+        """从 LLM 回复文本中提取工具调用"""
         if not content:
             return None
 
-        # 格式1: JSON {tool:"name", args:{}}
         patterns = [
             r'\{\s*"tool"\s*:\s*"([^"]+)"\s*,\s*"args"\s*:\s*(\{.*?\})\s*\}',
             r'\{\s*"name"\s*:\s*"([^"]+)"\s*,\s*"arguments"\s*:\s*(\{.*?\})\s*\}',
         ]
+
         for pattern in patterns:
             match = re.search(pattern, content, re.DOTALL)
             if match:
@@ -781,28 +707,6 @@ class AgentEngine:
                     return {"name": name, "arguments": args}
                 except json.JSONDecodeError:
                     continue
-
-        # 格式2: XML <tool_call> <tool_name>xxx</tool_name> <arguments>{"path":"/tmp"}</arguments>
-        xml_pattern = r'<tool_call>.*?<tool_name>([^<]+)</tool_name>.*?<arguments>(\{[^}]*\})</arguments>'
-        match = re.search(xml_pattern, content, re.DOTALL | re.IGNORECASE)
-        if match:
-            name = match.group(1).strip()
-            try:
-                args = json.loads(match.group(2))
-                return {"name": name, "arguments": args}
-            except:
-                pass
-
-        # 格式3: Markdown code block with tool name
-        code_pattern = r'```(?:json)?\s*\n?\s*\{\s*"(?:action|tool|name)"\s*:\s*"([^"]+)"\s*,\s*"(?:action_input|args|arguments|input)"\s*:\s*(\{.*?\})\s*\}'
-        match = re.search(code_pattern, content, re.DOTALL)
-        if match:
-            name = match.group(1)
-            try:
-                args = json.loads(match.group(2))
-                return {"name": name, "arguments": args}
-            except:
-                pass
 
         return None
 

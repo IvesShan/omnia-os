@@ -156,6 +156,14 @@ async def general_error_handler(request: Request, exc: Exception):
     )
 
 
+# ========== 健康检查（最高优先级，不经过其他路由） ==========
+
+@app.get("/health")
+async def health():
+    """健康检查 - 轻量级，不触发任何重操作"""
+    return {"status": "ok", "version": "2.0.0"}
+
+
 # ========== 静态文件 ==========
 
 web_dir = settings.project_root / "web"
@@ -165,15 +173,7 @@ if static_dir.exists():
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
 
-# ========== 基础路由 ==========
-
-@app.get("/health")
-async def health():
-    """健康检查"""
-    return {"status": "ok", "version": "2.0.0"}
-
-
-# ========== 挂载路由模块（必须在静态文件路由之前） ==========
+# ========== 挂载路由模块 ==========
 
 from src.omnia.routers import provider, chat, memory, graph, status, workflow, feishu
 from src.omnia.routers import swarm, scheduler, skills
@@ -185,6 +185,8 @@ from src.omnia.routers import summary
 from src.omnia.routers import vector, plan, gateway
 from src.omnia.routers import reasoning, capability, reflection, progressive
 from src.omnia.routers import performance
+from src.omnia.routers import license
+
 # Progressive Capability 渐进式能力
 # Reflection 反思模块
 app.include_router(reflection.router, tags=["reflection"])
@@ -256,9 +258,11 @@ app.include_router(interrupt.router, tags=["interrupt"])
 # Wake 唤醒功能
 app.include_router(wake.router, tags=["wake"])
 
+# Summary 总结模块
+app.include_router(summary.router, prefix="/api", tags=["summary"])
 
-
-
+# License 授权管理
+app.include_router(license.router, tags=["license"])
 
 
 # ========== 工具管理路由 ==========
@@ -335,4 +339,3 @@ if __name__ == "__main__":
         port=settings.port,
         reload=settings.debug
     )
-app.include_router(summary.router, prefix="/api", tags=["summary"])

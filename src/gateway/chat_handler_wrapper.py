@@ -48,7 +48,6 @@ class ChatHandlerWrapper:
         Returns:
             处理结果字典
         """
-        from omnia.web_server import _store_confirmation
         
         # 初始化 MemoryPalace
         session_id = chat_id or str(uuid.uuid4())[:8]

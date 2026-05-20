@@ -33,9 +33,9 @@ except ImportError:
 
 # 日志配置
 LOG_FILES = [
-    "daemon.log",
-    "watchdog.log",
-    "web_server.log",
+    
+    
+    
     "memory_enhance.log",
 ]
 

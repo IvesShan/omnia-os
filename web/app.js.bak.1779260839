@@ -536,9 +536,11 @@ function updateTypingStatus(message) {
 }
 
 function removeTyping() {
-  // 注意：不再在这里隐藏中止按钮！
-  // 中止按钮的显示/隐藏由重写的 sendMessage() 统一管理
-  // removeTyping 只负责移除打字动画元素
+  // 隐藏中止按钮
+  const stopBtnEl = document.getElementById('stop-btn');
+  const sendBtnEl = document.getElementById('send-btn');
+  if (stopBtnEl) stopBtnEl.style.display = 'none';
+  if (sendBtnEl) sendBtnEl.style.display = 'flex';
   
   if (typingEl) {
     typingEl.remove();

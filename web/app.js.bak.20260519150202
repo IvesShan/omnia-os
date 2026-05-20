@@ -40,6 +40,8 @@ document.addEventListener('visibilitychange', () => {
     }
   }
 });
+
+
 // 滚动节流
 let scrollPending = false;
 function scheduleScrollToBottom() {
@@ -64,8 +66,10 @@ function clockLoop(timestamp) {
   }
   requestAnimationFrame(clockLoop);
 }
+
+
 const CHAT_KEY = 'omnia_chat_history_v1';
-const MAX_CHAT_HISTORY = 100;
+const MAX_CHAT_HISTORY = 200;
 
 const $ = (s) => document.querySelector(s);
 const messagesEl = $('#messages');
@@ -201,6 +205,8 @@ removeImageBtn.addEventListener('click', () => {
   imageInput.value = '';
   imagePreview.style.display = 'none';
 });
+
+
 // 改进的剪贴板粘贴图片功能 - 带调试日志和视觉反馈
 // 将此代码替换 app.js 中的粘贴事件处理部分
 
@@ -536,9 +542,11 @@ function updateTypingStatus(message) {
 }
 
 function removeTyping() {
-  // 注意：不再在这里隐藏中止按钮！
-  // 中止按钮的显示/隐藏由重写的 sendMessage() 统一管理
-  // removeTyping 只负责移除打字动画元素
+  // 隐藏中止按钮
+  const stopBtnEl = document.getElementById('stop-btn');
+  const sendBtnEl = document.getElementById('send-btn');
+  if (stopBtnEl) stopBtnEl.style.display = 'none';
+  if (sendBtnEl) sendBtnEl.style.display = 'flex';
   
   if (typingEl) {
     typingEl.remove();
@@ -758,13 +766,14 @@ async function sendMessage() {
   sendBtn.disabled = true;
   attachBtn.disabled = true;
   
-
-  const history = chatHistory.slice(-30).map(m => ({
+  // 构建历史消息（带自动压缩）
+  const rawHistory = chatHistory.slice(-200).map(m => ({
     role: m.role,
     content: m.content
   }));
   
-  
+  // 自动压缩旧消息
+  const history = await buildCompressedHistory(rawHistory);
 
   // 使用 SSE 流式端点
   let reader = null;
@@ -1785,6 +1794,26 @@ function getProviderName(id) {
   };
   return names[id] || id;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 async function selectProvider(providerId, configured) {
   if (!configured) {
     alert('该 API 未配置，请在 .env 文件中添加对应的 API Key');
@@ -2111,9 +2140,6 @@ sendMessage = async function() {
   // 创建 AbortController
   window.currentAbortController = new AbortController();
   
-  // 显示中止按钮
-  showStopButton(true);
-  
   try {
     await originalSendMessage();
   } catch (err) {
@@ -2124,12 +2150,12 @@ sendMessage = async function() {
     }
   } finally {
     window.currentAbortController = null;
-    // 隐藏中止按钮
-    showStopButton(false);
   }
 };
 
 console.log('[AbortController] 中止控制器已启用');
+
+
 // ========== 中止按钮逻辑 ==========
 const sendBtnEl = document.getElementById('send-btn');
 const stopBtn = document.getElementById('stop-btn');
@@ -2173,6 +2199,8 @@ if (stopBtn) {
     }
   });
 }
+
+
 // =========================================
 
 // =========================================
@@ -2222,7 +2250,7 @@ function updateTokenDisplay(status) {
 // 检查 Token 状态
 async function checkTokenStatus() {
   // 从 chatHistory 构建消息列表
-  const messages = chatHistory.slice(-30).map(m => ({
+  const messages = chatHistory.slice(-200).map(m => ({
     role: m.role,
     content: m.content
   }));

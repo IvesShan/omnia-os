@@ -1,7 +1,7 @@
 {
-  "timestamp": "2026-05-19T11:51:27",
-  "topic": "聊天框里的复制粘贴什么的都不能用，我发现vscode有自己的智能体的聊天框，能在这个基础上改吗？用他...",
-  "summary": "## 你说得对！用 VSCode 原生 Chat API 更好\n\n目前我们用的是**自定义 Webview**，相当于在侧边栏嵌入了一个网页，所以复制粘贴、快捷键都有问题。\n\n### 两种方案对比\n\n| | 自定义 Webview（当前） | VSCode 原生 Chat API |\n|---|---|---|\n| 复制粘贴 | ❌ 需自己实现 | ✅ 原生支持 |\n| 快捷键 | ❌ 需自己处理",
+  "timestamp": "2026-05-20T18:57:29",
+  "topic": "test",
+  "summary": "收到！连接正常，随时可以开始工作。有什么需要我帮忙的吗？ 😊",
   "active_project": null,
   "active_files": null,
   "key_decisions": null,

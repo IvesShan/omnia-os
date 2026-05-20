@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Omnia - 授权激活</title>
+    <style>
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-tertiary: #21262d;
+            --text-primary: #e6edf3;
+            --text-secondary: #8b949e;
+            --accent: #58a6ff;
+            --accent-hover: #79c0ff;
+            --success: #3fb950;
+            --warning: #d29922;
+            --danger: #f85149;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 480px;
+            padding: 20px;
+        }
+
+        .card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--bg-tertiary);
+            border-radius: 12px;
+            padding: 32px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .logo {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .logo h1 {
+            font-size: 28px;
+            color: var(--accent);
+            margin-bottom: 8px;
+        }
+
+        .logo p {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        .status-card {
+            background: var(--bg-tertiary);
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 24px;
+            text-align: center;
+        }
+
+        .status-card.active {
+            border: 1px solid var(--success);
+        }
+
+        .status-card.expired {
+            border: 1px solid var(--danger);
+        }
+
+        .status-card.inactive {
+            border: 1px solid var(--warning);
+        }
+
+        .status-icon {
+            font-size: 32px;
+            margin-bottom: 8px;
+        }
+
+        .status-text {
+            font-size: 16px;
+            font-weight: 500;
+        }
+
+        .status-detail {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-top: 8px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px 16px;
+            background: var(--bg-primary);
+            border: 1px solid var(--bg-tertiary);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 16px;
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            transition: border-color 0.2s;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .form-group input::placeholder {
+            color: var(--text-secondary);
+            letter-spacing: 1px;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: var(--bg-primary);
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-hover);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .message {
+            margin-top: 16px;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            text-align: center;
+            display: none;
+        }
+
+        .message.success {
+            background: rgba(63, 185, 80, 0.1);
+            border: 1px solid var(--success);
+            color: var(--success);
+            display: block;
+        }
+
+        .message.error {
+            background: rgba(248, 81, 73, 0.1);
+            border: 1px solid var(--danger);
+            color: var(--danger);
+            display: block;
+        }
+
+        .pricing {
+            margin-top: 24px;
+            padding-top: 24px;
+            border-top: 1px solid var(--bg-tertiary);
+        }
+
+        .pricing h3 {
+            font-size: 14px;
+            color: var(--text-secondary);
+            text-align: center;
+            margin-bottom: 16px;
+        }
+
+        .pricing-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+        }
+
+        .pricing-item {
+            text-align: center;
+            padding: 12px 8px;
+            background: var(--bg-tertiary);
+            border-radius: 8px;
+        }
+
+        .pricing-item .period {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+        }
+
+        .pricing-item .price {
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--accent);
+        }
+
+        .pricing-item .unit {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 24px;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .loading {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid var(--bg-primary);
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <div class="logo">
+                <h1>🧠 Omnia</h1>
+                <p>AI 认知操作系统 - 商业版</p>
+            </div>
+
+            <div class="status-card" id="statusCard">
+                <div class="status-icon" id="statusIcon">⏳</div>
+                <div class="status-text" id="statusText">正在检查授权状态...</div>
+                <div class="status-detail" id="statusDetail"></div>
+            </div>
+
+            <div id="activateForm">
+                <div class="form-group">
+                    <label>请输入授权卡密</label>
+                    <input 
+                        type="text" 
+                        id="licenseKey" 
+                        placeholder="XXXX-XXXX-XXXX-XXXX"
+                        maxlength="19"
+                        autocomplete="off"
+                    >
+                </div>
+                <button class="btn btn-primary" id="activateBtn" onclick="activateLicense()">
+                    激活授权
+                </button>
+                <div class="message" id="message"></div>
+            </div>
+
+            <div class="pricing">
+                <h3>授权价格</h3>
+                <div class="pricing-grid">
+                    <div class="pricing-item">
+                        <div class="period">月卡</div>
+                        <div class="price">¥88</div>
+                        <div class="unit">/月</div>
+                    </div>
+                    <div class="pricing-item">
+                        <div class="period">季卡</div>
+                        <div class="price">¥198</div>
+                        <div class="unit">/3月</div>
+                    </div>
+                    <div class="pricing-item">
+                        <div class="period">年卡</div>
+                        <div class="price">¥398</div>
+                        <div class="unit">/年</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>购买卡密请联系管理员</p>
+            <p style="margin-top: 8px;">© 2025 Omnia. All rights reserved.</p>
+        </div>
+    </div>
+
+    <script>
+        // 页面加载时检查授权状态
+        window.onload = function() {
+            checkLicenseStatus();
+        };
+
+        // 自动格式化卡密输入
+        document.getElementById('licenseKey').addEventListener('input', function(e) {
+            let value = e.target.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+            let formatted = '';
+            for (let i = 0; i < value.length && i < 16; i++) {
+                if (i > 0 && i % 4 === 0) formatted += '-';
+                formatted += value[i];
+            }
+            e.target.value = formatted;
+        });
+
+        async function checkLicenseStatus() {
+            try {
+                const response = await fetch('/api/license/status');
+                const data = await response.json();
+                
+                const statusCard = document.getElementById('statusCard');
+                const statusIcon = document.getElementById('statusIcon');
+                const statusText = document.getElementById('statusText');
+                const statusDetail = document.getElementById('statusDetail');
+                const activateForm = document.getElementById('activateForm');
+
+                if (data.is_valid) {
+                    statusCard.className = 'status-card active';
+                    statusIcon.textContent = '✅';
+                    statusText.textContent = '授权有效';
+                    statusDetail.textContent = `${data.type_label} | 过期: ${data.expire_time} | 剩余 ${data.remaining_days} 天`;
+                    activateForm.style.display = 'none';
+                } else if (data.status === 'expired') {
+                    statusCard.className = 'status-card expired';
+                    statusIcon.textContent = '⚠️';
+                    statusText.textContent = '授权已过期';
+                    statusDetail.textContent = `过期时间: ${data.expire_time}`;
+                } else {
+                    statusCard.className = 'status-card inactive';
+                    statusIcon.textContent = '🔒';
+                    statusText.textContent = '未激活';
+                    statusDetail.textContent = '请输入卡密激活软件';
+                }
+            } catch (error) {
+                console.error('检查授权状态失败:', error);
+            }
+        }
+
+        async function activateLicense() {
+            const keyInput = document.getElementById('licenseKey');
+            const btn = document.getElementById('activateBtn');
+            const message = document.getElementById('message');
+            
+            const key = keyInput.value.trim();
+            
+            if (!key || key.length < 16) {
+                message.className = 'message error';
+                message.textContent = '请输入完整的卡密';
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading"></span>正在激活...';
+            message.className = 'message';
+            message.style.display = 'none';
+
+            try {
+                const response = await fetch('/api/license/activate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ key: key }),
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    message.className = 'message success';
+                    message.textContent = data.message;
+                    
+                    // 2秒后刷新状态
+                    setTimeout(() => {
+                        checkLicenseStatus();
+                    }, 1500);
+                } else {
+                    message.className = 'message error';
+                    message.textContent = data.message || '激活失败';
+                }
+            } catch (error) {
+                message.className = 'message error';
+                message.textContent = '网络错误，请重试';
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '激活授权';
+            }
+        }
+
+        // 回车键激活
+        document.getElementById('licenseKey').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                activateLicense();
+            }
+        });
+    </script>
+</body>
+</html>

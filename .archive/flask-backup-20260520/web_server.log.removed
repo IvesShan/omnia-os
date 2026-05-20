@@ -1,0 +1,27 @@
+22:02:58 [INFO] core.plugin.auto_memory_hook: [AutoMemory] Hook registered: ON_MESSAGE -> auto_store_memory
+22:02:58 [INFO] core.plugin.auto_memory_hook: [AutoMemory] Hook registered: POST_RESPONSE -> auto_store_after_response
+22:02:58 [INFO] core.plugin.auto_memory_hook: [AutoMemory] Hook registered: POST_TOOL_USE -> extract_tool_knowledge
+22:02:58 [INFO] core.actuator.mcp_client: [MCP] SDK imported successfully
+[web_server] 端口 5001 被占用，等待释放...
+[web_server] 端口已释放，等待了 23 秒
+22:03:21 [INFO] core.actuator.mcp_client: [MCP] Connecting to 4 servers...
+Secure MCP Filesystem Server running on stdio
+Client does not support MCP Roots, using allowed directories set from server args: [ '/home/shan/omnia-os' ]
+22:03:22 [INFO] core.actuator.mcp_client: [MCP] ✓ Connected to 'filesystem' with 14 tools
+22:03:22 [INFO] core.actuator.mcp_client: [MCP] ✓ Connected to 'git' with 12 tools
+22:03:23 [INFO] core.actuator.mcp_client: [MCP] ✓ Connected to 'fetch' with 1 tools
+22:03:23 [INFO] core.actuator.mcp_client: [MCP] ✓ Connected to 'puppeteer' with 7 tools
+22:03:23 [INFO] core.actuator.mcp_client: [MCP] Connected: 4/4 servers, 34 tools available
+[MCP] ✓ Connected to MCP servers
+[Collaboration] ✓ Collaboration system initialized
+[Feishu] 启动 WebSocket 长连接...
+[Feishu] ✅ 长连接线程已启动
+Omnia Web UI 启动于 http://127.0.0.1:5001/
+ * Serving Flask app 'web_server'
+ * Debug mode: off
+Address already in use
+Port 5001 is in use by another program. Either identify and stop that program, or start the server with a different port.
+Puppeteer MCP Server closed
+[MCP] Shutting down...
+[MCP] Shutdown error: Attempted to exit cancel scope in a different task than it was entered in
+[MCP] ✓ Disconnected

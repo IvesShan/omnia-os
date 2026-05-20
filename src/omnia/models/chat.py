@@ -15,13 +15,17 @@ class ChatRequest(BaseModel):
     stream: bool = Field(False, description="是否流式")
     
     def get_messages(self) -> List[dict]:
-        """获取消息列表（兼容多种格式）"""
+        """获取消息列表（兼容多种格式）
+        
+        注意：返回的是副本，不会修改原始 history
+        """
         # 优先使用 messages
         if self.messages:
-            return self.messages
+            return list(self.messages)  # 返回副本
         
         # 兼容 Flask 格式：message + history
-        messages = self.history or []
+        # 创建副本，避免修改原始 history
+        messages = list(self.history) if self.history else []
         if self.message:
             messages.append({"role": "user", "content": self.message})
         

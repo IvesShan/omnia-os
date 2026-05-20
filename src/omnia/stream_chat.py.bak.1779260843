@@ -344,7 +344,6 @@ def _stream_chat_unified(
                                     'arguments': ''
                                 }
                             }
-                            current_tool_index += 1
                     
                     elif event_type == 'content_block_delta':
                         delta = data.get('delta', {})
@@ -375,10 +374,9 @@ def _stream_chat_unified(
                                     tool_calls_buffer[idx]['function']['arguments'] += partial_json
                     
                     elif event_type == 'content_block_stop':
-                        # Anthropic SSE 格式: {"type":"content_block_stop","index":N}
-                        # 只有 index 字段，没有 content_block
-                        # tool_use block 的递增在 content_block_start 中已处理
-                        pass
+                        block = data.get('content_block', {})
+                        if block and block.get('type') == 'tool_use':
+                            current_tool_index += 1
                     
                     elif event_type == 'message_delta':
                         delta = data.get('delta', {})

@@ -1,0 +1,1905 @@
+"""Omnia Web Server — Local chat interface + API proxy.
+
+Serves the web/ frontend and proxies chat requests to Moonshot API.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import subprocess
+import sys
+from datetime import datetime
+from pathlib import Path
+
+from flask import Flask, jsonify, request, send_from_directory
+from flask_cors import CORS
+
+# Load .env file
+try:
+    from dotenv import load_dotenv
+except ImportError:
+    # dotenv not installed, try manual loading
+    def load_dotenv(*args, **kwargs):
+        pass
+
+PROJECT_ROOT = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(PROJECT_ROOT / "src"))
+
+# Load environment variables from .env file
+load_dotenv(PROJECT_ROOT / ".env")
+
+from src.core.actuator.agent_swarm import SwarmOrchestrator
+from src.core.actuator.tool_registry import (
+    TOOLS_SCHEMA, 
+    check_tool_safety, 
+    dispatch_tool,
+    init_mcp_tools,
+    shutdown_mcp,
+    get_all_tools_schema,
+)
+from src.core.collaboration import get_collaboration_manager
+from src.core.cognition.context_compressor import ContextCompressor
+from src.core.memory_palace.memory_palace import MemoryPalace
+from src.core.neural_graph import NeuralGraph
+from src.core.neuro_center.notification_queue import NotificationQueue
+from src.core.plugin import get_hook_registry  # Auto-register hooks
+from omnia.chat import _load_api_key, _call_model_messages
+from omnia.wake import assemble_wake_prompt
+from omnia.tool_trigger import check_and_run, should_force_tool_check
+
+WEB_DIR = PROJECT_ROOT / "web"
+WORKSPACE = PROJECT_ROOT  # Git repo is here, not parent
+PENDING_CONF_PATH = settings.omnia_home / "pending_confirmations.json"
+
+import atexit
+import threading
+_pending_lock = threading.Lock()
+
+# Register MCP cleanup on exit
+def _cleanup_mcp():
+    try:
+        shutdown_mcp()
+    except Exception:
+        pass
+
+atexit.register(_cleanup_mcp)
+
+# API Provider selection — reads OMNIA_PROVIDER from .env on startup, or set dynamically by user choice
+_current_provider = os.environ.get("OMNIA_PROVIDER") or None
+
+
+
+
+def _load_pending() -> dict[str, dict]:
+    if PENDING_CONF_PATH.exists():
+        try:
+            return json.loads(PENDING_CONF_PATH.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError) as e:
+            print(f"[_load_pending] Failed to load {PENDING_CONF_PATH}: {e}")
+    return {}
+
+
+def _save_pending(data: dict[str, dict]) -> None:
+    PENDING_CONF_PATH.parent.mkdir(parents=True, exist_ok=True)
+    tmp = PENDING_CONF_PATH.with_suffix(".tmp")
+    try:
+        tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        tmp.replace(PENDING_CONF_PATH)
+    except OSError as e:
+        print(f"[_save_pending] Failed to save {PENDING_CONF_PATH}: {e}")
+        raise
+
+
+def _store_confirmation(cid: str, ctx: dict) -> None:
+    with _pending_lock:
+        data = _load_pending()
+        data[cid] = ctx
+        _save_pending(data)
+        print(f"[_store_confirmation] Stored cid={cid}, total_keys={len(data)}")
+
+
+def _pop_confirmation(cid: str) -> dict | None:
+    cid = (cid or "").strip()
+    if not cid:
+        print("[_pop_confirmation] Empty cid received")
+        return None
+    with _pending_lock:
+        data = _load_pending()
+        ctx = data.pop(cid, None)
+        if ctx:
+            _save_pending(data)
+            print(f"[_pop_confirmation] Popped cid={cid}, remaining={len(data)}")
+        else:
+            print(f"[_pop_confirmation] Miss cid={cid}, available_keys={list(data.keys())}")
+        return ctx
+
+
+def _daemon_status() -> bool:
+    pid_file = settings.omnia_home / "daemon.pid"
+    if pid_file.exists():
+        try:
+            os.kill(int(pid_file.read_text().strip()), 0)
+            return True
+        except OSError:
+            pass
+    return False
+
+
+def _memory_counts() -> dict:
+    db_file = settings.memory_palace_db
+    counts = {}
+    if db_file.exists():
+        import sqlite3
+        with sqlite3.connect(str(db_file)) as conn:
+            cursor = conn.cursor()
+            for table in ["facts", "relations", "habits", "timeline", "conversation_logs"]:
+                try:
+                    cursor.execute(f"SELECT COUNT(*) FROM {table}")
+                    counts[table] = cursor.fetchone()[0]
+                except sqlite3.OperationalError:
+                    counts[table] = 0
+    return counts
+
+def _ide_context() -> dict | None:
+    ide_file = settings.omnia_home / "ide_context.json"
+    if ide_file.exists():
+        try:
+            return json.loads(ide_file.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            pass
+    return None
+
+
+def _git_snapshot() -> dict:
+    result = {"uncommitted_count": 0, "recent_commits_24h": 0, "branch": None}
+    try:
+            branch_res = subprocess.run(
+                ["git", "-C", str(WORKSPACE), "rev-parse", "--abbrev-ref", "HEAD"],
+                capture_output=True, text=True, timeout=10,
+            )
+            if branch_res.returncode == 0:
+                result["branch"] = branch_res.stdout.strip()
+    except Exception:
+            pass
+
+    try:
+        status_res = subprocess.run(
+            ["git", "-C", str(WORKSPACE), "status", "--short"],
+        capture_output=True, text=True, timeout=10,
+    )
+        if status_res.returncode == 0:
+            lines = [l for l in status_res.stdout.splitlines() if l.strip()]
+            result["uncommitted_count"] = len(lines)
+    except Exception:
+        pass
+
+    try:
+        log_res = subprocess.run(
+            ["git", "-C", str(WORKSPACE), "log", "--since=24 hours ago", "--oneline", "--no-decorate"],
+            capture_output=True, text=True, timeout=10,
+        )
+        if log_res.returncode == 0:
+            commits = [l for l in log_res.stdout.splitlines() if l.strip()]
+            result["recent_commits_24h"] = len(commits)
+    except Exception:
+        pass
+
+    return result
+
+
+def _skills_summary() -> dict:
+    """递归统计所有技能（包括子目录中的技能）"""
+    # Omnia 统计自己的技能目录，而不是 OpenClaw 的
+    skills_dir = PROJECT_ROOT / "skills"
+    auto_skills_dir = PROJECT_ROOT / ".tmp_skills"
+    total = 0
+    auto_forged = 0
+    
+    # 递归查找所有 SKILL.md 文件
+    for base_dir in [skills_dir, auto_skills_dir]:
+        if base_dir.exists():
+            for skill_md in base_dir.rglob("SKILL.md"):
+                skill_dir = skill_md.parent
+                total += 1
+                # 判断是否为自动生成的技能
+                if "auto-forge" in skill_dir.name or skill_dir.name.startswith("auto-forge"):
+                    auto_forged += 1
+    
+    return {"total": total, "auto_forged": auto_forged}
+
+
+def _notifications() -> list:
+    q = NotificationQueue(settings.omnia_home / "notifications.jsonl")
+    notes = q.pop_pending(limit=5, mark_popped=False)
+    return [
+        {
+            "id": n.id,
+            "level": n.level,
+            "source": n.source,
+            "title": n.title,
+            "body": n.body,
+            "created_at": n.created_at,
+        }
+        for n in notes
+    ]
+
+
+def _system_vitals() -> dict:
+    vitals = {}
+    try:
+        import psutil
+        vitals["cpu_percent"] = psutil.cpu_percent(interval=0.1)
+        mem = psutil.virtual_memory()
+        vitals["memory_percent"] = mem.percent
+        vitals["memory_used_gb"] = round(mem.used / (1024 ** 3), 2)
+        vitals["memory_total_gb"] = round(mem.total / (1024 ** 3), 2)
+        disk = psutil.disk_usage("/")
+        vitals["disk_percent"] = disk.percent
+        # CPU temperature (best effort)
+        try:
+            temps = psutil.sensors_temperatures()
+            if temps:
+                for key, entries in temps.items():
+                    if entries:
+                        vitals["cpu_temp_c"] = round(entries[0].current, 1)
+                        break
+        except Exception:
+            vitals["cpu_temp_c"] = None
+    except ImportError:
+        pass
+    return vitals
+
+
+def _env_snapshot() -> dict:
+    """获取环境快照，包括当前使用的模型。"""
+    u = os.uname()
+    
+    # 确定当前使用的模型
+    global _current_provider
+    
+    # Provider 和模型映射 (顺序需与 /api/providers 一致)
+    provider_models = {
+        "xiaomi": ("MIMO_MODEL", "mimo-v2.5-pro"),
+        "deepseek": ("DEEPSEEK_MODEL", "deepseek-v4-flash"),
+        "qianfan": ("QIANFAN_MODEL", "qianfan-code-latest"),
+        "kimi": ("MOONSHOT_MODEL", "K2.6-code-preview"),
+        "openai": ("OPENAI_MODEL", "gpt-4o"),
+        "anthropic": ("ANTHROPIC_MODEL", "claude-3-5-sonnet-20241022"),
+    }
+    
+    model = "unknown"
+    provider = None
+    
+    # 1. 如果用户手动选择了 provider
+    if _current_provider:
+        provider = _current_provider
+        env_key, default = provider_models.get(provider, ("DEFAULT_MODEL", "unknown"))
+        model = os.environ.get(env_key, default)
+    else:
+        # 2. 自动检测：检查环境变量和 .env 文件
+        env_file = PROJECT_ROOT / ".env"
+        env_content = ""
+        if env_file.exists():
+            env_content = env_file.read_text(encoding="utf-8")
+        
+        # Provider → API key env var mapping (handles kimi's MOONSHOT_API_KEY)
+        api_key_env_map = {
+            "xiaomi": ("MIMO_API_KEY", "MIMO_API_KEY"),
+            "deepseek": ("DEEPSEEK_API_KEY", "DEEPSEEK_ACCESS_KEY"),
+            "qianfan": ("QIANFAN_API_KEY", "QIANFAN_ACCESS_KEY"),
+            "kimi": ("MOONSHOT_API_KEY", "MOONSHOT_API_KEY"),
+            "openai": ("OPENAI_API_KEY", "OPENAI_API_KEY"),
+            "anthropic": ("ANTHROPIC_API_KEY", "ANTHROPIC_API_KEY"),
+        }
+        
+        # 按优先级检测
+        for pid, (env_key, default) in provider_models.items():
+            key1, key2 = api_key_env_map[pid]
+            # 检查环境变量
+            if os.environ.get(key1) or os.environ.get(key2):
+                provider = pid
+                model = os.environ.get(env_key, default)
+                break
+            # 检查 .env 文件
+            if f"{key1}=" in env_content or f"{key2}=" in env_content:
+                provider = pid
+                # 从 .env 读取模型
+                for line in env_content.splitlines():
+                    if line.startswith(f"{env_key}="):
+                        model = line.split("=", 1)[1].strip()
+                        break
+                if model == "unknown":
+                    model = default
+                break
+    
+    return {
+        "hostname": u.nodename,
+        "model": model,
+        "provider": provider,
+        "shell": os.environ.get("SHELL", "/bin/bash").split("/")[-1],
+        "python": f"{sys.version_info.major}.{sys.version_info.minor}",
+        "os": f"{u.sysname} {u.release}",
+    }
+
+
+def _cron_schedule() -> list:
+    try:
+        result = subprocess.run(["crontab", "-l"], capture_output=True, text=True, timeout=5)
+        jobs = []
+        for line in result.stdout.splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            parts = line.split()
+            if len(parts) >= 6:
+                schedule = " ".join(parts[:5])
+                cmd = " ".join(parts[5:])
+                # 提取简洁名称
+                name = (cmd.split("/")[-1].split()[0] if "/" in cmd else (cmd.split()[0] if cmd.split() else "unknown"))
+                if name.endswith(".py"):
+                    name = name[:-3]
+                jobs.append({"name": name, "schedule": schedule})
+        return jobs
+    except Exception:
+        return []
+
+
+def _project_wings() -> list:
+    return [
+        {"name": "喵修匠", "status": "active", "desc": "维修平台 · 商家工单系统"},
+        {"name": "njuosun.com", "status": "active", "desc": "无人机维修站 · SEO 矩阵"},
+        {"name": "Omnia", "status": "active", "desc": "Agent OS · 核心架构开发中"},
+        {"name": "懂机帝", "status": "idle", "desc": "内容社区 · 暂时休眠"},
+    ]
+
+
+def create_app() -> Flask:
+    app = Flask(__name__, static_folder=str(WEB_DIR))
+    CORS(app)
+
+    @app.after_request
+    def add_no_cache_headers(response):
+        """防止浏览器缓存 API 响应"""
+        if request.path.startswith("/api/") or request.path == "/health":
+            response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
+        return response
+
+    # Initialize MCP tools on startup
+    mcp_initialized = False
+    try:
+        mcp_initialized = init_mcp_tools()
+        if mcp_initialized:
+            print("[MCP] ✓ Connected to MCP servers")
+        else:
+            print("[MCP] ⚠ MCP not available (install with: pip install mcp)")
+    except Exception as e:
+        print(f"[MCP] ✗ Initialization failed: {e}")
+    
+    # Store mcp status for status endpoint
+    app.config['MCP_INITIALIZED'] = mcp_initialized
+    
+    # Initialize Collaboration Manager
+    collab_manager = get_collaboration_manager()
+    app.register_blueprint(collab_manager.create_blueprint())
+    print("[Collaboration] ✓ Collaboration system initialized")
+
+    @app.route("/")
+    def index():
+        return send_from_directory(str(WEB_DIR), "index.html")
+
+    @app.route("/<path:filename>")
+    def static_files(filename):
+        # 如果是目录路径，自动添加 index.html
+        if filename.endswith('/'):
+            filename += 'index.html'
+        # 如果路径是目录（没有扩展名），尝试添加 /index.html
+        filepath = WEB_DIR / filename
+        if filepath.is_dir():
+            filename = filename.rstrip('/') + '/index.html'
+        return send_from_directory(str(WEB_DIR), filename)
+
+
+    @app.route("/health", methods=["GET"])
+    def health_check():
+        """轻量级健康检查端点 - 供看门狗和负载均衡使用"""
+        return jsonify({
+            "status": "ok",
+            "timestamp": datetime.now().isoformat(timespec="seconds"),
+        })
+
+    @app.route("/api/status", methods=["GET"])
+    def status():
+        # Get MCP tools count if available
+        mcp_tools_count = 0
+        if app.config.get('MCP_INITIALIZED'):
+            try:
+                all_tools = get_all_tools_schema()
+                mcp_tools_count = len(all_tools) - len(TOOLS_SCHEMA)
+            except Exception:
+                pass
+        
+        return jsonify(
+            {
+                "daemon_running": _daemon_status(),
+                "api_ready": _load_api_key(prefer_provider=_current_provider)[1] is not None,
+                "memory": _memory_counts(),
+                "ide_context": _ide_context(),
+                "git": _git_snapshot(),
+                "skills": _skills_summary(),
+                "notifications": _notifications(),
+                "system": _system_vitals(),
+                "env": _env_snapshot(),
+                "cron": _cron_schedule(),
+                "wings": _project_wings(),
+                "mcp": {
+                    "initialized": app.config.get('MCP_INITIALIZED', False),
+                    "tools_count": mcp_tools_count,
+                },
+                "timestamp": datetime.now().isoformat(timespec="seconds"),
+            }
+        )
+
+    @app.route("/ide-context", methods=["POST"])
+    def receive_ide_context():
+        """Receive IDE context from VSCode extension."""
+        data = request.get_json(force=True, silent=True)
+        if not data:
+            return jsonify({"error": "No data"}), 400
+        
+        ide_file = settings.omnia_home / "ide_context.json"
+        ide_file.parent.mkdir(parents=True, exist_ok=True)
+        
+        try:
+            ide_file.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+            return jsonify({"status": "ok", "file": data.get("file")})
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/mcp/status", methods=["GET"])
+    def mcp_status():
+        """Get MCP connection status and available tools."""
+        from src.core.actuator.mcp_client import get_mcp_registry, MCP_AVAILABLE
+        
+        if not MCP_AVAILABLE:
+            return jsonify({
+                "available": False,
+                "message": "MCP SDK not installed. Run: pip install mcp"
+            })
+        
+        initialized = app.config.get('MCP_INITIALIZED', False)
+        
+        try:
+            all_tools = get_all_tools_schema()
+            native_count = len(TOOLS_SCHEMA)
+            mcp_count = len(all_tools) - native_count
+            
+            # Get tool names
+            tool_names = []
+            for tool in all_tools[native_count:]:
+                name = tool.get("function", {}).get("name", "unknown")
+                desc = tool.get("function", {}).get("description", "")[:50]
+                tool_names.append({"name": name, "description": desc})
+            
+            return jsonify({
+                "available": True,
+                "initialized": initialized,
+                "native_tools": native_count,
+                "mcp_tools": mcp_count,
+                "total_tools": len(all_tools),
+                "tools": tool_names[:20],  # Limit to first 20
+                "config_path": str(PROJECT_ROOT / "config" / "mcp_servers.json"),
+            })
+        except Exception as e:
+            return jsonify({
+                "available": True,
+                "initialized": initialized,
+                "error": str(e),
+            })
+
+    @app.route("/api/memory/search", methods=["POST"])
+    def memory_search():
+        data = request.get_json(force=True, silent=True) or {}
+        query = (data.get("query") or "").strip()
+        layer = data.get("layer", "all")
+        if not query:
+            return jsonify({"results": []})
+        try:
+            mp = MemoryPalace()
+            mp.initialize()
+            
+            # Use search_all_semantic for semantic search
+            results = []
+            search_results = mp.search_all_semantic(query, top_k=20)
+            
+            # Flatten results from all layers
+            for layer_name, items in search_results.items():
+                for item, score in items:
+                    # 安全序列化：提取内容字段（不同表字段名不同）
+                    # facts: value, habits: pattern, timeline: title+description
+                    content = ""
+                    if layer_name == "facts":
+                        content = str(item.get("value", ""))
+                    elif layer_name == "habits":
+                        content = str(item.get("pattern", ""))
+                    elif layer_name == "timeline":
+                        content = str(item.get("title", "")) + " " + str(item.get("description", ""))
+                    else:
+                        content = str(item.get("content", item.get("value", item.get("pattern", ""))))
+                    
+                    # 确保不包含 bytes 类型字段
+                    safe_item = {
+                        "id": int(item.get("id", 0)),
+                        "content": content[:500],
+                        "created_at": str(item.get("created_at", "")),
+                    }
+                    results.append({
+                        "layer": layer_name,
+                        "id": int(item.get("id", 0)),
+                        "snippet": content[:200],
+                        "score": float(score) if score else 0.0,
+                        "data": safe_item
+                    })
+            
+            # Sort by score and limit
+            results.sort(key=lambda x: x["score"], reverse=True)
+            results = results[:20]
+            
+            return jsonify({"results": results})
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return jsonify({"error": str(e)}), 500
+
+    # === Neural Graph API ===
+    
+
+    @app.route("/api/neural-graph/stats", methods=["GET"])
+    def neural_graph_stats():
+        """获取神经图谱统计信息"""
+        try:
+            graph = NeuralGraph()
+            return jsonify(graph.get_stats())
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+    
+    @app.route("/api/neural-graph/related/<name>", methods=["GET"])
+    def neural_graph_related(name):
+        """获取相关节点"""
+        try:
+            graph = NeuralGraph()
+            related = graph.get_related(name)
+            return jsonify({"name": name, "related": related})
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+    
+    @app.route("/api/neural-graph/intent", methods=["POST"])
+    def neural_graph_intent():
+        """识别用户意图"""
+        data = request.get_json(force=True, silent=True) or {}
+        query = (data.get("query") or "").strip()
+        
+        if not query:
+            return jsonify({"error": "Query is required"}), 400
+        
+        try:
+            graph = NeuralGraph()
+            intent = graph.recognize_intent(query)
+            return jsonify(intent)
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+    
+    @app.route("/api/neural-graph/extract", methods=["POST"])
+    def neural_graph_extract():
+        """提取文本中的实体"""
+        data = request.get_json(force=True, silent=True) or {}
+        text = (data.get("text") or "").strip()
+        use_llm = data.get("use_llm", False)
+        
+        if not text:
+            return jsonify({"error": "Text is required"}), 400
+        
+        try:
+            graph = NeuralGraph()
+            entities = graph.extract_entities(text)
+            return jsonify({
+                "text": text,
+                "entities": [
+                    {"type": e.type, "name": e.name, "confidence": e.confidence}
+                    for e in entities
+                ]
+            })
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+    
+    @app.route("/api/neural-graph/build", methods=["POST"])
+    def neural_graph_build():
+        """从 Memory Palace 构建神经图谱"""
+        data = request.get_json(force=True, silent=True) or {}
+        use_llm = data.get("use_llm", False)
+        batch_size = data.get("batch_size", 100)
+        
+        try:
+            from src.core.neural_graph import build_neural_graph
+            
+            key_name, api_key = _load_api_key(prefer_provider=_current_provider)
+            provider = _current_provider or ("deepseek" if "DEEPSEEK" in (key_name or "") else ("qianfan" if "QIANFAN" in (key_name or "") else "kimi"))
+            
+            stats = build_neural_graph(api_key=api_key, provider=provider)
+            
+            return jsonify({
+                "status": "success",
+                "stats": stats
+            })
+        except Exception as e:
+            import traceback
+            return jsonify({
+                "status": "error",
+                "error": str(e),
+                "traceback": traceback.format_exc()
+            }), 500
+    
+    @app.route("/api/neural-graph/search", methods=["POST"])
+    def neural_graph_search():
+        """在图谱中搜索"""
+        data = request.get_json(force=True, silent=True) or {}
+        query = (data.get("query") or "").strip()
+        limit = data.get("limit", 10)
+        
+        if not query:
+            return jsonify({"nodes": [], "related": []})
+        
+        try:
+            graph = NeuralGraph()
+            
+            # 搜索节点
+            nodes = graph.search_nodes(query, limit)
+            
+            # 获取相关
+            related = []
+            if nodes:
+                related = graph.get_related(nodes[0]["name"])
+            
+            return jsonify({
+                "query": query,
+                "nodes": nodes,
+                "related": related[:limit]
+            })
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+    
+    @app.route("/api/neural-graph/export", methods=["GET"])
+    def neural_graph_export():
+        """导出图谱数据供前端可视化"""
+        limit = request.args.get("limit", 100, type=int)
+        
+        try:
+            graph = NeuralGraph()
+            data = graph.export_to_json(limit=limit)
+            return jsonify(data)
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    # === Graph Visualization API ===
+    
+    @app.route("/api/graph", methods=["GET"])
+    def graph_export():
+        """导出图谱数据用于可视化"""
+        min_weight = float(request.args.get("min_weight", 0.0))
+        try:
+            graph = NeuralGraph()
+            return jsonify(graph.export_to_json(min_weight=min_weight))
+        except Exception as e:
+            return jsonify({"nodes": [], "edges": [], "error": str(e)}), 500
+    
+    @app.route("/api/graph/stats", methods=["GET"])
+    def graph_stats():
+        """获取图谱统计"""
+        try:
+            graph = NeuralGraph()
+            return jsonify(graph.get_stats())
+        except Exception as e:
+            return jsonify({"total_nodes": 0, "total_edges": 0, "error": str(e)}), 500
+    
+    @app.route("/api/graph/node/<name>", methods=["GET"])
+    def graph_node_detail(name):
+        """获取节点详情"""
+        try:
+            graph = NeuralGraph()
+            related = graph.get_related(name)
+            return jsonify({"name": name, "related": related})
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+
+
+    # === Neural Graph Advanced Algorithms API ===
+    # 集成高级图算法：路径查找、中心度分析、社区发现
+    
+    @app.route("/api/graph/path", methods=["GET"])
+    def graph_find_path():
+        """查找两个节点之间的最短路径"""
+        start_id = request.args.get("start_id", "")
+        end_id = request.args.get("end_id", "")
+        max_depth = request.args.get("max_depth", 4, type=int)
+        
+        if not start_id or not end_id:
+            return jsonify({"error": "start_id and end_id are required"}), 400
+        
+        try:
+            from src.core.neural_graph_algorithms import algorithms
+            path = algorithms.find_path(start_id, end_id, max_depth)
+            if path is None:
+                return jsonify({"found": False, "message": "No path found"})
+            return jsonify({"found": True, "path": path})
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+    
+    @app.route("/api/graph/paths", methods=["GET"])
+    def graph_find_all_paths():
+        """查找两个节点之间的所有路径"""
+        start_id = request.args.get("start_id", "")
+        end_id = request.args.get("end_id", "")
+        max_depth = request.args.get("max_depth", 3, type=int)
+        limit = request.args.get("limit", 5, type=int)
+        
+        if not start_id or not end_id:
+            return jsonify({"error": "start_id and end_id are required"}), 400
+        
+        try:
+            from src.core.neural_graph_algorithms import algorithms
+            paths = algorithms.find_all_paths(start_id, end_id, max_depth, limit)
+            return jsonify({"found": len(paths) > 0, "paths": paths, "count": len(paths)})
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+    
+    @app.route("/api/graph/centrality/degree", methods=["GET"])
+    def graph_degree_centrality():
+        """获取度中心性最高的节点（连接数最多）"""
+        top_k = request.args.get("top_k", 10, type=int)
+        
+        try:
+            from src.core.neural_graph_algorithms import algorithms
+            results = algorithms.get_degree_centrality(top_k)
+            return jsonify({"centrality": results})
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+    
+    @app.route("/api/graph/centrality/pagerank", methods=["GET"])
+    def graph_pagerank():
+        """获取 PageRank 最高的节点（影响力最大）"""
+        top_k = request.args.get("top_k", 10, type=int)
+        
+        try:
+            from src.core.neural_graph_algorithms import algorithms
+            results = algorithms.get_pagerank(top_k)
+            return jsonify({"pagerank": results})
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+    
+    @app.route("/api/graph/centrality/betweenness", methods=["GET"])
+    def graph_betweenness_centrality():
+        """获取介数中心性最高的节点（作为桥梁最多）"""
+        top_k = request.args.get("top_k", 10, type=int)
+        
+        try:
+            from src.core.neural_graph_algorithms import algorithms
+            results = algorithms.get_betweenness_centrality(top_k)
+            return jsonify({"betweenness": results})
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+    
+    @app.route("/api/graph/communities", methods=["GET"])
+    def graph_find_communities():
+        """发现图谱中的社区结构"""
+        try:
+            from src.core.neural_graph_algorithms import algorithms
+            communities = algorithms.find_communities()
+            return jsonify({"communities": communities, "count": len(communities)})
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+    
+    @app.route("/api/graph/neighbors/<node_id>", methods=["GET"])
+    def graph_get_neighbors(node_id):
+        """获取节点的邻居信息"""
+        depth = request.args.get("depth", 1, type=int)
+        
+        try:
+            from src.core.neural_graph_algorithms import algorithms
+            neighbors = algorithms.get_neighbors(node_id, depth)
+            return jsonify(neighbors)
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+    
+    @app.route("/api/graph/search", methods=["GET"])
+    def graph_search_nodes():
+        """搜索节点"""
+        query = request.args.get("q", "")
+        limit = request.args.get("limit", 20, type=int)
+        
+        if not query:
+            return jsonify({"error": "Query parameter 'q' is required"}), 400
+        
+        try:
+            from src.core.neural_graph_algorithms import algorithms
+            results = algorithms.search_nodes(query, limit)
+            return jsonify({"query": query, "results": results, "count": len(results)})
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/model/status", methods=["GET"])
+    def get_model_status():
+        """Return model service status for frontend."""
+        global _current_provider
+        
+        # Check if daemon is running
+        daemon_running = _daemon_status()
+        
+        # Check if any provider is configured
+        env_vars = {
+            "xiaomi": "MIMO_API_KEY",
+            "deepseek": "DEEPSEEK_API_KEY",
+            "qianfan": "QIANFAN_API_KEY",
+            "kimi": "MOONSHOT_API_KEY", 
+            "openai": "OPENAI_API_KEY",
+            "anthropic": "ANTHROPIC_API_KEY",
+        }
+
+        # 添加本地模型
+        local_models = []
+        local_llm_config = PROJECT_ROOT / "config" / "local_llm.yaml"
+        if local_llm_config.exists():
+            try:
+                import yaml
+                with open(local_llm_config, 'r', encoding='utf-8') as f:
+                    config = yaml.safe_load(f)
+                for model_id, model_info in config.get('models', {}).items():
+                    local_models.append({
+                        "id": f"local-{model_id}",
+                        "name": model_info.get('display_name', model_id),
+                        "configured": True,  # 本地模型总是可用
+                        "model": model_id,
+                        "type": "local",
+                        "supports_tools": model_info.get('supports_tools', False),
+                        "supports_thinking": model_info.get('supports_thinking', False),
+                    })
+            except Exception as e:
+                print(f"[providers] Failed to load local_llm.yaml: {e}")
+        
+
+        
+        cloud_online = False
+        for pid, env_key in env_vars.items():
+            if os.environ.get(env_key):
+                cloud_online = True
+                break
+            # Also check .env file
+            env_file = PROJECT_ROOT / ".env"
+            if env_file.exists():
+                for line in env_file.read_text(encoding="utf-8").splitlines():
+                    line = line.strip()
+                    if line.startswith(f"{env_key}=") and not line.startswith("#"):
+                        cloud_online = True
+                        break
+        
+        return jsonify({
+            "local_online": daemon_running,
+            "cloud_online": cloud_online,
+            "current_mode": _current_provider or "cloud",
+        })
+    @app.route("/api/token/status", methods=["POST"])
+    def get_token_status():
+        """Estimate token usage for current conversation context.
+        
+        Frontend calls this to display token utilization in the UI.
+        Returns estimated token count based on message content length.
+        """
+        try:
+            data = request.get_json() or {}
+            messages = data.get("messages", [])
+            model = data.get("model", "kimi")
+            
+            # Estimate tokens: ~4 chars per token for Chinese, ~0.75 words for English
+            # This is a rough estimation; actual tokenization depends on the model
+            total_chars = 0
+            for msg in messages:
+                content = msg.get("content", "")
+                total_chars += len(content)
+            
+            # Rough token estimation: 1 token ≈ 4 characters (mixed CN/EN average)
+            estimated_tokens = total_chars // 4
+            
+            # Model context limits (approximate)
+            model_limits = {
+                "kimi": 128000,
+                "openai": 128000,
+                "anthropic": 200000,
+                "qianfan": 128000,
+                "deepseek": 64000,
+            }
+            
+            limit = model_limits.get(model, 128000)
+            utilization = min(estimated_tokens / limit * 100, 100)
+            
+            return jsonify({
+                "total_tokens": estimated_tokens,
+                "limit": limit,
+                "utilization": round(utilization, 1),
+                "status": "ok" if utilization < 80 else "warning" if utilization < 95 else "critical",
+                "model": model,
+            })
+        except Exception as e:
+            return jsonify({
+                "total_tokens": 0,
+                "utilization": 0,
+                "status": "error",
+                "error": str(e),
+            }), 500
+
+
+
+    @app.route("/api/providers", methods=["GET"])
+    def get_providers_route():
+        """Return available API providers and current selection."""
+        global _current_provider
+        
+        providers = []
+        env_vars = {
+            "xiaomi": ("MIMO_API_KEY", "小米 MiMo", "mimo-v2.5-pro"),
+            "deepseek": ("DEEPSEEK_API_KEY", "DeepSeek", "deepseek-v4-flash"),
+            "qianfan": ("QIANFAN_API_KEY", "百度千帆", "baiduqianfancodingplan/qianfan-code-latest"),
+            "kimi": ("MOONSHOT_API_KEY", "Moonshot", "K2.6-code-preview"),
+            "openai": ("OPENAI_API_KEY", "OpenAI", "gpt-4o"),
+            "anthropic": ("ANTHROPIC_API_KEY", "Anthropic", "claude-3-5-sonnet-20241022"),
+        }
+        
+        # Check which providers are configured
+        for pid, (env_key, name, default_model) in env_vars.items():
+            configured = bool(os.environ.get(env_key))
+            # Also check .env file (skip comments and empty lines)
+            if not configured:
+                env_file = PROJECT_ROOT / ".env"
+                if env_file.exists():
+                    for line in env_file.read_text(encoding="utf-8").splitlines():
+                        line = line.strip()
+                        if not line or line.startswith("#"):
+                            continue
+                        if line.startswith(f"{env_key}="):
+                            configured = True
+                            break
+            
+            model = os.environ.get(f"{pid.upper()}_MODEL", default_model)
+            providers.append({
+                "id": pid,
+                "name": name,
+                "configured": configured,
+                "model": model,
+            })
+        
+        # 添加本地模型
+        local_models = []
+        local_llm_config = PROJECT_ROOT / "config" / "local_llm.yaml"
+        if local_llm_config.exists():
+            try:
+                import yaml
+                with open(local_llm_config, 'r', encoding='utf-8') as f:
+                    config = yaml.safe_load(f)
+                for model_id, model_info in config.get('models', {}).items():
+                    local_models.append({
+                        "id": f"local-{model_id}",
+                        "name": model_info.get('display_name', model_id),
+                        "configured": True,  # 本地模型总是可用
+                        "model": model_id,
+                        "type": "local",
+                        "supports_tools": model_info.get('supports_tools', False),
+                        "supports_thinking": model_info.get('supports_thinking', False),
+                    })
+            except Exception as e:
+                print(f"[providers] Failed to load local_llm.yaml: {e}")
+        
+        # Determine active provider
+        # Priority: .env file > system env vars
+        # .env file is the user's explicit project config, should take precedence
+        if _current_provider:
+            active = _current_provider
+        else:
+            active = None  # Initialize first
+            # First check .env file (only non-commented lines)
+            env_file = PROJECT_ROOT / ".env"
+            if env_file.exists():
+                for line in env_file.read_text(encoding="utf-8").splitlines():
+                    line = line.strip()
+                    if line.startswith("#") or not line:
+                        continue
+                    for pid, (env_key, _, _) in env_vars.items():
+                        if line.startswith(f"{env_key}="):
+                            active = pid
+                            break
+                    if active:
+                        break
+            
+            # Fallback to system environment variables
+            if not active:
+                for pid, (env_key, _, _) in env_vars.items():
+                    if os.environ.get(env_key):
+                        active = pid
+                        break
+            
+            if not active:
+                active = None
+        
+        
+        # 添加本地模型到列表
+        for local_model in local_models:
+            providers.append(local_model)
+
+        return jsonify({
+            "providers": providers,
+            "active": active,
+        })
+
+    @app.route("/api/providers", methods=["POST"])
+    def set_provider_route():
+        """Set the active API provider."""
+        global _current_provider
+        data = request.get_json(force=True, silent=True) or {}
+        provider = data.get("provider")
+        
+        # 允许任何 local-* 的本地模型
+        valid_providers_set = {"deepseek", "qianfan", "kimi", "openai", "anthropic", "xiaomi", "local"}
+        if not provider.startswith("local-") and provider not in valid_providers_set:
+            return jsonify({"error": f"Invalid provider: {provider}"}), 400
+        
+        # 本地模型特殊处理
+        if provider == "local" or provider.startswith("local-"):
+            _current_provider = provider
+            return jsonify({"ok": True, "provider": provider})
+        
+        # Check if provider is configured
+        env_key = {
+            "deepseek": "DEEPSEEK_API_KEY",
+            "qianfan": "QIANFAN_API_KEY",
+            "kimi": "MOONSHOT_API_KEY",
+            "openai": "OPENAI_API_KEY",
+            "xiaomi": "MIMO_API_KEY",
+            "anthropic": "ANTHROPIC_API_KEY",
+        }[provider]
+        
+        configured = bool(os.environ.get(env_key))
+        if not configured:
+            # Check .env file
+            env_file = PROJECT_ROOT / ".env"
+            if env_file.exists():
+                for line in env_file.read_text(encoding="utf-8").splitlines():
+                    if line.startswith(f"{env_key}="):
+                        configured = True
+                        break
+        
+        if not configured:
+            return jsonify({"error": f"Provider {provider} is not configured"}), 400
+        
+        _current_provider = provider
+        return jsonify({"ok": True, "provider": provider})
+
+    @app.route("/api/open-ide", methods=["POST"])
+    def open_ide():
+        try:
+            import subprocess
+            subprocess.Popen(
+                ["code", str(WORKSPACE)],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+            return jsonify({"ok": True})
+        except Exception as e:
+            return jsonify({"ok": False, "error": str(e)}), 500
+
+    @app.route("/api/confirm", methods=["POST"])
+    def confirm():
+        data = request.get_json(force=True, silent=True) or {}
+        cid = (data.get("confirm_id") or "").strip()
+        approved = bool(data.get("approved"))
+        print(f"[confirm] received cid='{cid}', approved={approved}, body_preview={str(data)[:200]}")
+        ctx = _pop_confirmation(cid)
+        if not ctx:
+            return jsonify({"error": "无效的确认 ID 或已过期"}), 404
+
+        if not approved:
+            if ctx.get("type") == "plan_executor":
+                return jsonify({
+                    "reply": f"[已取消] 未执行 Plan 步骤 `{ctx['steps'][ctx['current_step_index']]['tool_name']}`，整个任务已中止。",
+                    "steps": [],
+                })
+            return jsonify({
+                "reply": f"[已取消] 未执行 {ctx['tool_name']}。",
+                "steps": [],
+            })
+
+        # PlanExecutor confirmation
+        if ctx.get("type") == "plan_executor":
+            from src.core.actuator.plan_executor import ExecutionPlan, PlanExecutor, Step
+            executor = PlanExecutor(ctx["api_key"], ctx["provider"])
+            steps = [
+                Step(
+                    id=s["id"],
+                    description=s["description"],
+                    tool_name=s["tool_name"],
+                    tool_args=s["tool_args"],
+                    result=s.get("result"),
+                    status=s["status"],
+                    observation=s["observation"],
+                )
+                for s in ctx["steps"]
+            ]
+            plan = ExecutionPlan(goal=ctx["goal"], steps=steps, context=ctx["context"])
+            start_idx = ctx["current_step_index"]
+            try:
+                result = executor.resume_from_step(plan, start_idx)
+                return jsonify({"reply": result["reply"], "steps": result["steps"]})
+            except Exception as e:
+                return jsonify({"error": str(e)}), 500
+
+        # Single-tool confirmation (fast path)
+        fn_name = ctx["tool_name"]
+        fn_args = ctx["tool_args"]
+        try:
+            result = dispatch_tool(fn_name, fn_args)
+        except Exception as e:
+            result = {"error": str(e)}
+
+        result_json = json.dumps(result, ensure_ascii=False)
+        if len(result_json) > 1500:
+            result_json = ContextCompressor().compress(result_json).summary
+        step = {"tool": fn_name, "arguments": fn_args, "result_summary": str(result)[:200]}
+        new_messages = ctx["messages"] + [
+            {
+                "role": "tool",
+                "tool_call_id": ctx.get("tool_call_id", "unknown"),
+                "name": fn_name,
+                "content": result_json,
+            }
+        ]
+        # 添加指令：要求模型生成自然语言回复
+        new_messages.append({
+            "role": "system", 
+            "content": "工具已执行完成。现在请用自然语言总结结果并回答用户的问题。不要输出任何工具调用格式。"
+        })
+        try:
+            data2 = _call_model_messages(ctx["api_key"], ctx["provider"], new_messages, tools=None)
+            reply = data2["choices"][0]["message"].get("content", "")
+            # 如果模型还是返回工具调用格式，清理它
+            import re
+            if re.match(r'^\w+\s*\n?\s*\{', reply):
+                # 截取工具调用前的内容
+                match = re.match(r'^([^\n\{]+)', reply)
+                if match:
+                    reply = match.group(1).strip()
+                else:
+                    reply = f"已执行 {fn_name}。"
+            if not reply:
+                reply = f"已执行 {fn_name}。"
+        except Exception as e:
+            reply = f"[执行完成，但总结时出错: {e}]"
+        return jsonify({"reply": reply, "steps": [step]})
+
+    @app.route("/api/workflow/status", methods=["GET"])
+    def workflow_status():
+        """返回工作流引擎状态"""
+        # 简单实现：检查是否有活动的工作流日志
+        seo_log = Path("/tmp/omnia_workflow_seo.log")
+        active = seo_log.exists() and seo_log.stat().st_size > 0
+        return jsonify({
+            "active": active,
+            "current": "SEO Pipeline" if active else None,
+            "last_check": datetime.now().isoformat()
+        })
+
+    @app.route("/api/workflow", methods=["POST"])
+    def run_workflow():
+        data = request.get_json(force=True, silent=True) or {}
+        name = (data.get("name") or "").strip()
+        if not name:
+            return jsonify({"error": "workflow name is required"}), 400
+
+        try:
+            if name == "git-status":
+                result = dispatch_tool("execute_shell", {"command": f"git -C {WORKSPACE} status --short"})
+                return jsonify({"ok": True, "result": result})
+
+            if name == "backup-workspace":
+                backup_dir = WORKSPACE.parent / f"openclaw-backup-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+                cmd = [
+                    "rsync", "-a",
+                    "--exclude=.git",
+                    "--exclude=node_modules",
+                    "--exclude=.venv",
+                    str(WORKSPACE) + "/",
+                    str(backup_dir) + "/"
+                ]
+                subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                return jsonify({"ok": True, "message": f"Backup started to {backup_dir}"})
+
+            if name == "seo-deploy":
+                seo_script = WORKSPACE / "drone-repair-website" / "scripts" / "run_seo_pipeline.py"
+                if seo_script.exists():
+                    cmd = ["nohup", "python3", str(seo_script)]
+                    with open("/tmp/omnia_workflow_seo.log", "w") as log_file:
+                        subprocess.Popen(
+                            cmd,
+                            stdout=log_file,
+                            stderr=subprocess.STDOUT,
+                            cwd=str(WORKSPACE / "drone-repair-website")
+                        )
+                    return jsonify({"ok": True, "message": "SEO pipeline started in background"})
+                return jsonify({"ok": False, "error": "SEO script not found"}), 404
+
+            if name == "courseware-check":
+                course_dir = WORKSPACE / "projects" / "drone_course_v2"
+                if course_dir.exists():
+                    result = dispatch_tool("execute_shell", {"command": f"find {course_dir} -name '*.html' | wc -l"})
+                    return jsonify({"ok": True, "result": result})
+                return jsonify({"ok": False, "error": "Course directory not found"}), 404
+
+            return jsonify({"error": f"Unknown workflow: {name}"}), 400
+        except Exception as e:
+            return jsonify({"ok": False, "error": str(e)}), 500
+
+    @app.route("/webhook/feishu", methods=["POST"])
+    def feishu_webhook():
+        """飞书事件推送接收端点"""
+        event = request.get_json(force=True, silent=True) or {}
+        
+        # URL 验证
+        if event.get("type") == "url_verification":
+            return jsonify({"challenge": event.get("challenge")})
+        
+        # 消息事件
+        if event.get("header", {}).get("event_type") == "im.message.receive_v1":
+            body = event.get("event", {})
+            message = body.get("message", {})
+            sender = body.get("sender", {})
+            content = message.get("content", "{}")
+            
+            # 提取文本
+            try:
+                text = json.loads(content).get("text", "")
+            except Exception:
+                text = content
+            
+            # 记录消息
+            print(f"[Feishu] {sender.get('sender_id', {}).get('open_id')}: {text[:50]}")
+            
+            # 转发给 Agent 处理
+            try:
+                from src.omnia.services.agent_engine import AgentEngine
+                from src.omnia.services.llm_client import LLMClient
+                from src.omnia.services.session_manager import SessionManager
+                
+                llm = LLMClient()
+                session_mgr = SessionManager()
+                engine = AgentEngine(llm_client=llm, session_manager=session_mgr)
+                
+                import asyncio
+                response = asyncio.create_task(engine.chat(text, session_id=f"feishu_{sender.get('sender_id', {}).get('open_id', 'unknown')}"))
+            except Exception as agent_err:
+                print(f"[Feishu] Agent processing error: {agent_err}")
+            
+            # 同时存储到通知队列作为备份
+            try:
+                queue = NotificationQueue()
+                queue.enqueue({
+                    "type": "feishu_message",
+                    "user_id": sender.get("sender_id", {}).get("open_id"),
+                    "chat_id": message.get("chat_id"),
+                    "content": text,
+                    "timestamp": datetime.now().isoformat(),
+                })
+            except Exception as e:
+                print(f"[Feishu] Queue error: {e}")
+        
+        return jsonify({"code": 0})
+
+    @app.route("/api/chat", methods=["POST"])
+    def chat():
+        """Omnia 统一聊天处理器 - 支持 Gateway 模式和直接模式。
+        
+        通过环境变量 OMNIA_USE_GATEWAY=true 启用 Gateway 模式。
+        默认使用直接模式（legacy）以保持兼容性。
+        """
+        from flask import request, jsonify, Response
+        import os
+        
+        data = request.get_json(force=True, silent=True) or {}
+        message = (data.get("message") or "").strip()
+        history = data.get("history") or []
+        provider = data.get("provider")
+        
+        if not message:
+            return jsonify({"error": "消息不能为空"}), 400
+        
+        # 检查是否启用 Gateway 模式
+        use_gateway = os.environ.get("OMNIA_USE_GATEWAY", "false").lower() == "true"
+        
+        if use_gateway:
+            # Gateway 模式：通过 OpenClaw Gateway 处理
+            try:
+                from gateway.integration import handle_chat_unified
+                
+                def generate():
+                    for event in handle_chat_unified(message, history, provider):
+                        yield event
+                
+                return Response(
+                    generate(),
+                    mimetype="text/event-stream",
+                    headers={
+                        "Cache-Control": "no-cache",
+                        "Connection": "keep-alive",
+                    }
+                )
+            except ImportError:
+                return jsonify({"error": "Gateway 模式不可用，缺少 gateway.integration 模块"}), 500
+            except Exception as e:
+                return jsonify({"error": f"Gateway 错误: {str(e)}"}), 500
+        else:
+            # 直接模式：使用 chat_handler（带对话记录）
+            from omnia.chat import _load_api_key
+            from omnia.chat_handler import handle_chat
+            from src.core.actuator.tool_registry import get_all_tools_schema
+            
+            # Provider 检测：请求级 provider > 全局设置 > 自动检测
+            global _current_provider
+            if provider:
+                pass  # 使用用户请求指定的 provider
+            elif _current_provider:
+                provider = _current_provider
+            else:
+                # 自动检测：从 .env 或环境变量找第一个可用的
+                key_name, api_key = _load_api_key()
+                provider = "kimi"
+                if key_name == "DEEPSEEK_API_KEY":
+                    provider = "deepseek"
+                elif key_name in ("QIANFAN_API_KEY", "QIANFAN_ACCESS_KEY"):
+                    provider = "qianfan"
+                elif key_name == "OPENAI_API_KEY":
+                    provider = "openai"
+                elif key_name == "ANTHROPIC_API_KEY":
+                    provider = "anthropic"
+                elif key_name == "MIMO_API_KEY":
+                    provider = "xiaomi"
+            
+            # 根据选中的 provider 加载对应的 API key
+            key_name, api_key = _load_api_key(prefer_provider=provider)
+            
+            if provider == "anthropic":
+                return jsonify({"error": "Web UI 暂不支持 Anthropic"}), 501
+            
+            try:
+                # 获取所有工具 schema
+                all_tools_schema = get_all_tools_schema()
+                
+                # 组装系统提示
+                system_prompt = assemble_wake_prompt(message)
+                
+                # ========== 前置工具检查钩子（方案A）==========
+                # 在消息发给 LLM 之前，强制检查是否需要工具验证
+                _tool_result = check_and_run(message)
+                if _tool_result:
+                    print(f"[tool_preroll] 命中关键词，注入工具检查结果")
+                    _tool_warning = "\n\n[系统强制工具检查结果 - 请基于以下实际数据回答用户]\n"
+                    _tool_warning += _tool_result
+                    _tool_warning += "\n[/系统强制工具检查结果]\n"
+                    system_prompt += _tool_warning
+                else:
+                    print(f"[tool_preroll] 未命中关键词，正常处理")
+                # ========== 前置工具检查结束 ==========
+                
+                
+                # 使用 chat_handler 处理（包含对话记录）
+                result = handle_chat(
+                    message=message,
+                    history=history,
+                    api_key=api_key,
+                    provider=provider,
+                    system_prompt=system_prompt,
+                    all_tools_schema=all_tools_schema
+                )
+                
+                return jsonify(result)
+            except Exception as e:
+                import traceback
+                print(f"[ERROR] Chat failed: {e}")
+                print(traceback.format_exc())
+                return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/chat/stream", methods=["POST"])
+    def chat_stream():
+        """SSE 流式聊天端点 - 参考 OpenClaw 的流式实现"""
+        from flask import Response
+        from omnia.stream_chat import stream_chat
+        
+        data = request.get_json(force=True, silent=True) or {}
+        message = (data.get("message") or "").strip()
+        history = data.get("history") or []
+        
+        if not message:
+            return jsonify({"error": "消息不能为空"}), 400
+        
+        # Provider 选择：优先使用全局设置
+        global _current_provider
+        provider = _current_provider or "deepseek"
+        
+        def generate():
+            import json, traceback
+            try:
+                for event in stream_chat(message, history, provider=provider):
+                    yield event
+            except Exception as e:
+                tb = traceback.format_exc()
+                print(f'[StreamError] Chat stream crashed: {e}')
+                print(tb)
+                err_msg = 'data: ' + json.dumps({"type": "error", "message": "Stream error: " + str(e)}) + '\n\n'
+                done_msg = 'data: ' + json.dumps({"type": "done", "full_content": ""}) + '\n\n'
+                yield err_msg
+                yield done_msg
+        
+        return Response(
+            generate(),
+            mimetype="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",  # 禁用 nginx 缓冲
+            }
+        )
+
+    # === 讨论系统 API ===
+    
+    @app.route("/api/discuss/start", methods=["POST"])
+    def discuss_start():
+        """开始一个新的讨论会话"""
+        from omnia.discuss_api import handle_start_discussion
+        
+        data = request.get_json(force=True, silent=True) or {}
+        global _current_provider
+        provider = _current_provider or "qianfan"
+        key_name, api_key = _load_api_key(prefer_provider=provider)
+        
+        result = handle_start_discussion(data, api_key, provider)
+        if isinstance(result, tuple):
+            return jsonify(result[0]), result[1]
+        return jsonify(result)
+    
+    @app.route("/api/discuss/infinite", methods=["POST"])
+    def discuss_infinite():
+        """接收无限的意见"""
+        from omnia.discuss_api import handle_infinite_opinion
+        
+        data = request.get_json(force=True, silent=True) or {}
+        provider = _current_provider or "qianfan"
+        key_name, api_key = _load_api_key(prefer_provider=provider)
+        
+        result = handle_infinite_opinion(data, api_key, provider)
+        if isinstance(result, tuple):
+            return jsonify(result[0]), result[1]
+        return jsonify(result)
+    
+    @app.route("/api/discuss/omnia", methods=["POST"])
+    def discuss_omnia():
+        """生成 Omnia 的意见"""
+        from omnia.discuss_api import handle_omnia_opinion
+        
+        data = request.get_json(force=True, silent=True) or {}
+        provider = _current_provider or "qianfan"
+        key_name, api_key = _load_api_key(prefer_provider=provider)
+        
+        result = handle_omnia_opinion(data, api_key, provider)
+        if isinstance(result, tuple):
+            return jsonify(result[0]), result[1]
+        return jsonify(result)
+    
+    @app.route("/api/discuss/next", methods=["POST"])
+    def discuss_next():
+        """开始下一轮讨论"""
+        from omnia.discuss_api import handle_next_round
+        
+        data = request.get_json(force=True, silent=True) or {}
+        provider = _current_provider or "qianfan"
+        key_name, api_key = _load_api_key(prefer_provider=provider)
+        
+        result = handle_next_round(data, api_key, provider)
+        if isinstance(result, tuple):
+            return jsonify(result[0]), result[1]
+        return jsonify(result)
+    
+    @app.route("/api/discuss/decide", methods=["POST"])
+    def discuss_decide():
+        """用户做出决策"""
+        from omnia.discuss_api import handle_make_decision
+        
+        data = request.get_json(force=True, silent=True) or {}
+        result = handle_make_decision(data)
+        if isinstance(result, tuple):
+            return jsonify(result[0]), result[1]
+        return jsonify(result)
+    
+    @app.route("/api/discuss/get", methods=["POST"])
+    def discuss_get():
+        """获取讨论会话状态"""
+        from omnia.discuss_api import handle_get_discussion
+        
+        data = request.get_json(force=True, silent=True) or {}
+        result = handle_get_discussion(data)
+        if isinstance(result, tuple):
+            return jsonify(result[0]), result[1]
+        return jsonify(result)
+    
+    @app.route("/api/discuss/list", methods=["GET"])
+    def discuss_list():
+        """列出所有讨论会话"""
+        from omnia.discuss_api import handle_list_discussions
+        return jsonify(handle_list_discussions())
+    
+    @app.route("/discuss")
+    def discuss_page():
+        """讨论页面"""
+        return send_from_directory(str(WEB_DIR), "discuss.html")
+    @app.route("/dji")
+    def dji_page():
+        """DJI 设备诊断页面"""
+        return send_from_directory(str(WEB_DIR / "dji"), "index.html")
+    
+    @app.route("/dji/<path:filename>")
+    def dji_static_files(filename):
+        """DJI 静态文件"""
+        return send_from_directory(str(WEB_DIR / "dji"), filename)
+    
+        # === DJI 设备诊断 API ===
+    @app.route("/api/dji/scan", methods=["GET"])
+    def dji_scan_devices():
+        """扫描 DJI 设备"""
+        try:
+            from dji.transport.usb_transport import list_dji_devices
+            devices = list_dji_devices()
+            return jsonify({
+                "success": True,
+                "devices": devices,
+                "count": len(devices)
+            })
+        except Exception as e:
+            return jsonify({
+                "success": False,
+                "error": str(e)
+            }), 500
+
+    @app.route("/api/dji/connect", methods=["POST"])
+    def dji_connect_device():
+        """连接 DJI 设备"""
+        try:
+            data = request.get_json()
+            device_id = data.get("device_id")
+            
+            from dji import DJIDeviceManager
+            manager = DJIDeviceManager()
+            
+            if manager.connect_usb():
+                devices = manager.scan_devices()
+                return jsonify({
+                    "success": True,
+                    "devices": [d.to_dict() for d in devices]
+                })
+            else:
+                return jsonify({
+                    "success": False,
+                    "error": "连接失败"
+                }), 400
+        except Exception as e:
+            return jsonify({
+                "success": False,
+                "error": str(e)
+            }), 500
+
+    @app.route("/api/dji/diagnose", methods=["POST"])
+    def dji_diagnose_device():
+        """诊断 DJI 设备"""
+        try:
+            data = request.get_json()
+            device_id = data.get("device_id")
+            
+            # 实现诊断逻辑
+            checks = []
+            status = "healthy"
+            
+            # 检查设备连接
+            try:
+                import subprocess
+                result = subprocess.run(["ping", "-c", "1", "-W", "2", device_id], capture_output=True, timeout=5)
+                if result.returncode == 0:
+                    checks.append({"name": "connectivity", "status": "ok", "detail": "设备可达"})
+                else:
+                    checks.append({"name": "connectivity", "status": "warning", "detail": "设备不可达"})
+                    status = "warning"
+            except Exception:
+                checks.append({"name": "connectivity", "status": "unknown", "detail": "无法检测"})
+            
+            # 检查系统资源
+            try:
+                import psutil
+                cpu = psutil.cpu_percent(interval=1)
+                mem = psutil.virtual_memory().percent
+                checks.append({"name": "system_cpu", "status": "ok" if cpu < 80 else "warning", "detail": f"CPU: {cpu}%"})
+                checks.append({"name": "system_memory", "status": "ok" if mem < 80 else "warning", "detail": f"内存: {mem}%"})
+                if cpu > 80 or mem > 80:
+                    status = "warning"
+            except ImportError:
+                checks.append({"name": "system_monitor", "status": "unknown", "detail": "psutil 未安装"})
+            
+            return jsonify({
+                "success": True,
+                "report": {
+                    "device_id": device_id,
+                    "status": status,
+                    "checks": checks,
+                    "timestamp": __import__("datetime").datetime.now().isoformat()
+                }
+            })
+        except Exception as e:
+            return jsonify({
+                "success": False,
+                "error": str(e)
+            }), 500
+
+
+    # === 启动飞书长连接 ===
+    _start_feishu_adapter(app)
+    _add_feishu_routes(app)
+
+
+    # === Token 状态 API ===
+    
+    @app.route("/api/token/status", methods=["POST"])
+    def token_status():
+        """检查当前上下文的 Token 状态"""
+        try:
+            from src.core.cognition.token_manager import TokenManager, MODEL_LIMITS
+        except ImportError:
+            return jsonify({"error": "TokenManager not available", "status": "unavailable"}), 503
+        
+        data = request.get_json(force=True, silent=True) or {}
+        messages = data.get("messages") or []
+        model = data.get("model", "kimi")
+        
+        if not messages:
+            return jsonify({
+                "total_tokens": 0,
+                "max_tokens": MODEL_LIMITS.get(model, 128000),
+                "utilization": 0,
+                "status": "empty"
+            })
+        
+        try:
+            manager = TokenManager(model=model)
+            result = manager.check_overflow(messages)
+            
+            return jsonify({
+                "total_tokens": result["total_tokens"],
+                "max_tokens": result["max_tokens"],
+                "utilization": result["utilization"],
+                "remaining": result["remaining"],
+                "status": result["status"],
+                "message_count": len(messages),
+                "model": model
+            })
+        except Exception as e:
+            return jsonify({"error": str(e), "status": "error"}), 500
+    
+    @app.route("/api/models", methods=["GET"])
+    def list_models():
+        """获取支持的模型列表"""
+        try:
+            from src.core.cognition.token_manager import MODEL_LIMITS
+        except ImportError:
+            return jsonify({"models": [{"id": "kimi", "max_tokens": 128000, "name": "Kimi"}], "default": "kimi"})
+        
+        models = []
+        for model_id, max_tokens in MODEL_LIMITS.items():
+            models.append({
+                "id": model_id,
+                "max_tokens": max_tokens,
+                "name": {
+                    "kimi": "Kimi (Moonshot)",
+                    "deepseek": "DeepSeek",
+                    "qianfan": "百度千帆",
+                    "openai": "OpenAI GPT-4",
+                    "anthropic": "Anthropic Claude",
+                    "local": "本地模型"
+                }.get(model_id, model_id)
+            })
+        
+        return jsonify({"models": models, "default": "kimi"})
+
+    return app
+
+
+
+def _start_feishu_adapter(app):
+    """启动飞书 WebSocket 机器人 - 集成到 Omnia 主服务"""
+    from omnia.feishu_bot import init_feishu_bot, start_feishu_bot
+    
+    # 从环境变量读取配置
+    app_id = os.environ.get("FEISHU_APP_ID", "")
+    app_secret = os.environ.get("FEISHU_APP_SECRET", "")
+    
+    if not app_id or not app_secret:
+        # 尝试从 .env 文件读取
+        env_file = PROJECT_ROOT / ".env"
+        if env_file.exists():
+            for line in env_file.read_text(encoding="utf-8").splitlines():
+                line = line.strip()
+                if line.startswith("FEISHU_APP_ID="):
+                    app_id = line.split("=", 1)[1].strip()
+                elif line.startswith("FEISHU_APP_SECRET="):
+                    app_secret = line.split("=", 1)[1].strip()
+    
+    if not app_id or not app_secret:
+        print("[Feishu] 配置缺失，跳过启动")
+        return
+    
+    # 获取当前 Provider 的回调函数
+    def get_current_provider():
+        global _current_provider
+        return _current_provider
+    
+    # 初始化飞书机器人
+    bot = init_feishu_bot(
+        app_id=app_id,
+        app_secret=app_secret,
+        omnia_api_url="http://127.0.0.1:5001/api/chat",
+        get_provider=get_current_provider,
+    )
+    
+    if not bot:
+        print("[Feishu] 初始化失败")
+        return
+    
+    # 启动机器人
+    if start_feishu_bot():
+        print("[Feishu] ✅ WebSocket 机器人已启动")
+        app.config['FEISHU_BOT_RUNNING'] = True
+    else:
+        print("[Feishu] ❌ 启动失败")
+        app.config['FEISHU_BOT_RUNNING'] = False
+
+
+def _add_feishu_routes(app):
+    """添加飞书机器人管理 API"""
+    
+    @app.route("/api/feishu/status", methods=["GET"])
+    def feishu_status():
+        """获取飞书机器人状态"""
+        from omnia.feishu_bot import get_feishu_bot, FEISHU_SDK_AVAILABLE
+        
+        bot = get_feishu_bot()
+        
+        return jsonify({
+            "sdk_available": FEISHU_SDK_AVAILABLE,
+            "running": bot.running if bot else False,
+            "configured": bool(os.environ.get("FEISHU_APP_ID") or 
+                              (PROJECT_ROOT / ".env").exists()),
+        })
+    
+    @app.route("/api/feishu/start", methods=["POST"])
+    def feishu_start():
+        """启动飞书机器人"""
+        from omnia.feishu_bot import start_feishu_bot
+        
+        if start_feishu_bot():
+            app.config['FEISHU_BOT_RUNNING'] = True
+            return jsonify({"ok": True, "message": "飞书机器人已启动"})
+        else:
+            return jsonify({"ok": False, "error": "启动失败"}), 500
+    
+    @app.route("/api/feishu/stop", methods=["POST"])
+    def feishu_stop():
+        """停止飞书机器人"""
+        from omnia.feishu_bot import stop_feishu_bot
+        
+        stop_feishu_bot()
+        app.config['FEISHU_BOT_RUNNING'] = False
+        return jsonify({"ok": True, "message": "飞书机器人已停止"})
+
+
+def _check_port_in_use(port: int, host: str = "127.0.0.1") -> bool:
+    """Check if a port is genuinely in use by another process.
+    
+    Uses SO_REUSEADDR to distinguish TIME_WAIT (safe to bind) from
+    genuine occupation by a running process.
+    """
+    import socket
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            s.bind((host, port))
+            return False  # Port is free (or in TIME_WAIT, which is fine)
+        except OSError:
+            return True   # Port is genuinely in use by a live process
+
+
+def main():
+    import time
+    import traceback
+    
+    CRASH_LOG = Path("/tmp/omnia_web_crash.log")
+    
+    # Check if port is genuinely in use by another LIVE process
+    # (SO_REUSEADDR lets us bind to TIME_WAIT sockets, so this only
+    # returns True if another process is actually listening)
+    if _check_port_in_use(5001):
+        print("=" * 60)
+        print("WARNING: Port 5001 is occupied by another live process!")
+        print("=" * 60)
+        print("\nSolution:")
+        print("  lsof -i :5001")
+        print("  kill -9 <PID>")
+        print("=" * 60)
+        sys.exit(1)
+    
+    try:
+        app = create_app()
+        
+        # 启动飞书机器人（后台线程，共享 API Provider）
+        _start_feishu_adapter(app)
+        
+        print("Omnia Web UI started at http://127.0.0.1:5001/")
+        # Werkzeug's BaseWSGIServer sets allow_reuse_address=True (SO_REUSEADDR)
+        # by default, so we can bind to TIME_WAIT sockets without waiting.
+        app.run(host="0.0.0.0", port=5001, threaded=True)
+    except OSError as e:
+        if "Address already in use" in str(e) or "errno 98" in str(e):
+            print(f"[FATAL] Port 5001 bind failed: {e}")
+            print("[FATAL] Waiting 60s for TIME_WAIT to expire...")
+            time.sleep(60)
+            sys.exit(1)
+        else:
+            tb = traceback.format_exc()
+            print(f"[FATAL] Web Server startup failed: {e}")
+            print(tb)
+            try:
+                CRASH_LOG.write_text(
+                    f"=== {datetime.now().isoformat()} ===\n"
+                    f"Startup failed (OSError): {e}\n{tb}\n",
+                    encoding="utf-8"
+                )
+            except Exception:
+                pass
+            sys.exit(1)
+    except Exception as e:
+        tb = traceback.format_exc()
+        print(f"[FATAL] Web Server crashed: {e}")
+        print(tb)
+        try:
+            CRASH_LOG.write_text(
+                f"=== {datetime.now().isoformat()} ===\n"
+                f"Web Server crash: {e}\n{tb}\n",
+                encoding="utf-8"
+            )
+        except Exception:
+            pass
+        sys.exit(1)
+    finally:
+        print("[MCP] Shutting down...")
+        try:
+            _cleanup_mcp()
+        except Exception:
+            pass
+        print("[MCP] Disconnected")
+
+
+if __name__ == "__main__":
+    main()
+
+    # === Token 状态 API ===
+    

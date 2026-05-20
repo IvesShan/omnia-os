@@ -32,7 +32,7 @@ class LLMClient:
     }
     
     # 支持工具调用的 Provider
-    API_TOOL_PROVIDERS = {"deepseek", "openai", "xiaomi", "qianfan"}
+    API_TOOL_PROVIDERS = {"deepseek", "openai", "xiaomi", "qianfan", "kimi"}
     
     def __init__(self):
         timeout = httpx.Timeout(connect=5.0, read=180.0, write=10.0, pool=10.0)
@@ -215,6 +215,10 @@ class LLMClient:
             "stream": True,
         }
         
+        # Kimi 需要 max_tokens 参数
+        if provider == "kimi":
+            body["max_tokens"] = 4096
+        
         # 添加工具（如果支持）
         if tools and provider in self.API_TOOL_PROVIDERS:
             body["tools"] = tools
@@ -222,96 +226,206 @@ class LLMClient:
         
         headers = self._build_headers(api_key, provider)
         
-        # 累积器
-        full_content = ""
-        full_reasoning = ""
-        tool_calls = {}
-        
         try:
             print(f"[LLMClient] Starting stream request to {provider}, timeout: {self.client.timeout}")
             async with self.client.stream("POST", url, json=body, headers=headers) as response:
                 response.raise_for_status()
                 
-                buffer = ""
-                async for chunk in response.aiter_text():
-                    buffer += chunk
+                # Kimi/Anthropic 格式 SSE vs OpenAI 格式 SSE
+                if provider == "kimi":
+                    async for event in self._stream_anthropic(response):
+                        yield event
+                else:
+                    async for event in self._stream_openai(response):
+                        yield event
                     
-                    while "\n" in buffer:
-                        line, buffer = buffer.split("\n", 1)
-                        line = line.strip()
-                        
-                        if not line or line.startswith(":"):
-                            continue
-                        
-                        if not line.startswith("data: "):
-                            continue
-                        
-                        data_str = line[6:]
-                        
-                        if data_str == "[DONE]":
-                            yield self._yield_done(tool_calls, full_content, full_reasoning)
-                            return
-                        
-                        try:
-                            data = json.loads(data_str)
-                        except json.JSONDecodeError:
-                            continue
-                        
-                        choices = data.get("choices", [])
-                        if not choices:
-                            continue
-                        
-                        choice = choices[0]
-                        delta = choice.get("delta", {})
-                        finish_reason = choice.get("finish_reason")
-                        
-                        # 文本内容
-                        content = delta.get("content")
-                        if content:
-                            full_content += content
-                            yield {"type": "token", "content": content}
-                        
-                        # 推理内容 (DeepSeek thinking mode)
-                        reasoning = delta.get("reasoning_content")
-                        if reasoning:
-                            full_reasoning += reasoning
-                            yield {"type": "thinking", "content": reasoning}
-                        
-                        # 工具调用（增量累积）
-                        tool_calls_delta = delta.get("tool_calls") or []
-                        for tc_delta in tool_calls_delta:
-                            idx = tc_delta.get("index", 0)
-                            if idx not in tool_calls:
-                                tool_calls[idx] = {
-                                    "id": "",
-                                    "name": "",
-                                    "arguments": "",
-                                }
-                            
-                            if tc_delta.get("id"):
-                                tool_calls[idx]["id"] = tc_delta["id"]
-                            
-                            func = tc_delta.get("function", {})
-                            if func.get("name"):
-                                tool_calls[idx]["name"] += func["name"]
-                            if func.get("arguments"):
-                                tool_calls[idx]["arguments"] += func["arguments"]
-                        
-                        # 结束原因处理
-                        if finish_reason in ("stop", "tool_calls"):
-                            yield self._yield_done(tool_calls, full_content, full_reasoning)
-                            return
-                        
-            # 流正常结束但没有 [DONE] 或 finish_reason
-            yield self._yield_done(tool_calls, full_content, full_reasoning)
-            print(f"[LLMClient] Stream completed normally")
-            
         except httpx.HTTPStatusError as e:
             error_msg = f"API 调用失败: {e.response.status_code}"
+            try:
+                err_body = await e.response.aread()
+                error_msg += f" - {err_body.decode('utf-8', errors='replace')[:500]}"
+            except:
+                pass
             yield {"type": "error", "message": error_msg}
         except Exception as e:
             error_msg = f"请求异常: {str(e)}"
             yield {"type": "error", "message": error_msg}
+    
+    async def _stream_openai(self, response) -> AsyncGenerator[dict, None]:
+        """解析 OpenAI 格式 SSE（DeepSeek/Xiaomi/QianFan/OpenAI）"""
+        full_content = ""
+        full_reasoning = ""
+        tool_calls = {}
+        
+        buffer = ""
+        async for chunk in response.aiter_text():
+            buffer += chunk
+            
+            while "\n" in buffer:
+                line, buffer = buffer.split("\n", 1)
+                line = line.strip()
+                
+                if not line or line.startswith(":"):
+                    continue
+                
+                if not line.startswith("data: "):
+                    continue
+                
+                data_str = line[6:]
+                
+                if data_str == "[DONE]":
+                    yield self._yield_done(tool_calls, full_content, full_reasoning)
+                    return
+                
+                try:
+                    data = json.loads(data_str)
+                except json.JSONDecodeError:
+                    continue
+                
+                choices = data.get("choices", [])
+                if not choices:
+                    continue
+                
+                choice = choices[0]
+                delta = choice.get("delta", {})
+                finish_reason = choice.get("finish_reason")
+                
+                # 文本内容
+                content = delta.get("content")
+                if content:
+                    full_content += content
+                    yield {"type": "token", "content": content}
+                
+                # 推理内容 (DeepSeek thinking mode)
+                reasoning = delta.get("reasoning_content")
+                if reasoning:
+                    full_reasoning += reasoning
+                    yield {"type": "thinking", "content": reasoning}
+                
+                # 工具调用（增量累积）
+                tool_calls_delta = delta.get("tool_calls") or []
+                for tc_delta in tool_calls_delta:
+                    idx = tc_delta.get("index", 0)
+                    if idx not in tool_calls:
+                        tool_calls[idx] = {"id": "", "name": "", "arguments": ""}
+                    
+                    if tc_delta.get("id"):
+                        tool_calls[idx]["id"] = tc_delta["id"]
+                    
+                    func = tc_delta.get("function", {})
+                    if func.get("name"):
+                        tool_calls[idx]["name"] += func["name"]
+                    if func.get("arguments"):
+                        tool_calls[idx]["arguments"] += func["arguments"]
+                
+                # 结束原因处理
+                if finish_reason in ("stop", "tool_calls"):
+                    yield self._yield_done(tool_calls, full_content, full_reasoning)
+                    return
+        
+        # 流正常结束但没有 [DONE] 或 finish_reason
+        yield self._yield_done(tool_calls, full_content, full_reasoning)
+        print(f"[LLMClient] OpenAI stream completed normally")
+    
+    async def _stream_anthropic(self, response) -> AsyncGenerator[dict, None]:
+        """解析 Anthropic 格式 SSE（Kimi）"""
+        full_content = ""
+        full_reasoning = ""
+        tool_calls = {}
+        current_tool_index = 0
+        
+        buffer = ""
+        async for chunk in response.aiter_text():
+            buffer += chunk
+            
+            while "\n" in buffer:
+                line, buffer = buffer.split("\n", 1)
+                line = line.strip()
+                
+                if not line or line.startswith(":"):
+                    continue
+                
+                # Anthropic 格式 SSE 有 event:xxx 和 data:xxx 两行 (注意没有空格)
+                if line.startswith("event:"):
+                    event_type = line[6:]
+                    # 下一行应该是 data:...
+                    if "\n" not in buffer:
+                        # 数据还没来，把 event 放回 buffer
+                        buffer = line + "\n" + buffer
+                        break
+                    data_line, buffer = buffer.split("\n", 1)
+                    data_line = data_line.strip()
+                    
+                    if not data_line.startswith("data:"):
+                        continue
+                    
+                    data_str = data_line[5:]
+                    
+                    try:
+                        data = json.loads(data_str) if data_str else {}
+                    except json.JSONDecodeError:
+                        continue
+                    
+                    # 处理不同类型的 event
+                    if event_type == "message_start":
+                        pass  # 初始化消息
+                    
+                    elif event_type == "content_block_start":
+                        block = data.get("content_block", {})
+                        block_type = block.get("type", "")
+                        
+                        if block_type == "tool_use":
+                            idx = current_tool_index
+                            tool_calls[idx] = {
+                                "id": block.get("id", ""),
+                                "name": block.get("name", ""),
+                                "arguments": "",
+                            }
+                    
+                    elif event_type == "content_block_delta":
+                        delta = data.get("delta", {})
+                        delta_type = delta.get("type", "")
+                        
+                        if delta_type == "text_delta":
+                            text = delta.get("text", "")
+                            if text:
+                                full_content += text
+                                yield {"type": "token", "content": text}
+                        
+                        elif delta_type == "thinking_delta":
+                            thinking = delta.get("thinking", "")
+                            if thinking:
+                                full_reasoning += thinking
+                                yield {"type": "thinking", "content": thinking}
+                        
+                        elif delta_type == "input_json_delta":
+                            partial_json = delta.get("partial_json", "")
+                            if partial_json:
+                                # 找到当前正在构建的工具调用
+                                idx = current_tool_index
+                                if idx in tool_calls:
+                                    tool_calls[idx]["arguments"] += partial_json
+                    
+                    elif event_type == "content_block_stop":
+                        block = data.get("content_block", {})
+                        if block and block.get("type") == "tool_use":
+                            current_tool_index += 1
+                    
+                    elif event_type == "message_delta":
+                        delta = data.get("delta", {})
+                        stop_reason = delta.get("stop_reason", "")
+                        
+                        if stop_reason in ("end_turn", "tool_use"):
+                            yield self._yield_done(tool_calls, full_content, full_reasoning)
+                            return
+                    
+                    elif event_type == "message_stop":
+                        yield self._yield_done(tool_calls, full_content, full_reasoning)
+                        return
+        
+        # 流结束
+        yield self._yield_done(tool_calls, full_content, full_reasoning)
+        print(f"[LLMClient] Anthropic stream completed normally")
     
     def _yield_done(self, tool_calls, full_content, full_reasoning):
         """生成 done 事件，包含工具调用结果"""

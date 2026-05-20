@@ -1,0 +1,74 @@
+"""
+IDE 上下文注入补丁
+
+这个补丁会在 agent_engine.py 中添加 _load_ide_context 方法
+并修改 inject_system_prompt 来注入 IDE 上下文
+
+应用方法：
+在 agent_engine.py 中添加以下代码
+"""
+
+# 需要在 agent_engine.py 中添加的内容
+
+IDE_CONTEXT_LOADER = '''
+    def _load_ide_context(self) -> Optional[Dict[str, Any]]:
+        """加载 VS Code 扩展上报的 IDE 上下文"""
+        try:
+            from src.omnia.config import settings
+            context_file = settings.omnia_home / "ide_context.json"
+            if not context_file.exists():
+                return None
+            import json as _json
+            data = _json.loads(context_file.read_text(encoding="utf-8"))
+            # 检查是否在 5 分钟内
+            from datetime import datetime
+            received_at = data.get("received_at", "")
+            if received_at:
+                last_update = datetime.fromisoformat(received_at)
+                elapsed = (datetime.now() - last_update).total_seconds()
+                if elapsed > 300:
+                    return None
+            return data
+        except Exception:
+            return None
+'''
+
+IDE_CONTEXT_INJECT = '''
+        # ===== 注入 IDE 上下文（Phase 1） =====
+        ide_ctx = self._load_ide_context()
+        if ide_ctx:
+            ide_prompt = "\\n\\n## 🖥️ 用户 VS Code IDE 环境\\n"
+            ide_prompt += "（以下信息由 VS Code 扩展实时上报，你可以参考这些信息来更好地帮助用户）\\n\\n"
+
+            file_name = ide_ctx.get("file")
+            if file_name:
+                from pathlib import Path
+                ide_prompt += f"- **当前文件**: {Path(file_name).name}\\n"
+                ide_prompt += f"- **文件路径**: {file_name}\\n"
+
+            language = ide_ctx.get("language")
+            if language:
+                ide_prompt += f"- **编程语言**: {language}\\n"
+
+            line = ide_ctx.get("line")
+            column = ide_ctx.get("column")
+            if line is not None:
+                ide_prompt += f"- **光标位置**: 第 {line} 行"
+                if column is not None:
+                    ide_prompt += f", 第 {column} 列"
+                ide_prompt += "\\n"
+
+            selected = ide_ctx.get("selectedText", "")
+            if selected:
+                ide_prompt += f"- **用户选中的代码**: \\n```\\n{selected[:500]}\\n```\\n"
+
+            full_content = ide_ctx.get("fullContent", "")
+            if full_content and len(full_content) > 0:
+                max_len = 3000
+                content = full_content[:max_len]
+                if len(full_content) > max_len:
+                    content += "\\n... (已截断)"
+                ide_prompt += f"\\n- **当前文件内容**:\\n```{language or ''}\\n{content}\\n```\\n"
+
+            tool_prompt += ide_prompt
+'''

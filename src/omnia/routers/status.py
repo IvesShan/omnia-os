@@ -241,6 +241,7 @@ def _mcp_status(app=None) -> dict:
             "tools_count": 0,
         }
 
+
 def _tool_summary() -> dict:
     """获取工具系统摘要"""
     try:
@@ -368,10 +369,11 @@ async def confirm_action(request: dict):
 
 @router.post("/open-ide")
 async def open_ide():
-    """打开 IDE"""
+    """打开 IDE（复用已打开的 VS Code 窗口）"""
     try:
+        # 使用 --reuse-window 参数复用已打开的 VS Code 窗口
         subprocess.Popen(
-            ["code", str(settings.project_root)],
+            ["code", "--reuse-window", str(settings.project_root)],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             start_new_session=True,

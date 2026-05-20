@@ -68,8 +68,8 @@ class MemoryTools:
                             },
                             "layer": {
                                 "type": "string",
-                                "enum": ["facts", "relations", "habits", "timeline"],
-                                "description": "记忆层：facts(事实), relations(关系), habits(习惯), timeline(时间线)"
+                                "enum": ["facts", "relations", "habits", "timeline", "conversations"],
+                                "description": "记忆层：facts(事实), relations(关系), habits(习惯), timeline(时间线), conversations(对话)"
                             }
                         },
                         "required": ["content", "layer"]
@@ -137,7 +137,7 @@ class MemoryTools:
 
     async def _save_memory(self, content: str, layer: str = "facts") -> Dict[str, Any]:
         """保存记忆"""
-        valid_layers = ["facts", "relations", "habits", "timeline"]
+        valid_layers = ["facts", "relations", "habits", "timeline", "conversations"]
         if layer not in valid_layers:
             return {"error": f"无效的记忆层: {layer}，可选: {valid_layers}"}
         
@@ -156,6 +156,10 @@ class MemoryTools:
                 mp.save_habit(content)
             elif layer == "timeline":
                 mp.save_timeline(content)
+            elif layer == "conversations":
+                # 对话层需要特殊处理，这里只是示例
+                # 实际对话记录应该由对话系统自动记录
+                return {"error": "对话层记录应由对话系统自动记录，不支持手动保存", "ok": False}
             
             return {"ok": True, "layer": layer, "content": content}
         except ImportError:
@@ -173,7 +177,8 @@ class MemoryTools:
             if settings.memory_palace_db.exists():
                 with sqlite3.connect(str(settings.memory_palace_db)) as conn:
                     cursor = conn.cursor()
-                    for table in ["facts", "relations", "habits", "timeline"]:
+                    # 统计所有记忆层，包括对话层
+                    for table in ["facts", "relations", "habits", "timeline", "conversation_logs", "tool_logs"]:
                         try:
                             cursor.execute(f"SELECT COUNT(*) FROM {table}")
                             counts[table] = cursor.fetchone()[0]

@@ -31,36 +31,24 @@ def cmd_chat(args):
 
 def cmd_status(args):
     workspace_root = PROJECT_ROOT.parent
-    pid_file = settings.omnia_home / "daemon.pid"
-    log_file = settings.omnia_home / "daemon.log"
     db_file = settings.memory_palace_db
     queue_file = settings.omnia_home / "notifications.jsonl"
 
     print("=" * 60)
-    print("Omnia Status")
+    print("Omnia Status (FastAPI)")
     print("=" * 60)
 
-    # Daemon
-    if pid_file.exists():
-        pid = pid_file.read_text().strip()
-        try:
-            import os
-            os.kill(int(pid), 0)
-            print(f"\nPersona Daemon: running (pid={pid})")
-        except ProcessLookupError:
-            print(f"\nPersona Daemon: stale pid file ({pid})")
-    else:
-        print("\nPersona Daemon: not running")
-
-    # Recent log tail
-    if log_file.exists():
-        lines = log_file.read_text().splitlines()
-        recent = lines[-5:]
-        print(f"\nRecent daemon log ({len(recent)} line(s)):")
-        for line in recent:
-            print(f"  {line}")
-    else:
-        print("\nDaemon log: not found")
+    # FastAPI Server
+    import urllib.request
+    try:
+        req = urllib.request.Request("http://localhost:8765/api/status", method="GET")
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            if resp.status == 200:
+                print("\nFastAPI Server: running (http://localhost:8765)")
+            else:
+                print(f"\nFastAPI Server: returned status {resp.status}")
+    except Exception as e:
+        print(f"\nFastAPI Server: not reachable ({e})")
 
     # Memory palace
     if db_file.exists():
