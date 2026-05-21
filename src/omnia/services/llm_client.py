@@ -296,10 +296,15 @@ class LLMClient:
                     full_content += content
                     yield {"type": "token", "content": content}
                 
-                # 推理内容 (DeepSeek thinking mode)
+                # 推理内容 (DeepSeek/Xiaomi thinking mode)
                 reasoning = delta.get("reasoning_content")
                 if reasoning:
                     full_reasoning += reasoning
+                    # 兼容旧客户端：如果 content 为空，将 reasoning 也作为 token 发送
+                    # 这样客户端不会看到空白回复
+                    if not content:
+                        full_content += reasoning
+                        yield {"type": "token", "content": reasoning}
                     yield {"type": "thinking", "content": reasoning}
                 
                 # 工具调用（增量累积）
@@ -396,6 +401,8 @@ class LLMClient:
                             thinking = delta.get("thinking", "")
                             if thinking:
                                 full_reasoning += thinking
+                                # 兼容旧客户端
+                                yield {"type": "token", "content": "[思考] " + thinking}
                                 yield {"type": "thinking", "content": thinking}
                         
                         elif delta_type == "input_json_delta":
