@@ -179,7 +179,6 @@ class AgentEngine:
         execution_history = []
         total_content = ""
         repeat_count = 0
-        repeat_count = 0
 
         # 记录用户消息到记忆库
         if session_id:
@@ -364,33 +363,6 @@ class AgentEngine:
 
                 tool_calls_made += 1
                 
-# 循环检测（非流式版本）
-                if execution_history:
-                    last = execution_history[-1]
-                    if len(execution_history) >= 2:
-                        prev = execution_history[-2]
-                        if last["name"] == prev["name"] and last["args"] == prev["args"]:
-                            repeat_count += 1
-                            if repeat_count >= 2:
-                                for msg in current_messages:
-                                    if msg.get("role") == "system":
-                                        msg["content"] += f"\n\n⚠️【关键警告】你已连续{repeat_count}次调用工具 {tool_name} 且参数完全相同。这是循环行为。请立即改变策略，使用不同方法或直接回复用户。\n"
-                                        break
-                                if repeat_count >= 3:
-                                    return {
-                                        "content": f"⚠️ 检测到工具调用循环：工具 {tool_name} 以相同参数连续调用{repeat_count}次，已强制终止。可能是：1) 文件太大需要分段查看 2) 路径不存在 3) 请尝试用不同方法解决。",
-                                        "tool_calls": tool_calls_made,
-                                        "rounds": rounds,
-                                        "interrupted": True,
-                                    }
-                        else:
-                            repeat_count = 0
-                    else:
-                        repeat_count = 0
-                else:
-                    repeat_count = 0
-                # 修剪消息历史，防止 token 无限增长
-                MAX_HISTORY = 60
                 if len(current_messages) > MAX_HISTORY + 2:
                     preserved = [current_messages[0]]
                     last_user_idx = 0
