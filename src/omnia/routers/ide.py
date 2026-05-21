@@ -10,28 +10,45 @@ from __future__ import annotations
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
-from src.omnia.config import settings
 from src.omnia.config import settings
 
 router = APIRouter()
 
 # ========== 请求/响应模型 ==========
 
+
 class IDEContext(BaseModel):
-    """IDE 上下文数据"""
+    """
+    IDE 上下文数据
+    
+    兼容 VSCode 扩展发送的格式：
+    - file: 当前文件路径
+    - language: 语言类型
+    - line: 光标行号
+    - column: 光标列号
+    - selectedText: 选中的文本
+    - timestamp: 时间戳（数字或字符串）
+    - fullContent: 完整文件内容（可选）
+    """
     file: Optional[str] = None
     language: Optional[str] = None
+    line: Optional[int] = None
+    column: Optional[int] = None
+    selectedText: Optional[str] = None
+    timestamp: Optional[Any] = None  # 支持数字或字符串
+    fullContent: Optional[str] = None
+    
+    # 兼容旧格式（可选）
     selection: Optional[Dict[str, Any]] = None
     cursor: Optional[Dict[str, int]] = None
     project: Optional[str] = None
     branch: Optional[str] = None
-    diagnostics: Optional[list] = None
-    timestamp: Optional[str] = None
+    diagnostics: Optional[List[Any]] = None
 
 
 class IDEStatusResponse(BaseModel):
@@ -42,6 +59,7 @@ class IDEStatusResponse(BaseModel):
 
 
 # ========== 辅助函数 ==========
+
 
 def _get_ide_context_path() -> Path:
     """获取 IDE 上下文文件路径"""
@@ -73,7 +91,52 @@ def _save_ide_context(data: Dict[str, Any]) -> None:
         raise
 
 
+def _normalize_context(context: IDEContext) -> Dict[str, Any]:
+    """
+    规范化上下文数据
+    
+    将 VSCode 扩展发送的格式转换为前端期望的格式
+    """
+    data = {}
+    
+    # 基本字段
+    data["file"] = context.file
+    data["language"] = context.language
+    data["line"] = context.line
+    data["column"] = context.column
+    data["selectedText"] = context.selectedText or ""
+    data["fullContent"] = context.fullContent
+    
+    # 处理时间戳（支持数字和字符串）
+    if context.timestamp is not None:
+        if isinstance(context.timestamp, (int, float)):
+            # 数字时间戳转为 ISO 格式
+            try:
+                dt = datetime.fromtimestamp(context.timestamp / 1000.0)
+                data["timestamp"] = dt.isoformat(timespec="seconds")
+            except (ValueError, OSError):
+                data["timestamp"] = str(context.timestamp)
+        else:
+            data["timestamp"] = str(context.timestamp)
+    
+    # 兼容旧格式字段
+    if context.selection:
+        data["selection"] = context.selection
+    if context.cursor:
+        data["cursor"] = context.cursor
+    if context.project:
+        data["project"] = context.project
+    if context.branch:
+        data["branch"] = context.branch
+    if context.diagnostics:
+        data["diagnostics"] = context.diagnostics
+    
+    # 移除 None 值
+    return {k: v for k, v in data.items() if v is not None}
+
+
 # ========== 路由 ==========
+
 
 @router.post("/ide-context")
 async def receive_ide_context(context: IDEContext):
@@ -84,10 +147,9 @@ async def receive_ide_context(context: IDEContext):
     - 当前打开的文件
     - 光标位置
     - 选中内容
-    - 诊断信息（错误、警告）
-    - 项目信息
+    - 文件内容（可选）
     """
-    data = context.model_dump(exclude_none=True)
+    data = _normalize_context(context)
     data["received_at"] = datetime.now().isoformat(timespec="seconds")
 
     try:
