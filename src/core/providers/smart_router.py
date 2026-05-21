@@ -1,29 +1,30 @@
 """
+Smart Model Router - 智能模型路由器（v2）
+
+支持三种模式：
+1. LOCAL_ONLY - 只用本地模型
+2. CLOUD_ONLY - 只用云端模型
+3. AUTO - 智能选择（默认）
+
+配置方式（优先级从高到低）：
+- 代码传入：SmartModelRouter(mode_override="local_only")
+- 环境变量：export OMNIA_MODEL_MODE=local_only
+- 默认值：RouterConfig.default_mode（auto）
+
+修复历史：
+- v2: 修复重复变量赋值、按需初始化本地客户端、支持 mode_override、
+      provider 注册表、chat 双重 fallback、健康检查缓存
+"""
+
+from __future__ import annotations
+
 from core.logging_config import get_logger
 
 logger = get_logger(__name__)
 
-Smart Model Router - 智能模型路由器
-
-支持三种模式：
-1. LOCAL_ONLY - 只用本地模型
-2. CLOUD_ONLY - 只用云端模型  
-3. AUTO - 智能选择（默认）
-
-使用方式：
-    # 方式1：环境变量
-    export OMNIA_MODEL_MODE=local_only
-    
-    # 方式2：代码中设置
-    router = SmartModelRouter()
-    router.set_mode("local_only")
-    
-    # 方式3：单次请求指定
-    await router.chat(messages, mode="cloud_only")
-"""
-
 import os
-from typing import Optional, Literal
+import time
+from typing import Optional
 from dataclasses import dataclass
 from enum import Enum
 
@@ -32,27 +33,40 @@ from .local_client import LocalLLMClient, LocalModelConfig
 
 class ModelMode(Enum):
     """模型使用模式"""
-    LOCAL_ONLY = "local_only"    # 只用本地
-    CLOUD_ONLY = "cloud_only"    # 只用云端
-    AUTO = "auto"                # 智能选择（默认）
+    LOCAL_ONLY = "local_only"
+    CLOUD_ONLY = "cloud_only"
+    AUTO = "auto"
 
 
 class ModelTier(Enum):
     """模型层级"""
-    LOCAL = "local"              # 本地模型
-    CLOUD_FAST = "cloud_fast"    # 云端快速模型
-    CLOUD_SMART = "cloud_smart"  # 云端智能模型
+    LOCAL = "local"
+    CLOUD_FAST = "cloud_fast"
+    CLOUD_SMART = "cloud_smart"
+
+
+def _parse_mode(s: Optional[str]) -> Optional[ModelMode]:
+    """解析模式字符串，返回 None 表示无效/未指定"""
+    if not s:
+        return None
+    s = s.strip().lower()
+    return {
+        "local_only": ModelMode.LOCAL_ONLY,
+        "local": ModelMode.LOCAL_ONLY,
+        "cloud_only": ModelMode.CLOUD_ONLY,
+        "cloud": ModelMode.CLOUD_ONLY,
+        "auto": ModelMode.AUTO,
+    }.get(s)
 
 
 @dataclass
 class RouterConfig:
     """路由配置"""
-    # 模型选择
     default_mode: ModelMode = ModelMode.AUTO
     local_model: str = "gemma-4-E4B-it-OBLITERATED-Q8_0.gguf"
     cloud_fast_model: str = "qianfan"
     cloud_smart_model: str = "kimi"
-    
+
     # AUTO 模式参数
     prefer_local: bool = True
     complexity_threshold: int = 1000  # 超过此 token 数切换云端
@@ -60,194 +74,299 @@ class RouterConfig:
 
 
 class SmartModelRouter:
-    """智能模型路由器"""
-    
-    _instance = None  # 单例
-    
-    def __new__(cls, config: Optional[RouterConfig] = None):
+    """
+    智能模型路由器（全局单例）
+
+    优先级：mode_override 构造参数 > OMNIA_MODEL_MODE 环境变量 > config.default_mode
+    """
+
+    _instance: Optional["SmartModelRouter"] = None
+
+    def __new__(cls, *args, **kwargs):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             cls._instance._initialized = False
         return cls._instance
-    
-    def __init__(self, config: Optional[RouterConfig] = None):
+
+    def __init__(
+        self,
+        config: Optional[RouterConfig] = None,
+        mode_override: Optional[str] = None,
+    ):
         if self._initialized:
             return
-            
-        # 从环境变量读取模式
-        env_mode = os.getenv("OMNIA_MODEL_MODE", "auto").lower()
-        
+
         self.config = config or RouterConfig()
-        self._mode = self._parse_mode(env_mode) or self.config.default_mode
-        
-        # 初始化本地客户端（仅在 local 模式下）
-        env_mode = os.getenv("OMNIA_MODEL_MODE", "auto").lower()
-        if env_mode in ("local", "local_only"):
-            self.local_client = LocalLLMClient(LocalModelConfig(
-                model_id=self.config.local_model
-            ))
-        else:
-            # 云端模式下不初始化本地客户端，避免连接 localhost:8080
-            self.local_client = None
-            logger.info(f"[SmartRouter] Cloud mode: local client disabled")
-        
+
+        # 解析模式：优先级 mode_override > 环境变量 > config.default_mode
+        parsed = (
+            _parse_mode(mode_override)
+            or _parse_mode(os.getenv("OMNIA_MODEL_MODE"))
+            or self.config.default_mode
+        )
+        self._mode: ModelMode = parsed
+
+        # 本地客户端：按需延迟初始化
+        self._local_client: Optional[LocalLLMClient] = None
         self._local_available: Optional[bool] = None
-        self._last_check: float = 0
+        self._last_health_check: float = 0.0
+        self._health_check_interval: float = 60.0  # 秒
+
+        # provider 注册表（运行时可注册额外 provider）
+        self._provider_registry: dict[str, object] = {}
+
+        # 如果当前模式需要本地，立即初始化
+        if self._need_local():
+            self._ensure_local_client()
+
         self._initialized = True
-    
-    def _parse_mode(self, mode_str: str) -> Optional[ModelMode]:
-        """解析模式字符串"""
-        mode_map = {
-            "local_only": ModelMode.LOCAL_ONLY,
-            "local": ModelMode.LOCAL_ONLY,
-            "cloud_only": ModelMode.CLOUD_ONLY,
-            "cloud": ModelMode.CLOUD_ONLY,
-            "auto": ModelMode.AUTO,
-        }
-        return mode_map.get(mode_str.lower())
-    
+        logger.info(
+            f"[SmartRouter] Initialized: mode={self._mode.value}, "
+            f"local_client={'ready' if self._local_client else 'deferred'}"
+        )
+
+    # ─────────────────────────────────────────────
+    # 内部辅助
+    # ─────────────────────────────────────────────
+
+    def _need_local(self) -> bool:
+        """判断当前模式是否可能需要本地模型"""
+        if self._mode == ModelMode.LOCAL_ONLY:
+            return True
+        if self._mode == ModelMode.AUTO and self.config.prefer_local:
+            return True
+        return False
+
+    def _ensure_local_client(self):
+        """按需初始化本地客户端，避免云端模式下无谓初始化"""
+        if self._local_client is not None:
+            return
+        try:
+            self._local_client = LocalLLMClient(
+                LocalModelConfig(model_id=self.config.local_model)
+            )
+            # 注册到 provider 表（接口兼容 ModelClient）
+            self._provider_registry.setdefault("local", self._local_client)
+            logger.info(f"[SmartRouter] Local client initialized: {self.config.local_model}")
+        except Exception as e:
+            logger.warning(f"[SmartRouter] Failed to init local client: {e}")
+            self._local_client = None
+
+    def _select_cloud_provider(self) -> str:
+        """选择一个可用的云端 provider"""
+        import os as _os
+        # 优先 Kimi → 千帆 → 注册表第一个
+        if _os.getenv("MOONSHOT_API_KEY") or _os.getenv("KIMI_API_KEY"):
+            return "kimi"
+        if _os.getenv("QIANFAN_API_KEY") or _os.getenv("BAIDU_API_KEY"):
+            return "qianfan"
+        if _os.getenv("DEEPSEEK_API_KEY"):
+            return "deepseek"
+        # 从注册表里找一个非 local 的
+        for name in self._provider_registry:
+            if name != "local":
+                return name
+        return "kimi"  # 无可用时仍返回 kimi，让调用方报错
+
+    # ─────────────────────────────────────────────
+    # 模式切换
+    # ─────────────────────────────────────────────
+
     @property
     def mode(self) -> ModelMode:
-        """当前模式"""
         return self._mode
-    
+
     def set_mode(self, mode: str | ModelMode):
-        """
-        设置模式
-        
-        Args:
-            mode: "local_only" | "cloud_only" | "auto" | ModelMode
-        """
+        """运行时切换模式"""
         if isinstance(mode, str):
-            parsed = self._parse_mode(mode)
+            parsed = _parse_mode(mode)
             if parsed is None:
-                raise ValueError(f"无效模式: {mode}，支持: local_only, cloud_only, auto")
+                raise ValueError(
+                    f"无效模式: {mode}，支持: local_only, cloud_only, auto"
+                )
             self._mode = parsed
         else:
             self._mode = mode
-    
-    async def is_local_available(self) -> bool:
-        """检查本地模型是否可用"""
-        # 如果本地客户端未初始化，直接返回 False
-        if self.local_client is None:
+
+        # 如果切换到需要本地的模式，确保本地客户端已初始化
+        if self._need_local():
+            self._ensure_local_client()
+
+        logger.info(f"[SmartRouter] Mode changed to: {self._mode.value}")
+
+    # ─────────────────────────────────────────────
+    # 健康检查（带缓存）
+    # ─────────────────────────────────────────────
+
+    async def is_local_available(self, force: bool = False) -> bool:
+        """检查本地模型是否可用（60 秒缓存）"""
+        if not self._need_local():
             return False
-        
-        import time
+
+        self._ensure_local_client()
+        if self._local_client is None:
+            return False
+
         now = time.time()
-        
-        # 缓存 60 秒
-        if self._local_available is not None and (now - self._last_check) < 60:
+        if (
+            not force
+            and self._local_available is not None
+            and (now - self._last_health_check) < self._health_check_interval
+        ):
             return self._local_available
-        
-        self._local_available = await self.local_client.health_check()
-        self._last_check = now
+
+        try:
+            self._local_available = await self._local_client.health_check()
+        except Exception:
+            self._local_available = False
+
+        self._last_health_check = time.time()
         return self._local_available
-    
+
+    # ─────────────────────────────────────────────
+    # 复杂度估算
+    # ─────────────────────────────────────────────
+
     def estimate_complexity(self, messages: list[dict]) -> int:
         """估算对话复杂度（token 数）"""
         total = 0
         for msg in messages:
-            content = msg.get("content", "")
-            # 简单估算：中文约 1.5 字/token，英文约 4 字符/token
-            total += len(content) // 2
+            content = msg.get("content") or ""
+            total += max(1, len(content) // 2)
         return total
-    
-    async def select_model(
-        self,
-        messages: list[dict],
-        mode: Optional[str] = None
-    ) -> tuple[str, ModelTier]:
+
+    # ─────────────────────────────────────────────
+    # provider 注册
+    # ─────────────────────────────────────────────
+
+    def register_provider(self, name: str, client):
+        """注册外部 provider（可选）"""
+        self._provider_registry[name] = client
+        logger.info(f"[SmartRouter] Registered provider: {name}")
+
+    # ─────────────────────────────────────────────
+    # 核心：选择 provider
+    # ─────────────────────────────────────────────
+
+    def _choose_provider(self, messages: list[dict], mode: Optional[str] = None):
         """
-        选择最佳模型
-        
-        Args:
-            messages: 对话消息
-            mode: 临时覆盖模式
-            
+        选择 provider 和 tier
+
         Returns:
-            (model_id, tier)
+            (provider_name, ModelTier)
         """
-        # 确定使用的模式
-        use_mode = self._mode
-        if mode:
-            parsed = self._parse_mode(mode)
-            if parsed:
-                use_mode = parsed
-        
-        # LOCAL_ONLY 模式
+        use_mode = _parse_mode(mode) or self._mode
+
+        # ── LOCAL_ONLY ──
         if use_mode == ModelMode.LOCAL_ONLY:
-            if await self.is_local_available():
-                return (f"local/{self.config.local_model}", ModelTier.LOCAL)
-            else:
-                raise RuntimeError("本地模型不可用，请先启动服务: bash scripts/local_llm.sh start")
-        
-        # CLOUD_ONLY 模式
+            return "local", ModelTier.LOCAL
+
+        # ── CLOUD_ONLY ──
         if use_mode == ModelMode.CLOUD_ONLY:
-            return (self.config.cloud_smart_model, ModelTier.CLOUD_SMART)
-        
-        # AUTO 模式
-        if self.config.prefer_local and await self.is_local_available():
-            complexity = self.estimate_complexity(messages)
-            
-            if complexity <= self.config.complexity_threshold:
-                return (f"local/{self.config.local_model}", ModelTier.LOCAL)
-            else:
-                return (self.config.cloud_smart_model, ModelTier.CLOUD_SMART)
-        
-        # 降级到云端
-        if self.config.auto_fallback:
-            return (self.config.cloud_fast_model, ModelTier.CLOUD_FAST)
-        
-        raise RuntimeError("无可用模型")
-    
+            return self._select_cloud_provider(), ModelTier.CLOUD_SMART
+
+        # ── AUTO ──
+        if self.config.prefer_local:
+            return "local", ModelTier.LOCAL
+        return self._select_cloud_provider(), ModelTier.CLOUD_FAST
+
+    # ─────────────────────────────────────────────
+    # 核心：调用 provider
+    # ─────────────────────────────────────────────
+
+    async def _call_provider(
+        self, provider: str, messages: list[dict], **kwargs
+    ) -> dict:
+        """调用指定 provider 的 chat 方法"""
+        client = self._provider_registry.get(provider)
+        if client is None:
+            raise RuntimeError(f"Provider '{provider}' not registered")
+        return await client.chat(messages, **kwargs)
+
+    async def _try_chat(
+        self, provider: str, messages: list[dict], **kwargs
+    ) -> Optional[dict]:
+        """尝试调用，失败返回 None（用于 fallback）"""
+        try:
+            return await self._call_provider(provider, messages, **kwargs)
+        except (ConnectionError, OSError, TimeoutError) as e:
+            logger.warning(f"[SmartRouter] Network error ({provider}): {e}")
+            return None
+        except Exception as e:
+            logger.warning(f"[SmartRouter] Provider error ({provider}): {e}")
+            return None
+
+    # ─────────────────────────────────────────────
+    # 公开接口：chat
+    # ─────────────────────────────────────────────
+
     async def chat(
         self,
         messages: list[dict],
         mode: Optional[str] = None,
-        **kwargs
+        **kwargs,
     ) -> str:
         """
-        发送对话请求
-        
+        发送对话请求（自动选择模型 + fallback）
+
         Args:
             messages: 对话消息
             mode: 临时覆盖模式（"local_only" | "cloud_only" | "auto"）
-            **kwargs: 其他参数
-            
+            **kwargs: 传递给底层 provider 的额外参数
+
         Returns:
-            模型响应
+            模型响应内容（str）
+
+        Raises:
+            RuntimeError: 所有 provider 均不可用
         """
-        model_id, tier = await self.select_model(messages, mode)
-        
-        if tier == ModelTier.LOCAL:
-            # 使用本地模型
-            response = await self.local_client.chat(messages, **kwargs)
-            return response
-        else:
-            # 使用云端模型（通过现有的 provider 系统）
-            try:
-                from src.core.providers import get_client_for_model
-                cloud_client = get_client_for_model(model_id)
-                if cloud_client:
-                    response = await cloud_client.chat(messages, **kwargs)
-                    return response
+        provider, tier = self._choose_provider(messages, mode)
+
+        # ── 本地模式：检查可用性，必要时 fallback ──
+        if provider == "local":
+            avail = await self.is_local_available()
+            if not avail:
+                if self.config.auto_fallback:
+                    provider = self._select_cloud_provider()
+                    tier = ModelTier.CLOUD_FAST
+                    logger.info("[SmartRouter] Local unavailable, fallback to cloud")
                 else:
-                    # 回退到本地模型
-                    print(f"[SmartRouter] 云端模型 {model_id} 不可用，回退到本地模型")
-                    response = await self.local_client.chat(messages, **kwargs)
-                    return response
-            except ImportError:
-                # provider 系统不可用，回退到本地
-                print(f"[SmartRouter] Provider 系统不可用，使用本地模型")
-                response = await self.local_client.chat(messages, **kwargs)
-                return response
-            except Exception as cloud_err:
-                print(f"[SmartRouter] 云端调用失败: {cloud_err}，回退到本地模型")
-                response = await self.local_client.chat(messages, **kwargs)
-                return response
+                    raise RuntimeError(
+                        "本地模型不可用。请启动: bash scripts/local_llm.sh start"
+                    )
+
+        # ── 第一次尝试 ──
+        result = await self._try_chat(provider, messages, **kwargs)
+        if result is not None:
+            return result.get("content", "")
+
+        # ── 第二次尝试（fallback） ──
+        if self.config.auto_fallback:
+            fallback = (
+                self._select_cloud_provider() if provider == "local" else "local"
+            )
+            # 确保 fallback 的 provider 已注册
+            if fallback == "local":
+                self._ensure_local_client()
+                avail = await self.is_local_available()
+                if not avail:
+                    # 云端 fallback 失败 → 尝试另一个云端
+                    fallback = self._select_cloud_provider()
+
+            result = await self._try_chat(fallback, messages, **kwargs)
+            if result is not None:
+                return result.get("content", "")
+
+        raise RuntimeError(
+            f"All providers failed. Tried: {provider} + fallback. "
+            f"Check API keys or local model server."
+        )
 
 
-# 全局单例
+# ─────────────────────────────────────────────
+# 全局单例 + 便捷函数
+# ─────────────────────────────────────────────
+
 _router: Optional[SmartModelRouter] = None
 
 
@@ -259,33 +378,25 @@ def get_router() -> SmartModelRouter:
     return _router
 
 
-# 便捷函数
+def reset_router():
+    """重置全局路由器（用于测试）"""
+    global _router
+    SmartModelRouter._instance = None
+    _router = None
+
+
 async def smart_chat(
     messages: list[dict],
     mode: Optional[str] = None,
-    **kwargs
+    **kwargs,
 ) -> str:
-    """
-    智能对话（自动选择模型）
-    
-    Args:
-        messages: 对话消息
-        mode: 可选模式覆盖
-        
-    Returns:
-        模型响应
-    """
+    """智能对话（自动选择模型）"""
     router = get_router()
     return await router.chat(messages, mode=mode, **kwargs)
 
 
 def set_model_mode(mode: str):
-    """
-    全局设置模型模式
-    
-    Args:
-        mode: "local_only" | "cloud_only" | "auto"
-    """
+    """全局设置模型模式"""
     router = get_router()
     router.set_mode(mode)
 
@@ -294,57 +405,3 @@ def get_model_mode() -> str:
     """获取当前模型模式"""
     router = get_router()
     return router.mode.value
-
-
-# =========================================
-# 健康检查函数
-# =========================================
-
-async def check_local_health() -> bool:
-    """
-    检查本地模型是否在线
-    
-    Returns:
-        True 如果本地模型服务可用
-    """
-    import aiohttp
-    
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(
-                "http://localhost:8080/health",
-                timeout=aiohttp.ClientTimeout(total=3)
-            ) as resp:
-                if resp.status == 200:
-                    data = await resp.json()
-                    return data.get("status") == "ok"
-                return False
-    except (TimeoutError, ConnectionError) as e:
-        return False
-
-
-async def check_cloud_health() -> bool:
-    """
-    检查云端模型是否可用
-    
-    Returns:
-        True 如果至少有一个云端 API 配置正确
-    """
-    import os
-    
-    # 检查 Kimi API
-    kimi_key = os.getenv("MOONSHOT_API_KEY") or os.getenv("KIMI_API_KEY")
-    if kimi_key:
-        return True
-    
-    # 检查百度千帆
-    baidu_key = os.getenv("BAIDU_API_KEY") or os.getenv("QIANFAN_API_KEY")
-    if baidu_key:
-        return True
-    
-    # 检查 DeepSeek
-    deepseek_key = os.getenv("DEEPSEEK_API_KEY")
-    if deepseek_key:
-        return True
-    
-    return False
