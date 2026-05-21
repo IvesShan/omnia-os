@@ -458,7 +458,7 @@ def get_all_tools_schema() -> List[Dict[str, Any]]:
     return schemas
 
 
-def dispatch_tool(name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+async def dispatch_tool(name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
     """
     Dispatch a tool call to either native implementation or MCP server.
     """
