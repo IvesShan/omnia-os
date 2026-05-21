@@ -20,6 +20,7 @@ from omnia.wake import assemble_wake_prompt
 from omnia.tool_trigger import check_and_run
 from omnia.chat import _load_api_key, _build_model_config
 from omnia.tool_optimizer import ToolExecutionOptimizer, ParallelToolExecutor
+from src.core.actuator.tool_executor import ToolCallExecutor
 from src.core.actuator.tool_registry import TOOLS_SCHEMA
 from src.core.memory_palace.memory_palace import MemoryPalace
 
@@ -40,6 +41,7 @@ _current_provider = None
 
 # 全局优化器实例
 _optimizer = None
+_tool_executor = None  # 统一工具执行器
 _executor = ThreadPoolExecutor(max_workers=4)  # 并行执行线程池
 
 
@@ -55,6 +57,13 @@ def get_optimizer():
             max_rounds=MAX_TOOL_ITERATIONS
         )
     return _optimizer
+
+def get_tool_executor():
+    """获取统一工具执行器实例（含安全检查 + MCP 支持）"""
+    global _tool_executor
+    if _tool_executor is None:
+        _tool_executor = ToolCallExecutor()
+    return _tool_executor
 
 
 def stream_chat(message: str, history: list = None, provider: str = None) -> Generator[str, None, None]:
@@ -540,11 +549,10 @@ def _stream_chat_unified(
             assistant_message["tool_calls"] = tool_calls
         messages.append(assistant_message)
         
-        # 使用优化器执行工具（支持并行 + 缓存）
-        optimizer = get_optimizer()
+        # 使用统一工具执行器（支持安全检查 + MCP 工具）
+        tool_exec = get_tool_executor()
         
-        # 预处理工具调用：解析 arguments JSON 字符串
-        processed_tool_calls = []
+        # 预处理工具调用
         for tc in tool_calls:
             fn = tc.get("function") or {}
             tool_name = fn.get("name", "")
@@ -553,80 +561,34 @@ def _stream_chat_unified(
                 args = json.loads(args_str) if args_str else {}
             except Exception:
                 args = {}
-            processed_tool_calls.append({
-                "name": tool_name,
-                "arguments": args
+            
+            yield f"data: {json.dumps({'type': 'status', 'message': f'Executing tool: {tool_name}...'})}\n\n"
+
+
+            yield f"data: {json.dumps({'type': 'tool_call', 'name': tool_name, 'arguments': args})}\n\n"
+
+
+            # 统一执行（含安全检查 + MCP 支持）
+            exec_result = await tool_exec.execute_single(tool_name, args)
+            
+            result_content = exec_result.output if exec_result.success else (exec_result.error or "执行失败")
+            
+            yield f"data: {json.dumps({'type': 'tool_result', 'name': tool_name, 'content': result_content[:200]})}\n\n"
+
+
+            messages.append({
+                "role": "tool",
+                "tool_call_id": tc.get("id", ""),
+                "content": result_content
             })
-        
-        # 分析是否可并行执行
-        can_parallel, groups = ParallelToolExecutor.can_execute_in_parallel(processed_tool_calls)
-        # groups 是分组的索引列表，如果不冲突且有多于1个工具，则可并行
-        
-        if can_parallel and len(tool_calls) > 1:
-            # 并行执行
-            yield f"data: {json.dumps({'type': 'status', 'message': f'⚡ 并行执行 {len(tool_calls)} 个工具...'})}\n\n"
             
-            results = optimizer.execute_tools_parallel(tool_calls)
-            
-            for tool_call, result in zip(tool_calls, results):
-                function_name = (tool_call.get("function") or {}).get("name", "unknown")
-                result_summary = str(result.result)[:100] if result.success else "错误:" + str(result.error)[:100]
-                yield f"data: {json.dumps({'type': 'tool_result', 'name': function_name, 'content': str(result.result)[:200] if result.success else str(result.error)[:200]})}\n\n"
-                
-                # 添加工具结果到消息历史
-                tool_call_id = tool_call.get("id", "")
-                messages.append({
-                    "role": "tool",
-                    "tool_call_id": tool_call_id,
-                    "content": str(result.result) if result.success else str(result.error)
-                })
-                
-                # 记录执行历史（用于循环检测和反思）
-                execution_history.append({
-                    'name': function_name,
-                    'args': processed_tool_calls[tool_calls.index(tool_call)]['arguments'],
-                    'result_summary': result_summary,
-                    'success': result.success,
-                    'iteration': iteration
-                })
-        else:
-            # 逐个执行
-            for tc in tool_calls:
-                fn = tc.get("function") or {}
-                tool_name = fn.get("name", "")
-                args_str = fn.get("arguments", "{}")
-                try:
-                    args = json.loads(args_str) if args_str else {}
-                except Exception:
-                    args = {}
-                
-                yield f"data: {json.dumps({'type': 'status', 'message': f'正在执行工具: {tool_name}...'})}\n\n"
-                
-                yield f"data: {json.dumps({'type': 'tool_call', 'name': tool_name, 'arguments': args})}\n\n"
-                
-                # 执行工具
-                result = optimizer.execute_tool(tool_name, args)
-                
-                result_summary = str(result.result)[:100] if result.success else "错误:" + str(result.error)[:100]
-                yield f"data: {json.dumps({'type': 'tool_result', 'name': tool_name, 'content': str(result.result)[:200] if result.success else str(result.error)[:200]})}\n\n"
-                
-                # 添加工具结果到消息历史
-                tool_call_id = tc.get("id", "")
-                messages.append({
-                    "role": "tool",
-                    "tool_call_id": tool_call_id,
-                    "content": str(result.result) if result.success else str(result.error)
-                })
-                
-                # 记录执行历史（用于循环检测和反思）
-                execution_history.append({
-                    'name': tool_name,
-                    'args': args,
-                    'result_summary': result_summary,
-                    'success': result.success,
-                    'iteration': iteration
-                })
-        
+            execution_history.append({
+                'name': tool_name,
+                'args': args,
+                'result_summary': result_content[:100],
+                'success': exec_result.success,
+                'iteration': iteration
+            })
         # 记录中间步骤
         if session_id:
             try:
