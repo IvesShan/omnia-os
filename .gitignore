@@ -110,3 +110,7 @@ skills/imported/*/node_modules/
 
 # Skills runtime data
 skills/.omnia/
+
+# 自动上下文文件
+last_context.json
+last_context.md
