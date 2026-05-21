@@ -452,7 +452,7 @@ def _call_model_messages(api_key: str, provider: str, messages: list, tools: lis
 
     print(f"[_call_model_messages] POST {url}")
     print(f"[_call_model_messages] Headers: {list(headers.keys())}")
-    response = requests.post(url, headers=headers, json=payload, timeout=300)
+    response = requests.post(url, headers=headers, json=payload, timeout=600)
 
     print(f"[_call_model_messages] Response status: {response.status_code}")
     

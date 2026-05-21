@@ -61,7 +61,7 @@ class Settings(BaseSettings):
     
     # 性能配置
     max_concurrent_requests: int = 100
-    request_timeout: int = 60
+    request_timeout: int = 120  # 从 60 秒增加到 120 秒
     
     # YAML 配置缓存
     _model_mode_config: Optional[Dict[str, Any]] = None
