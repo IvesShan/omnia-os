@@ -1,7 +1,7 @@
 {
-  "timestamp": "2026-05-21T14:48:03",
+  "timestamp": "2026-05-21T17:25:40",
   "topic": "查看当前目录",
-  "summary": "好的，现在有了当前目录的列表。这是一个相当大的目录，包含了很多文件和子目录。我需要整理一下，给用户一个清晰的概览。\n\n从结果看，有：\n- 以点开头的隐藏文件和目录：.archive, .env, .env.example, .fix_progress.md, .git, .gitignore, .omnia, .pids, .read_mac_file.py, .scp_get.py, .scp_",
+  "summary": "目录内容很多，我整理一下：## 当前目录结构\n\n当前目录包含 **128 个** 项目，主要分为以下几类：\n\n### 📁 核心目录\n| 目录 | 说明 |\n|------|------|\n| `src/` | 主源码 |\n| `backend/` | 后端服务 |\n| `web/` | 前端 |\n| `tauri-app/` | Tauri 桌面应用 |\n| `src-tauri/` | Taur",
   "active_project": null,
   "active_files": null,
   "key_decisions": null,
