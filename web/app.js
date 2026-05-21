@@ -1205,7 +1205,7 @@ function pulseIfChanged(el, newVal) {
 // --- 加载状态 ---
 async function loadStatus() {
   try {
-    const res = await fetch(`${API_BASE}/api/status`);
+    const res = await fetch(`${API_BASE}/api/status`, { cache: 'no-store' });
     const data = await res.json();
 
     // 头像框

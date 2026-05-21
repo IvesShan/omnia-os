@@ -34,6 +34,7 @@ from src.omnia.services.context_manager import (
 )
 
 from src.omnia.interrupt_manager import check_interrupt
+from src.omnia.services.auto_memory import auto_memory
 
 
 class AgentEngine:
@@ -177,6 +178,20 @@ class AgentEngine:
         execution_history = []
         total_content = ""
 
+        # 记录用户消息到记忆库
+        if session_id:
+            user_msg = ""
+            for m in reversed(messages):
+                if m.get("role") == "user":
+                    user_msg = m.get("content", "")
+                    break
+            if user_msg:
+                try:
+                    auto_memory.log_user_message(session_id, user_msg)
+                except Exception:
+                    import traceback
+                    print(f"[AutoMemory] Failed to log: {traceback.format_exc()}")
+
         current_messages = self.inject_system_prompt(messages)
 
         while rounds < self.max_tool_rounds:
@@ -214,6 +229,14 @@ class AgentEngine:
                 if not validation["valid"] and validation["false_claim"]:
                     current_messages.append({"role": "user", "content": validation["retry_hint"]})
                     continue
+
+                # 记录助手回复到记忆库
+                if session_id and content:
+                    try:
+                        auto_memory.log_assistant_reply(session_id, content, tool_calls_made)
+                    except Exception:
+                        import traceback
+                        print(f"[AutoMemory] Failed to log: {traceback.format_exc()}")
 
                 return {
                     "content": content,
@@ -368,6 +391,14 @@ class AgentEngine:
             if m.get("role") == "user":
                 original_user_message = m.get("content", "")
                 break
+
+        # 记录用户消息到记忆库
+        if session_id and original_user_message:
+            try:
+                auto_memory.log_user_message(session_id, original_user_message)
+            except Exception:
+                import traceback
+                print(f"[AutoMemory] Failed to log: {traceback.format_exc()}")
 
         trigger_result = analyze_message(original_user_message, "", messages)
         preroll_result = check_and_run(original_user_message)
@@ -596,6 +627,14 @@ class AgentEngine:
                     )
                 except Exception as e:
                     pass
+
+                # 记录助手回复到记忆库（无工具调用的直接回复）
+                if session_id and full_content:
+                    try:
+                        auto_memory.log_assistant_reply(session_id, full_content, tool_calls_made)
+                    except Exception:
+                        import traceback
+                        print(f"[AutoMemory] Failed to log: {traceback.format_exc()}")
 
                 yield {
                     "type": "done",

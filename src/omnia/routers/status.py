@@ -45,16 +45,13 @@ class StatusResponse(BaseModel):
 
 
 def _daemon_status() -> bool:
-    """检查守护进程状态"""
-    pid_file = OMNIA_HOME / "daemon.pid"
-    if not pid_file.exists():
-        return False
-    
+    """检查 FastAPI 服务状态（Flask Daemon 已移除）"""
+    import urllib.request
     try:
-        pid = int(pid_file.read_text().strip())
-        os.kill(pid, 0)
-        return True
-    except (ValueError, ProcessLookupError, PermissionError):
+        req = urllib.request.Request("http://localhost:8765/health", method="GET")
+        with urllib.request.urlopen(req, timeout=3) as resp:
+            return resp.status == 200
+    except Exception:
         return False
 
 
@@ -111,14 +108,27 @@ def _notifications() -> list:
 
 
 def _ide_context() -> dict | None:
-    """获取 IDE 上下文"""
+    """获取 IDE 上下文（5 分钟超时视为断开）"""
+    import time
     context_file = OMNIA_HOME / "ide_context.json"
     if not context_file.exists():
         return None
     
     try:
         import json
-        return json.loads(context_file.read_text())
+        data = json.loads(context_file.read_text())
+        # 检查是否过期（5 分钟无更新视为断开）
+        received_at = data.get("received_at", "")
+        if received_at:
+            try:
+                from datetime import datetime
+                last_update = datetime.fromisoformat(received_at)
+                elapsed = (datetime.now() - last_update).total_seconds()
+                if elapsed > 300:  # 5 分钟超时
+                    return None
+            except (ValueError, TypeError):
+                pass
+        return data
     except Exception:
         return None
 
