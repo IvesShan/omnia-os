@@ -66,7 +66,7 @@ def get_tool_executor():
     return _tool_executor
 
 
-def stream_chat(message: str, history: list = None, provider: str = None) -> Generator[str, None, None]:
+async def stream_chat(message: str, history: list = None, provider: str = None) -> AsyncGenerator[str, None]:
     """
     流式聊天处理 - 支持长任务
     
@@ -117,7 +117,8 @@ def stream_chat(message: str, history: list = None, provider: str = None) -> Gen
     except Exception as e:
         print(f"[stream_chat] Failed to log user message: {e}")
     
-    yield from _stream_chat_unified(message, history, api_key, provider, MAX_TOOL_ITERATIONS, {}, session_id)
+    async for chunk in _stream_chat_unified(message, history, api_key, provider, MAX_TOOL_ITERATIONS, {}, session_id):
+        yield chunk
 
 
 def _get_dynamic_limit(analysis: Dict) -> int:
@@ -151,7 +152,7 @@ def _build_headers(api_key: str, provider: str) -> dict:
     return headers
 
 
-def _stream_chat_unified(
+async def _stream_chat_unified(
     message: str,
     history: list,
     api_key: str,
