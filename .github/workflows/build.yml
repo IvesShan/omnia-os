@@ -1,0 +1,210 @@
+name: Build Omnia - All Platforms
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyarmor nuitka ordered-set
+          pip install flask flask-cors requests
+      
+      - name: Obfuscate with PyArmor
+        run: |
+          pyarmor gen -O dist/obfuscated -r backend/
+          pyarmor gen -O dist/obfuscated -r src/omnia/
+      
+      - name: Build with Nuitka
+        run: |
+          python -m nuitka --standalone --onefile `
+            --output-dir=dist/nuitka-build `
+            --output-filename=omnia-backend.exe `
+            --include-data-dir=seeds=seeds `
+            --include-data-dir=config=config `
+            --include-data-dir=web=web `
+            --include-package=flask `
+            --no-progressbar `
+            --assume-yes-for-downloads `
+            backend/standalone_main.py
+      
+      - name: Create Package
+        run: |
+          mkdir -p dist/package
+          cp dist/nuitka-build/standalone_main.dist/omnia-backend.exe dist/package/
+          cp -r seeds dist/package/
+          cp -r config dist/package/
+          cp -r web dist/package/
+          cp tools/license_system.py dist/package/
+          cp LICENSE.txt dist/package/ 2>/dev/null || true
+          cp README.md dist/package/ 2>/dev/null || true
+          
+          # Create batch launcher
+          echo "@echo off" > dist/package/start-omnia.bat
+          echo "cd /d \"%~dp0\"" >> dist/package/start-omnia.bat
+          echo "omnia-backend.exe --port 5001" >> dist/package/start-omnia.bat
+          echo "pause" >> dist/package/start-omnia.bat
+      
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: omnia-windows
+          path: dist/package/
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyarmor nuitka ordered-set
+          pip install flask flask-cors requests
+      
+      - name: Obfuscate with PyArmor
+        run: |
+          pyarmor gen -O dist/obfuscated -r backend/
+          pyarmor gen -O dist/obfuscated -r src/omnia/
+      
+      - name: Build with Nuitka
+        run: |
+          python -m nuitka --standalone --onefile \
+            --output-dir=dist/nuitka-build \
+            --output-filename=omnia-backend \
+            --include-data-dir=seeds=seeds \
+            --include-data-dir=config=config \
+            --include-data-dir=web=web \
+            --include-package=flask \
+            --no-progressbar \
+            --assume-yes-for-downloads \
+            --macos-create-app-bundle \
+            backend/standalone_main.py
+      
+      - name: Create Package
+        run: |
+          mkdir -p dist/package
+          cp dist/nuitka-build/standalone_main.dist/omnia-backend dist/package/
+          chmod +x dist/package/omnia-backend
+          cp -r seeds dist/package/
+          cp -r config dist/package/
+          cp -r web dist/package/
+          cp tools/license_system.py dist/package/
+          cp LICENSE.txt dist/package/ 2>/dev/null || true
+          cp README.md dist/package/ 2>/dev/null || true
+          
+          # Create shell launcher
+          echo '#!/bin/bash' > dist/package/start-omnia.sh
+          echo 'cd "$(dirname "$0")"' >> dist/package/start-omnia.sh
+          echo './omnia-backend --port 5001' >> dist/package/start-omnia.sh
+          chmod +x dist/package/start-omnia.sh
+      
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: omnia-macos
+          path: dist/package/
+
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyarmor nuitka ordered-set
+          pip install flask flask-cors requests
+      
+      - name: Obfuscate with PyArmor
+        run: |
+          pyarmor gen -O dist/obfuscated -r backend/
+          pyarmor gen -O dist/obfuscated -r src/omnia/
+      
+      - name: Build with Nuitka
+        run: |
+          python -m nuitka --standalone --onefile \
+            --output-dir=dist/nuitka-build \
+            --output-filename=omnia-backend \
+            --include-data-dir=seeds=seeds \
+            --include-data-dir=config=config \
+            --include-data-dir=web=web \
+            --include-package=flask \
+            --no-progressbar \
+            --assume-yes-for-downloads \
+            backend/standalone_main.py
+      
+      - name: Create Package
+        run: |
+          mkdir -p dist/package
+          cp dist/nuitka-build/standalone_main.dist/omnia-backend dist/package/
+          chmod +x dist/package/omnia-backend
+          cp -r seeds dist/package/
+          cp -r config dist/package/
+          cp -r web dist/package/
+          cp tools/license_system.py dist/package/
+          cp LICENSE.txt dist/package/ 2>/dev/null || true
+          cp README.md dist/package/ 2>/dev/null || true
+          
+          # Create shell launcher
+          echo '#!/bin/bash' > dist/package/start-omnia.sh
+          echo 'cd "$(dirname "$0")"' >> dist/package/start-omnia.sh
+          echo './omnia-backend --port 5001' >> dist/package/start-omnia.sh
+          chmod +x dist/package/start-omnia.sh
+      
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: omnia-linux
+          path: dist/package/
+
+  release:
+    needs: [build-windows, build-macos, build-linux]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    
+    steps:
+      - name: Download All Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist/
+      
+      - name: Create Archives
+        run: |
+          cd dist
+          tar -czf omnia-linux-amd64.tar.gz omnia-linux/
+          tar -czf omnia-macos-amd64.tar.gz omnia-macos/
+          zip -r omnia-windows-amd64.zip omnia-windows/
+      
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            dist/omnia-linux-amd64.tar.gz
+            dist/omnia-macos-amd64.tar.gz
+            dist/omnia-windows-amd64.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

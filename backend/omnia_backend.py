@@ -609,7 +609,7 @@ def get_providers():
     """
     try:
         # 从环境变量读取配置
-deepseek_key = os.environ.get('DEEPSEEK_API_KEY', '')
+        deepseek_key = os.environ.get('DEEPSEEK_API_KEY', '')
         baidu_key = os.environ.get('QIANFAN_API_KEY', '')
         kimi_key = os.environ.get('MOONSHOT_API_KEY', '')
         
