@@ -313,7 +313,8 @@ async def _stream_chat_unified(
         has_seen_reasoning = False  # 追踪本轮是否进入过思考模式 (用于逻辑判断)
         finish_reason = None
         
-        # Kimi/Anthropic 格式 SSE 支持
+        # 标准 OpenAI SSE 格式（所有 provider 统一）
+        # Kimi 现在使用 OpenAI 兼容端点，不再需要 Anthropic 特殊处理
         anthropic_event_buffer = None
         current_tool_index = 0
         

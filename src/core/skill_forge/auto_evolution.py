@@ -98,7 +98,7 @@ class SelfEvolutionEngine:
         self,
         memory_dir: Optional[Path] = None,
         skills_dir: Optional[Path] = None,
-        auto_approve: bool = False,  # If True, auto-approve vetted skills
+        auto_approve: bool = True,  # If True, auto-approve vetted skills
         min_pattern_frequency: int = 3,  # Minimum occurrences to consider
         lookback_days: int = 14,  # How far back to analyze
     ):

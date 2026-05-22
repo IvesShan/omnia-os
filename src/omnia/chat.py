@@ -282,10 +282,12 @@ def _build_model_config(provider: str) -> tuple[str, str]:
         model = "qianfan-code-latest"
         print(f"[_build_model_config] Using Qianfan Coding: url={url}, model={model}")
     elif provider == "kimi":
-        # Kimi Coding API - 与 OpenClaw 配置一致
-        url = "https://api.kimi.com/coding/v1/messages"
-        model = "kimi-code"  # 使用 OpenClaw 相同的模型名
-        print(f"[_build_model_config] Using Kimi Coding: url={url}, model={model}")
+        # Kimi Coding Plan - OpenAI 兼容端点
+        # 参考: https://www.kimi.com/code/docs/third-party-tools/other-coding-agents.html
+        # Roo Code 配置: Base URL=https://api.kimi.com/coding/v1, Model=kimi-for-coding
+        url = "https://api.kimi.com/coding/v1/chat/completions"
+        model = "kimi-for-coding"
+        print(f"[_build_model_config] Using Kimi Coding (OpenAI compatible): url={url}, model={model}")
     elif provider == "deepseek":
         # DeepSeek API
         url = "https://api.deepseek.com/v1/chat/completions"
@@ -393,12 +395,7 @@ def _call_model_messages(api_key: str, provider: str, messages: list, tools: lis
         model_name = provider.replace("local-", "") if provider.startswith("local-") else None
         return call_local_llm(messages, tools, model_name)
     
-    # Kimi 使用 Anthropic Messages API 格式
-    if provider == "kimi":
-        model = os.environ.get("KIMI_MODEL", "K2.6-code-preview")
-        return call_kimi_anthropic(api_key, messages, tools, model)
-    
-    # 其他 provider 使用 OpenAI 格式
+    # 所有 provider 统一走 OpenAI 兼容格式
     url, model = _build_model_config(provider)
     
     headers = {
@@ -406,6 +403,11 @@ def _call_model_messages(api_key: str, provider: str, messages: list, tools: lis
         "User-Agent": "Omnia-Agent/1.0",
         "Accept": "application/json",
     }
+    
+    if provider == "kimi":
+        # Kimi Coding 需要白名单 User-Agent，否则 403
+        # OpenClaw 使用 "claude-code/0.1.0" 伪装
+        headers["User-Agent"] = "claude-code/0.1.0"
     
     if provider == "xiaomi":
         # Xiaomi MiMo Token Plan - 使用 api-key 头（非 Bearer）

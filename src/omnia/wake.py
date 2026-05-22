@@ -397,6 +397,9 @@ def assemble_wake_prompt(
     budget = TokenBudget(system_limit=8192)
     final_prompt, evicted, total_tokens = budget.enforce_system_prompt(components)
 
+    # 强制中文思考与回复
+    final_prompt += "\n\n## Language Rule\n无论用户用什么语言，你的思考过程（thinking）和最终回复都必须使用中文。不要输出英文思考内容。"
+
     return final_prompt
 
 

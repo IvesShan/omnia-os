@@ -463,6 +463,9 @@ class AgentEngine:
                 elif event_type == "thinking":
                     self._reasoning_content = event.get("content", "")
                     self._thinking_mode_active = True
+                    # Kimi 的 thinking 也是回复内容，累积到 full_content
+                    full_content += event.get("content") or ""
+                    total_content += event.get("content") or ""
                     yield event
 
                 elif event_type == "tool_call_end":

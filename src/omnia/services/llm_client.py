@@ -17,7 +17,7 @@ class LLMClient:
     # Provider 配置
     PROVIDER_URLS = {
         "deepseek": "https://api.deepseek.com/v1/chat/completions",
-        "kimi": "https://api.kimi.com/coding/v1/messages",
+        "kimi": "https://api.kimi.com/coding/v1/chat/completions",
         "xiaomi": "https://token-plan-cn.xiaomimimo.com/v1/chat/completions",
         "openai": "https://api.openai.com/v1/chat/completions",
         "qianfan": "https://qianfan.baidubce.com/v2/coding/chat/completions",
@@ -25,7 +25,7 @@ class LLMClient:
     
     PROVIDER_MODELS = {
         "deepseek": "deepseek-v4-pro",
-        "kimi": "kimi-code",
+        "kimi": "kimi-for-coding",
         "xiaomi": "mimo-v2.5-pro",
         "openai": "gpt-4o",
         "qianfan": "qianfan-code-latest",
@@ -79,6 +79,7 @@ class LLMClient:
             headers["api-key"] = api_key
         elif provider == "kimi":
             headers["Authorization"] = f"Bearer {api_key}"
+            headers["User-Agent"] = "claude-code/0.1.0"
         else:
             headers["Authorization"] = f"Bearer {api_key}"
         
@@ -118,7 +119,7 @@ class LLMClient:
             data = response.json()
             
             if provider == "kimi":
-                return self._parse_kimi_response(data)
+                return self._parse_openai_response(data)
             else:
                 return self._parse_openai_response(data)
         except httpx.HTTPStatusError as e:
@@ -217,7 +218,7 @@ class LLMClient:
         
         # Kimi 需要 max_tokens 参数
         if provider == "kimi":
-            body["max_tokens"] = 4096
+            body["max_tokens"] = 32768
         
         # 添加工具（如果支持）
         if tools and provider in self.API_TOOL_PROVIDERS:
@@ -233,7 +234,7 @@ class LLMClient:
                 
                 # Kimi/Anthropic 格式 SSE vs OpenAI 格式 SSE
                 if provider == "kimi":
-                    async for event in self._stream_anthropic(response):
+                    async for event in self._stream_openai(response):
                         yield event
                 else:
                     async for event in self._stream_openai(response):
@@ -268,10 +269,10 @@ class LLMClient:
                 if not line or line.startswith(":"):
                     continue
                 
-                if not line.startswith("data: "):
+                if not line.startswith("data:"):
                     continue
                 
-                data_str = line[6:]
+                data_str = line[5:].strip()
                 
                 if data_str == "[DONE]":
                     yield self._yield_done(tool_calls, full_content, full_reasoning)
@@ -296,15 +297,12 @@ class LLMClient:
                     full_content += content
                     yield {"type": "token", "content": content}
                 
-                # 推理内容 (DeepSeek/Xiaomi thinking mode)
+                # 推理内容 (Kimi/DeepSeek/Xiaomi thinking mode)
                 reasoning = delta.get("reasoning_content")
                 if reasoning:
                     full_reasoning += reasoning
-                    # 兼容旧客户端：如果 content 为空，将 reasoning 也作为 token 发送
-                    # 这样客户端不会看到空白回复
-                    if not content:
-                        full_content += reasoning
-                        yield {"type": "token", "content": reasoning}
+                    # full_content += reasoning  # 修复：避免污染最终输出
+                    # 只作为 thinking 发送，不作为 token（避免重复）
                     yield {"type": "thinking", "content": reasoning}
                 
                 # 工具调用（增量累积）
@@ -352,7 +350,7 @@ class LLMClient:
                 
                 # Anthropic 格式 SSE 有 event:xxx 和 data:xxx 两行 (注意没有空格)
                 if line.startswith("event:"):
-                    event_type = line[6:]
+                    event_type = line[5:].strip()
                     # 下一行应该是 data:...
                     if "\n" not in buffer:
                         # 数据还没来，把 event 放回 buffer

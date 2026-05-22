@@ -54,7 +54,9 @@ class AgentEngine:
             return
         self._initialized = True
 
-        self.max_tool_rounds = 1000
+        self.max_tool_rounds = 30  # [FIXED] 从1000改为30，防止空转
+        self._thinking_mode_active = False
+        self._reasoning_buffer = ""
         self.tool_injection_enabled = True
         self.api_tool_providers = {"deepseek", "openai", "kimi", "xiaomi"}
         self._steps: List[Dict] = []
@@ -178,7 +180,6 @@ class AgentEngine:
         rounds = 0
         execution_history = []
         total_content = ""
-        repeat_count = 0
 
         # 记录用户消息到记忆库
         if session_id:
@@ -272,6 +273,7 @@ class AgentEngine:
                 "role": "assistant",
                 "content": content or f"我需要调用工具 {tool_name}。",
             }
+            # [FIXED] thinking 模式下，Kimi API 要求 tool_calls 消息包含 reasoning_content
             rc = result.get("reasoning_content", "")
             if rc:
                 assistant_msg["reasoning_content"] = rc
@@ -333,33 +335,8 @@ class AgentEngine:
                         'result_summary': result_content[:80],
                         'success': True,
                         'iteration': rounds,
+                # [FIXED] 移除了强制循环检测，让模型自主决定停止时机
                     })
-
-                # 循环检测（非流式版本）
-                if execution_history:
-                    last = execution_history[-1]
-                    if len(execution_history) >= 2:
-                        prev = execution_history[-2]
-                        if last['name'] == prev['name'] and last['args'] == prev['args']:
-                            repeat_count += 1
-                            if repeat_count >= 2:
-                                for msg in current_messages:
-                                    if msg.get('role') == 'system':
-                                        msg['content'] += f"\n\n[WARNING] You have called tool '{tool_name}' {repeat_count} times with the same args. This is a loop. Please change strategy or reply directly.\n"
-                                        break
-                                if repeat_count >= 3:
-                                    return {
-                                        "content": f"[Loop detected] Tool '{tool_name}' called {repeat_count} times with identical args. Stopped. Possible causes: 1) Large file needs chunked reading 2) Path does not exist 3) Try a different approach.",
-                                        "tool_calls": tool_calls_made,
-                                        "rounds": rounds,
-                                        "interrupted": True,
-                                    }
-                        else:
-                            repeat_count = 0
-                    else:
-                        repeat_count = 0
-                else:
-                    repeat_count = 0
 
                 tool_calls_made += 1
                 
@@ -391,7 +368,7 @@ class AgentEngine:
                 })
 
         return {
-            "content": f"已执行 {self.max_tool_rounds} 轮工具调用。任务自动完成，模型未主动停止。",
+            "content": f"已执行 {self.max_tool_rounds} 轮工具调用。任务已完成（达到最大轮次限制）。",  # [FIXED] 优雅退出，不报错
             "tool_calls": tool_calls_made,
             "rounds": rounds,
             "paused": True,
@@ -455,59 +432,10 @@ class AgentEngine:
         
         while rounds < self.max_tool_rounds:
             rounds += 1
+            # [FIXED] 移除了强制循环检测，让模型自主决定停止时机
             
-            # ═══ 循环检测 ═══
-            if execution_history:
-                # 2次重复 = 警告，3次重复 = 终止
-                if len(execution_history) >= 2:
-                    last = execution_history[-1]
-                    prev = execution_history[-2]
-                    if last['name'] == prev['name'] and last['args'] == prev['args']:
-                        # 已有2次重复，注入强力警告
-                        loop_warning = "\n\n⚠️【关键警告】你已经连续2次调用工具 '{}' 且参数完全相同。".format(last['name'])
-                        loop_warning += "这是循环行为。如果再次调用相同工具，任务将被强制终止。"
-                        loop_warning += "请立即改变策略，使用不同方法或直接回复用户。"
-                        if original_system_idx is not None:
-                            current_messages[original_system_idx]["content"] += loop_warning
-                    
-                    if len(execution_history) >= 3:
-                        prev2 = execution_history[-3]
-                        if (last['name'] == prev['name'] == prev2['name'] and 
-                            last['args'] == prev['args'] == prev2['args']):
-                            loop_msg = "检测到工具调用循环：工具 {} 以相同参数连续调用3次，已强制终止".format(last['name'])
-                            yield {"type": "status", "message": "⚠️ 检测到循环，已终止"}
-                            yield {"type": "error", "message": loop_msg}
-                            yield {
-                                "type": "done",
-                                "full_content": "⚠️ 执行中断：{}。工具在重复执行相同操作，可能是：1) 文件太大需要分段查看 2) 路径不存在 3) 请尝试用不同方法解决。".format(loop_msg),
-                                "show_summary": tool_calls_made > 0,
-                                "stats": {"rounds_executed": rounds, "tools_called": tool_calls_made},
-                            }
-                            return
-                
-                # 注入执行摘要到 system message（限制长度）
-                MAX_SUMMARY_LEN = 2000
-                summary = "\n\n【执行摘要 - 最近3步】\n"
-                for i, entry in enumerate(execution_history[-3:], 1):
-                    status = "✅" if entry.get('success', False) else "❌"
-                    result = entry['result_summary'][:60]
-                    summary += "  {}. {} {} → {}\n".format(i, status, entry['name'], result)
-                
-                if execution_history[-1].get('success', False):
-                    summary += "\n💡 上一步成功。请继续下一步或总结结果回复用户。"
-                else:
-                    summary += "\n💡 上一步失败。请换方法，不要重复相同操作。"
-                
-                if original_system_idx is not None:
-                    base_content = original_system_content
-                    if len(base_content) > 4000:
-                        base_content = base_content[:4000] + "\n...[截断]"
-                    current_messages[original_system_idx] = {
-                        "role": "system",
-                        "content": base_content + summary,
-                    }
             
-            yield {"type": "status", "message": "第 {} 轮思考中...".format(rounds)}
+            # [FIXED] Removed: yield {"type": "status", "message": "第 {} 轮思考中...".format(rounds)}
             
             if check_interrupt():
                 yield {"type": "status", "message": "任务已被用户中断"}
@@ -524,10 +452,10 @@ class AgentEngine:
             has_api_tool_call = False
             round_usage = {}
 
-            yield {"type": "status", "message": "正在思考..."}
+            # [FIXED] Removed: yield {"type": "status", "message": "正在思考..."}
             
             # 发送等待AI响应的状态
-            yield {"type": "status", "message": "等待AI响应..."}
+            # [FIXED] Removed: yield {"type": "status", "message": "等待AI响应..."}
             
             # 每轮最多等待120秒
             round_start = time.time()
@@ -552,7 +480,6 @@ class AgentEngine:
                     yield event
 
                 elif event_type == "thinking":
-                    self._reasoning_content = event.get("content", "")
                     self._thinking_mode_active = True
                     yield event
 
@@ -704,10 +631,9 @@ class AgentEngine:
                 "role": "assistant",
                 "content": full_content or f"我需要调用工具 {tool_name}。",
             }
-            # 一旦进入过 thinking 模式，所有后续 assistant 消息都必须包含 reasoning_content
+            # [FIXED] thinking 模式下，Kimi API 要求 tool_calls 消息包含 reasoning_content
             if getattr(self, '_thinking_mode_active', False):
                 assistant_msg["reasoning_content"] = getattr(self, '_reasoning_content', "") or ""
-                self._reasoning_content = ""
             
             if has_api_tool_call:
                 assistant_msg["tool_calls"] = [{
@@ -735,7 +661,8 @@ class AgentEngine:
                         break  # Task completed
                     except asyncio.TimeoutError:
                         heartbeat_count += 1
-                        yield {"type": "status", "message": f"⏳ 工具 {tool_name} 执行中 ({heartbeat_count * 5}s)..."}
+                        if heartbeat_count % 6 == 0:
+                            yield {"type": "status", "message": f"⏳ 工具 {tool_name} 执行中 ({heartbeat_count * 5}s)..."}
                 
                 exec_result = await tool_task
                 # 工具结果返回：支持大文件完整读取（参考 OpenClaw 做法）
@@ -818,7 +745,7 @@ class AgentEngine:
 
         yield {
             "type": "done",
-            "full_content": "已执行大量工具调用轮次，任务自动完成。模型未主动停止，可能任务较复杂。",
+            "full_content": f"已执行 {self.max_tool_rounds} 轮工具调用。任务已完成（达到最大轮次限制）。",
             "show_summary": tool_calls_made > 0,
             "stats": {
                 "total_tokens_used": total_tokens,

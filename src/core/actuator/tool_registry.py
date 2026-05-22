@@ -113,7 +113,7 @@ TOOLS_SCHEMA: List[Dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "web_search",
-            "description": "Search the web using Kimi. Returns AI-synthesized answer with citations. Use for up-to-date facts, documentation, troubleshooting.",
+            "description": "Search the web using Sogou (国内搜索引擎). Returns search results with titles and links. Use for up-to-date facts, documentation, troubleshooting.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -242,53 +242,66 @@ def tool_list_directory(path: str) -> Dict[str, Any]:
         return {"error": str(e)}
 
 
-
 def tool_web_search(query: str) -> Dict[str, Any]:
-    """Search the web using Bing HTML scraping.
+    """Search the web using Sogou (国内环境，更稳定).
     
-    NOTE: ddgs library causes DEADLOCK when called from ThreadPoolExecutor.
-    We use direct HTTP requests to Bing instead.
+    Uses direct HTTP requests to Sogou search engine.
     """
     import re
     import requests
     from urllib.parse import quote_plus
     
     try:
-        url = "https://www.bing.com/search?q=" + quote_plus(query)
+        url = "https://www.sogou.com/web?query=" + quote_plus(query)
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "Accept-Language": "en-US,en;q=0.5",
+            "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
         }
         resp = requests.get(url, headers=headers, timeout=10)
         
         if resp.status_code != 200:
-            return {"query": query, "error": f"Bing returned status {resp.status_code}"}
+            return {"query": query, "error": f"Sogou returned status {resp.status_code}"}
         
         html = resp.text
         
-        # Extract search results
-        all_links = re.findall(r'href="(https?://([^"]+))"[^>]*>([^<]+)</a>', html)
-        seen_urls = set()
-        results = []
+        # Extract search results from Sogou
+        # Sogou's result titles are in <h3> tags
+        h3_pattern = r'<h3[^>]*>(.*?)</h3>'
+        h3_matches = re.findall(h3_pattern, html, re.DOTALL)
         
-        for full_url, domain, link_text in all_links:
-            # Skip bing's own links and short links
-            if 'bing.com' in domain or 'microsoft.com' in domain:
-                continue
-            if len(link_text.strip()) < 5:
-                continue
-            if full_url in seen_urls:
-                continue
-            seen_urls.add(full_url)
+        results = []
+        seen_titles = set()
+        
+        for h3_content in h3_matches[:10]:  # 只取前10个
+            # 提取链接和标题
+            link_pattern = r'<a[^>]*href="([^"]+)"[^>]*>(.*?)</a>'
+            links = re.findall(link_pattern, h3_content, re.DOTALL)
             
-            title = re.sub(r'<[^>]+>', '', link_text).strip()
-            if title and len(results) < 5:
-                results.append({"title": title, "href": full_url})
+            for href, text in links:
+                # 清理标题中的HTML标签
+                title = re.sub(r'<[^>]+>', '', text).strip()
+                
+                # 跳过太短的标题或重复的标题
+                if len(title) < 3 or title in seen_titles:
+                    continue
+                
+                # 跳过搜狗自己的链接（但保留搜狗重定向链接）
+                if 'sogou.com' in href and '/link?' not in href:
+                    continue
+                
+                seen_titles.add(title)
+                results.append({"title": title, "href": href})
+                
+                if len(results) >= 5:
+                    break
+            
+            if len(results) >= 5:
+                break
         
         if results:
-            lines = ["**" + r['title'] + "**\n<" + r['href'] + ">" for r in results]
-            return {"query": query, "engine": "bing", "result": "\n\n".join(lines)}
+            lines = [f"**{r['title']}**\n<{r['href']}>" for r in results]
+            return {"query": query, "engine": "sogou", "result": "\n\n".join(lines)}
         
         return {"query": query, "error": "No results found"}
         
@@ -296,7 +309,6 @@ def tool_web_search(query: str) -> Dict[str, Any]:
         return {"query": query, "error": "Search timeout after 10s"}
     except Exception as e:
         return {"query": query, "error": str(e)}
-
 
 
 def tool_query_memory(query: str, layer: str = "all") -> Dict[str, Any]:
