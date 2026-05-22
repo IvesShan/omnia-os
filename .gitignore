@@ -114,3 +114,4 @@ skills/.omnia/
 # 自动上下文文件
 last_context.json
 last_context.md
+nuitka-crash-report.xml
