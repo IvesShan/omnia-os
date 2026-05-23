@@ -93,17 +93,18 @@ class LLMClient:
         return self.PROVIDER_MODELS.get(provider, "unknown")
     
     async def chat(self, messages: List[dict], provider: str = "deepseek", 
-                   tools: List[dict] = None, stream: bool = False) -> dict:
-        """非流式聊天"""
+                   tools: List[dict] = None, stream: bool = False, 
+                   max_retries: int = 2) -> dict:
+        """非流式聊天（带重试）"""
         api_key = self._load_api_key(provider)
         if not api_key:
-            return {"content": f"❌ 未配置 {provider} API Key", "error": "missing_api_key"}
+            return {"content": f"未配置 {provider} API Key", "error": "missing_api_key"}
         
         url = self.PROVIDER_URLS.get(provider)
         model = self._get_model(provider)
         
         if not url:
-            return {"content": f"❌ 不支持的 Provider: {provider}", "error": "unsupported_provider"}
+            return {"content": f"不支持的 Provider: {provider}", "error": "unsupported_provider"}
         
         body = {"model": model, "messages": messages, "stream": False}
         
@@ -113,20 +114,49 @@ class LLMClient:
         
         headers = self._build_headers(api_key, provider)
         
-        try:
-            response = await self.client.post(url, json=body, headers=headers)
-            response.raise_for_status()
-            data = response.json()
-            
-            if provider == "kimi":
+        # Retry loop
+        last_error = None
+        for attempt in range(max_retries + 1):
+            try:
+                response = await self.client.post(url, json=body, headers=headers)
+                response.raise_for_status()
+                data = response.json()
                 return self._parse_openai_response(data)
-            else:
-                return self._parse_openai_response(data)
-        except httpx.HTTPStatusError as e:
-            error_msg = f"API 调用失败: {e.response.status_code}"
-            return {"content": f"❌ {error_msg}", "error": error_msg}
-        except Exception as e:
-            return {"content": f"❌ 请求异常: {str(e)}", "error": str(e)}
+                
+            except httpx.HTTPStatusError as e:
+                # API returned error status (4xx, 5xx)
+                status_code = e.response.status_code
+                try:
+                    err_body = await e.response.aread()
+                    err_text = err_body.decode('utf-8', errors='replace')[:500]
+                except:
+                    err_text = ""
+                
+                last_error = f"API 错误 ({status_code}): {err_text}"
+                
+                # Don't retry on 4xx errors (client errors)
+                if 400 <= status_code < 500:
+                    break
+                    
+            except httpx.TimeoutException as e:
+                last_error = f"请求超时: {str(e)}"
+                # Timeout is retryable
+                
+            except httpx.ConnectError as e:
+                last_error = f"连接失败: {str(e)}"
+                # Connection error is retryable
+                
+            except Exception as e:
+                last_error = f"请求异常: {str(e)}"
+                # Unknown errors: retry once
+                
+            if attempt < max_retries:
+                wait_time = 2 ** attempt  # Exponential backoff: 1s, 2s
+                print(f"[LLMClient] Retry {attempt + 1}/{max_retries} after {wait_time}s: {last_error}")
+                await asyncio.sleep(wait_time)
+        
+        # All retries exhausted
+        return {"content": f"请求失败: {last_error}", "error": last_error}
     
     def _parse_openai_response(self, data: dict) -> dict:
         """解析 OpenAI 格式响应"""
@@ -191,6 +221,7 @@ class LLMClient:
         messages: List[dict],
         provider: str = "deepseek",
         tools: Optional[List[dict]] = None,
+        max_retries: int = 1,
     ) -> AsyncGenerator[dict, None]:
         """
         流式聊天

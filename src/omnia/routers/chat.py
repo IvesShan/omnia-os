@@ -71,6 +71,28 @@ async def chat(
     if not messages:
         raise HTTPException(status_code=400, detail="消息不能为空")
 
+    # ===== 注入 Omnia 身份定义 =====
+    has_system = any(m.get("role") == "system" for m in messages)
+    identity = "你是Omnia，永不遗忘的操作系统。你是独立项目，不是OpenClaw网关，也不是Infinite。"
+    if has_system:
+        for m in messages:
+            if m.get("role") == "system":
+                m["content"] = identity + " " + m["content"]
+                break
+    else:
+        messages.insert(0, {"role": "system", "content": identity})
+
+    # ===== 注入 Omnia 身份定义 =====
+    has_system = any(m.get("role") == "system" for m in messages)
+    identity = "你是Omnia，永不遗忘的操作系统。你是独立项目，不是OpenClaw网关，也不是Infinite。"
+    if has_system:
+        for m in messages:
+            if m.get("role") == "system":
+                m["content"] = identity + " " + m["content"]
+                break
+    else:
+        messages.insert(0, {"role": "system", "content": identity})
+
     # 检测 Provider
     provider = req.provider or settings.current_provider or _detect_provider_from_env()
 
