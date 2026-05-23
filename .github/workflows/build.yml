@@ -20,7 +20,7 @@ jobs:
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pyarmor nuitka ordered-set
+          pip install pyarmor nuitka ordered-set zstandard
           pip install flask flask-cors requests
       
       - name: Obfuscate with PyArmor
@@ -41,22 +41,30 @@ jobs:
             --assume-yes-for-downloads `
             backend/standalone_main.py
       
-      - name: Create Package
+      - name: Find and Package Binary
         run: |
           mkdir -p dist/package
-          cp dist/nuitka-build/standalone_main.dist/omnia-backend.exe dist/package/
-          cp -r seeds dist/package/
-          cp -r config dist/package/
-          cp -r web dist/package/
-          cp tools/license_system.py dist/package/
-          cp LICENSE.txt dist/package/ 2>/dev/null || true
-          cp README.md dist/package/ 2>/dev/null || true
+          # Nuitka with --onefile outputs directly to output-dir
+          $binary = Get-ChildItem -Path dist/nuitka-build -Filter "omnia-backend.exe" -Recurse | Select-Object -First 1
+          if ($binary) {
+            Copy-Item $binary.FullName dist/package/
+          } else {
+            Write-Error "Binary not found!"
+            Get-ChildItem -Path dist/nuitka-build -Recurse | ForEach-Object { Write-Host $_.FullName }
+            exit 1
+          }
+          Copy-Item -Recurse seeds dist/package/
+          Copy-Item -Recurse config dist/package/
+          Copy-Item -Recurse web dist/package/
+          Copy-Item tools/license_system.py dist/package/
+          Copy-Item LICENSE.txt dist/package/ -ErrorAction SilentlyContinue
+          Copy-Item README.md dist/package/ -ErrorAction SilentlyContinue
           
           # Create batch launcher
-          echo "@echo off" > dist/package/start-omnia.bat
-          echo "cd /d \"%~dp0\"" >> dist/package/start-omnia.bat
-          echo "omnia-backend.exe --port 5001" >> dist/package/start-omnia.bat
-          echo "pause" >> dist/package/start-omnia.bat
+          "@echo off" | Out-File -FilePath dist/package/start-omnia.bat -Encoding ASCII
+          "cd /d `"%~dp0`"" | Out-File -FilePath dist/package/start-omnia.bat -Append -Encoding ASCII
+          "omnia-backend.exe --port 5001" | Out-File -FilePath dist/package/start-omnia.bat -Append -Encoding ASCII
+          "pause" | Out-File -FilePath dist/package/start-omnia.bat -Append -Encoding ASCII
       
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
@@ -77,7 +85,7 @@ jobs:
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pyarmor nuitka ordered-set
+          pip install pyarmor nuitka ordered-set zstandard
           pip install flask flask-cors requests
       
       - name: Obfuscate with PyArmor
@@ -99,10 +107,17 @@ jobs:
             --macos-create-app-bundle \
             backend/standalone_main.py
       
-      - name: Create Package
+      - name: Find and Package Binary
         run: |
           mkdir -p dist/package
-          cp dist/nuitka-build/standalone_main.dist/omnia-backend dist/package/
+          # Find the binary (could be in subdirectory or directly in output dir)
+          BINARY=$(find dist/nuitka-build -name "omnia-backend" -type f | head -1)
+          if [ -z "$BINARY" ]; then
+            echo "Error: Binary not found!"
+            find dist/nuitka-build -type f
+            exit 1
+          fi
+          cp "$BINARY" dist/package/
           chmod +x dist/package/omnia-backend
           cp -r seeds dist/package/
           cp -r config dist/package/
@@ -136,7 +151,7 @@ jobs:
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pyarmor nuitka ordered-set
+          pip install pyarmor nuitka ordered-set zstandard
           pip install flask flask-cors requests
       
       - name: Obfuscate with PyArmor
@@ -157,10 +172,17 @@ jobs:
             --assume-yes-for-downloads \
             backend/standalone_main.py
       
-      - name: Create Package
+      - name: Find and Package Binary
         run: |
           mkdir -p dist/package
-          cp dist/nuitka-build/standalone_main.dist/omnia-backend dist/package/
+          # Find the binary (could be in subdirectory or directly in output dir)
+          BINARY=$(find dist/nuitka-build -name "omnia-backend" -type f | head -1)
+          if [ -z "$BINARY" ]; then
+            echo "Error: Binary not found!"
+            find dist/nuitka-build -type f
+            exit 1
+          fi
+          cp "$BINARY" dist/package/
           chmod +x dist/package/omnia-backend
           cp -r seeds dist/package/
           cp -r config dist/package/
