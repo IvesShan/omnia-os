@@ -37,6 +37,7 @@ jobs:
             --include-data-dir=config=config `
             --include-data-dir=web=web `
             --include-package=flask `
+            --include-package=sqlite3 `
             --no-progressbar `
             --assume-yes-for-downloads `
             backend/standalone_main.py
@@ -56,13 +57,24 @@ jobs:
           Copy-Item -Recurse seeds dist/package/
           Copy-Item -Recurse config dist/package/
           Copy-Item -Recurse web dist/package/
-          Copy-Item tools/license_system.py dist/package/
+          # 🔐 复制授权系统文件
+          New-Item -ItemType Directory -Path dist/package/tools -Force
+          Copy-Item tools/license_system.py dist/package/tools/
+          Copy-Item tools/keygen.py dist/package/tools/
           Copy-Item LICENSE.txt dist/package/ -ErrorAction SilentlyContinue
           Copy-Item README.md dist/package/ -ErrorAction SilentlyContinue
           
           # Create batch launcher
           "@echo off" | Out-File -FilePath dist/package/start-omnia.bat -Encoding ASCII
           "cd /d `"%~dp0`"" | Out-File -FilePath dist/package/start-omnia.bat -Append -Encoding ASCII
+          "echo." | Out-File -FilePath dist/package/start-omnia.bat -Append -Encoding ASCII
+          "echo  =========================================" | Out-File -FilePath dist/package/start-omnia.bat -Append -Encoding ASCII
+          "echo   Omnia AIOS v1.2.0" | Out-File -FilePath dist/package/start-omnia.bat -Append -Encoding ASCII
+          "echo  =========================================" | Out-File -FilePath dist/package/start-omnia.bat -Append -Encoding ASCII
+          "echo   Starting server..." | Out-File -FilePath dist/package/start-omnia.bat -Append -Encoding ASCII
+          "echo   Open http://127.0.0.1:5001/license to activate" | Out-File -FilePath dist/package/start-omnia.bat -Append -Encoding ASCII
+          "echo  =========================================" | Out-File -FilePath dist/package/start-omnia.bat -Append -Encoding ASCII
+          "echo." | Out-File -FilePath dist/package/start-omnia.bat -Append -Encoding ASCII
           "omnia-backend.exe --port 5001" | Out-File -FilePath dist/package/start-omnia.bat -Append -Encoding ASCII
           "pause" | Out-File -FilePath dist/package/start-omnia.bat -Append -Encoding ASCII
       
@@ -102,6 +114,7 @@ jobs:
             --include-data-dir=config=config \
             --include-data-dir=web=web \
             --include-package=flask \
+            --include-package=sqlite3 \
             --no-progressbar \
             --assume-yes-for-downloads \
             --macos-create-app-bundle \
@@ -122,14 +135,25 @@ jobs:
           cp -r seeds dist/package/
           cp -r config dist/package/
           cp -r web dist/package/
-          cp tools/license_system.py dist/package/
+          # 🔐 复制授权系统文件
+          mkdir -p dist/package/tools
+          cp tools/license_system.py dist/package/tools/
+          cp tools/keygen.py dist/package/tools/
           cp LICENSE.txt dist/package/ 2>/dev/null || true
           cp README.md dist/package/ 2>/dev/null || true
           
           # Create shell launcher
-          echo '#!/bin/bash' > dist/package/start-omnia.sh
-          echo 'cd "$(dirname "$0")"' >> dist/package/start-omnia.sh
-          echo './omnia-backend --port 5001' >> dist/package/start-omnia.sh
+          cat > dist/package/start-omnia.sh << 'LAUNCHER'
+          #!/bin/bash
+          echo "========================================="
+          echo "  Omnia AIOS v1.2.0"
+          echo "========================================="
+          echo "  Starting server..."
+          echo "  Open http://127.0.0.1:5001/license to activate"
+          echo "========================================="
+          cd "$(dirname "$0")"
+          ./omnia-backend --port 5001
+          LAUNCHER
           chmod +x dist/package/start-omnia.sh
       
       - name: Upload Artifact
@@ -168,6 +192,7 @@ jobs:
             --include-data-dir=config=config \
             --include-data-dir=web=web \
             --include-package=flask \
+            --include-package=sqlite3 \
             --no-progressbar \
             --assume-yes-for-downloads \
             backend/standalone_main.py
@@ -187,14 +212,25 @@ jobs:
           cp -r seeds dist/package/
           cp -r config dist/package/
           cp -r web dist/package/
-          cp tools/license_system.py dist/package/
+          # 🔐 复制授权系统文件
+          mkdir -p dist/package/tools
+          cp tools/license_system.py dist/package/tools/
+          cp tools/keygen.py dist/package/tools/
           cp LICENSE.txt dist/package/ 2>/dev/null || true
           cp README.md dist/package/ 2>/dev/null || true
           
           # Create shell launcher
-          echo '#!/bin/bash' > dist/package/start-omnia.sh
-          echo 'cd "$(dirname "$0")"' >> dist/package/start-omnia.sh
-          echo './omnia-backend --port 5001' >> dist/package/start-omnia.sh
+          cat > dist/package/start-omnia.sh << 'LAUNCHER'
+          #!/bin/bash
+          echo "========================================="
+          echo "  Omnia AIOS v1.2.0"
+          echo "========================================="
+          echo "  Starting server..."
+          echo "  Open http://127.0.0.1:5001/license to activate"
+          echo "========================================="
+          cd "$(dirname "$0")"
+          ./omnia-backend --port 5001
+          LAUNCHER
           chmod +x dist/package/start-omnia.sh
       
       - name: Upload Artifact
