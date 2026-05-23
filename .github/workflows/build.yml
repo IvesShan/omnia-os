@@ -6,6 +6,9 @@ on:
       - 'v*'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build-windows:
     runs-on: windows-latest
@@ -45,7 +48,6 @@ jobs:
       - name: Find and Package Binary
         run: |
           mkdir -p dist/package
-          # Nuitka with --onefile outputs directly to output-dir
           $binary = Get-ChildItem -Path dist/nuitka-build -Filter "omnia-backend.exe" -Recurse | Select-Object -First 1
           if ($binary) {
             Copy-Item $binary.FullName dist/package/
@@ -57,14 +59,12 @@ jobs:
           Copy-Item -Recurse seeds dist/package/
           Copy-Item -Recurse config dist/package/
           Copy-Item -Recurse web dist/package/
-          # 🔐 复制授权系统文件
           New-Item -ItemType Directory -Path dist/package/tools -Force
           Copy-Item tools/license_system.py dist/package/tools/
           Copy-Item tools/keygen.py dist/package/tools/
           Copy-Item LICENSE.txt dist/package/ -ErrorAction SilentlyContinue
           Copy-Item README.md dist/package/ -ErrorAction SilentlyContinue
           
-          # Create batch launcher
           "@echo off" | Out-File -FilePath dist/package/start-omnia.bat -Encoding ASCII
           "cd /d `"%~dp0`"" | Out-File -FilePath dist/package/start-omnia.bat -Append -Encoding ASCII
           "echo." | Out-File -FilePath dist/package/start-omnia.bat -Append -Encoding ASCII
@@ -123,7 +123,6 @@ jobs:
       - name: Find and Package Binary
         run: |
           mkdir -p dist/package
-          # Find the binary (could be in subdirectory or directly in output dir)
           BINARY=$(find dist/nuitka-build -name "omnia-backend" -type f | head -1)
           if [ -z "$BINARY" ]; then
             echo "Error: Binary not found!"
@@ -135,14 +134,12 @@ jobs:
           cp -r seeds dist/package/
           cp -r config dist/package/
           cp -r web dist/package/
-          # 🔐 复制授权系统文件
           mkdir -p dist/package/tools
           cp tools/license_system.py dist/package/tools/
           cp tools/keygen.py dist/package/tools/
           cp LICENSE.txt dist/package/ 2>/dev/null || true
           cp README.md dist/package/ 2>/dev/null || true
           
-          # Create shell launcher
           cat > dist/package/start-omnia.sh << 'LAUNCHER'
           #!/bin/bash
           echo "========================================="
@@ -200,7 +197,6 @@ jobs:
       - name: Find and Package Binary
         run: |
           mkdir -p dist/package
-          # Find the binary (could be in subdirectory or directly in output dir)
           BINARY=$(find dist/nuitka-build -name "omnia-backend" -type f | head -1)
           if [ -z "$BINARY" ]; then
             echo "Error: Binary not found!"
@@ -212,14 +208,12 @@ jobs:
           cp -r seeds dist/package/
           cp -r config dist/package/
           cp -r web dist/package/
-          # 🔐 复制授权系统文件
           mkdir -p dist/package/tools
           cp tools/license_system.py dist/package/tools/
           cp tools/keygen.py dist/package/tools/
           cp LICENSE.txt dist/package/ 2>/dev/null || true
           cp README.md dist/package/ 2>/dev/null || true
           
-          # Create shell launcher
           cat > dist/package/start-omnia.sh << 'LAUNCHER'
           #!/bin/bash
           echo "========================================="
@@ -258,11 +252,12 @@ jobs:
           zip -r omnia-windows-amd64.zip omnia-windows/
       
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           files: |
             dist/omnia-linux-amd64.tar.gz
             dist/omnia-macos-amd64.tar.gz
             dist/omnia-windows-amd64.zip
+          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
