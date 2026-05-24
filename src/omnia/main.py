@@ -1,10 +1,22 @@
 """
 Omnia FastAPI 主入口
 """
+import os
 import sys
 from pathlib import Path
-_PROJECT_ROOT = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(_PROJECT_ROOT / "src"))
+
+# 打包模式：通过环境变量获取路径，避免 __file__ 指向错误位置
+_root = os.environ.get("OMNIA_ROOT")
+if _root:
+    _PROJECT_ROOT = Path(_root)
+else:
+    # 开发模式：通过 __file__ 推断
+    _PROJECT_ROOT = Path(__file__).parent.parent.parent
+
+# 确保 src 目录在 sys.path 中
+_src_path = str(_PROJECT_ROOT / "src")
+if _src_path not in sys.path:
+    sys.path.insert(0, _src_path)
 
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -22,6 +34,7 @@ async def lifespan(app: FastAPI):
     """应用生命周期管理"""
     # ===== 启动时初始化 =====
     print(f"[Omnia] Starting FastAPI server on {settings.host}:{settings.port}")
+    print(f"[Omnia] Project root: {settings.project_root}")
     print(f"[Omnia] Debug mode: {settings.debug}")
     print(f"[Omnia] Current provider: {settings.current_provider or 'auto'}")
 

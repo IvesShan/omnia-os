@@ -1,57 +1,71 @@
-"""
-Omnia FastAPI 独立打包入口
-用于 Nuitka 打包的 FastAPI 版本
-"""
-import sys
 import os
-import argparse
+import sys
+import uvicorn
+import threading
+import webbrowser
+import time
+import socket
 from pathlib import Path
 
-# 打包后路径处理
-if getattr(sys, 'frozen', False):
-    # Nuitka 打包后的路径
-    PROJECT_ROOT = Path(sys.executable).parent
-else:
-    # 开发环境路径
-    PROJECT_ROOT = Path(__file__).parent.parent.parent
-
-# 确保 src 目录在 Python 路径中
-sys.path.insert(0, str(PROJECT_ROOT / "src"))
-
-# 设置环境变量
-os.environ["OMNIA_PROJECT_ROOT"] = str(PROJECT_ROOT)
-os.environ["OMNIA_PORTABLE_MODE"] = "1"
-
+def is_port_in_use(port):
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        try:
+            s.bind(('127.0.0.1', port))
+            return False
+        except OSError:
+            return True
 
 def main():
-    """FastAPI 启动入口"""
-    import uvicorn
-    
-    parser = argparse.ArgumentParser(description="Omnia AIOS - FastAPI Version")
-    parser.add_argument("--host", default="127.0.0.1", help="Bind address")
-    parser.add_argument("--port", type=int, default=8765, help="Port number")
-    parser.add_argument("--debug", action="store_true", help="Enable debug mode")
-    args = parser.parse_args()
-    
-    print("=" * 60)
-    print("  Omnia AIOS v2.0.0 (FastAPI)")
-    print("=" * 60)
-    print(f"  Starting server on {args.host}:{args.port}")
-    print(f"  Project root: {PROJECT_ROOT}")
-    print(f"  Debug mode: {args.debug}")
-    print("=" * 60)
-    print()
-    
-    # 导入 FastAPI 应用
-    from src.omnia.main import app
-    
-    uvicorn.run(
-        app,
-        host=args.host,
-        port=args.port,
-        log_level="debug" if args.debug else "info"
-    )
+    # Determine the base path (next to the executable)
+    if getattr(sys, 'frozen', False):
+        # Running as compiled executable
+        base_path = Path(sys.executable).parent
+    else:
+        # Running in a normal Python environment
+        base_path = Path(__file__).parent
 
+    # --- 关键修复：设置环境变量，供子模块(config.py)使用 ---
+    os.environ["OMNIA_ROOT"] = str(base_path)
+    
+    # --- 关键修复：设置 sys.path，确保 import 语句能工作 ---
+    current_path_str = str(base_path)
+    if current_path_str not in sys.path:
+        sys.path.insert(0, current_path_str)
+
+    # Now it is safe to import the FastAPI app
+    try:
+        # This 'import app' will trigger the loading of config.py and routers
+        from src.omnia.main import app 
+    except Exception as e:
+        print(f"启动失败: {e}")
+        import traceback
+        traceback.print_exc()
+        input("按回车键退出...")
+        return
+
+    port = 8765
+    host = "0.0.0.0"
+
+    print(f"\n🚀 Omnia Personal OS is running!")
+    print(f"👉 Open in browser: http://127.0.0.1:{port}")
+    print("   Press Ctrl+C to stop the server.\n")
+
+    def open_browser():
+        time.sleep(2)
+        if not is_port_in_use(port):
+             webbrowser.open(f"http://127.0.0.1:{port}/license")
+
+    # Open browser automatically
+    try:
+        if os.environ.get("DISPLAY") or sys.platform == "win32" or sys.platform == "darwin":
+            threading.Thread(target=open_browser, daemon=True).start()
+    except:
+        pass
+
+    try:
+        uvicorn.run(app, host=host, port=port, log_level="info")
+    except KeyboardInterrupt:
+        print("\n🛑 Server stopped.")
 
 if __name__ == "__main__":
     main()

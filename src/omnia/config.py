@@ -3,11 +3,28 @@ Omnia 配置管理
 使用 pydantic-settings 统一管理配置
 """
 
+import os
 from pathlib import Path
 from typing import Optional, Dict, Any
 
 import yaml
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+def _get_project_root() -> Path:
+    """
+    智能获取项目根目录，兼容 Nuitka 打包和开发环境。
+    优先级：
+    1. 环境变量 OMNIA_ROOT (由 standalone_main.py 在打包模式下设置)
+    2. 通过 __file__ 路径推断 (开发模式)
+    """
+    # 打包模式下，standalone_main.py 会设置这个环境变量
+    root = os.environ.get("OMNIA_ROOT")
+    if root:
+        return Path(root)
+
+    # 开发模式下，通过文件位置推断
+    return Path(__file__).parent.parent.parent
 
 
 class Settings(BaseSettings):
@@ -20,8 +37,8 @@ class Settings(BaseSettings):
         extra="ignore"
     )
     
-    # 项目路径
-    project_root: Path = Path(__file__).parent.parent.parent
+    # 项目路径 (智能推断)
+    project_root: Path = _get_project_root()
     
     # Omnia 主目录（保持与旧版本一致）
     omnia_home: Path = Path.home() / ".omnia"
