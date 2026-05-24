@@ -9,8 +9,9 @@ from pathlib import Path
 _root = os.environ.get("OMNIA_ROOT")
 if _root:
     _PROJECT_ROOT = Path(_root)
-    # 打包模式下 src 已编译进可执行文件，不需要手动添加 sys.path
-    # Nuitka --standalone 会自动处理 src 包的导入
+    # Nuitka --standalone 会把 src 子包编译进可执行文件
+    # 但需要确保临时解压目录也在 sys.path 中
+    # standalone_main.py 已经处理了，这里不再重复添加
 else:
     # 开发模式：通过 __file__ 推断
     _PROJECT_ROOT = Path(__file__).parent.parent.parent

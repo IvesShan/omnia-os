@@ -27,6 +27,7 @@ jobs:
           pip install fastapi uvicorn[standard] python-multipart
           pip install pydantic pydantic-settings pyyaml
           pip install httpx aiofiles requests psutil
+          pip install python-jose passlib bcrypt
       
       - name: Test Import
         run: |
@@ -61,6 +62,7 @@ jobs:
             --include-package=starlette.routing `
             --include-package=starlette.middleware `
             --include-package=starlette.middleware.cors `
+            --include-package=starlette.staticfiles `
             --include-package=pydantic `
             --include-package=pydantic_settings `
             --include-package=yaml `
@@ -71,9 +73,29 @@ jobs:
             --include-package=sqlite3 `
             --include-package=email.mime `
             --include-package=json `
+            --include-package=jose `
+            --include-package=passlib `
+            --include-package=bcrypt `
+            --include-package=src `
+            --include-package=src.omnia `
+            --include-package=src.omnia.routers `
+            --include-package=src.omnia.services `
+            --include-package=src.core `
+            --include-package=src.core.actuator `
             --no-progressbar `
             --assume-yes-for-downloads `
             src/omnia/standalone_main.py
+      
+      - name: Verify Binary
+        run: |
+          $binary = Get-ChildItem -Path dist/nuitka-build -Filter "omnia-backend.exe" -Recurse | Select-Object -First 1
+          if (-not $binary) {
+            Write-Error "❌ Binary not found!"
+            Get-ChildItem -Path dist/nuitka-build -Recurse | ForEach-Object { Write-Host $_.FullName }
+            exit 1
+          }
+          Write-Host "✅ Binary found: $($binary.FullName)"
+          Write-Host "   Size: $([math]::Round($binary.Length / 1MB, 2)) MB"
       
       - name: Find and Package Binary
         run: |
@@ -83,7 +105,6 @@ jobs:
             Copy-Item $binary.FullName dist/package/
           } else {
             Write-Error "Binary not found!"
-            Get-ChildItem -Path dist/nuitka-build -Recurse | ForEach-Object { Write-Host $_.FullName }
             exit 1
           }
           Copy-Item -Recurse seeds dist/package/
@@ -99,7 +120,7 @@ jobs:
           "cd /d `"%~dp0`"" | Out-File -FilePath dist/package/start-omnia.bat -Append -Encoding ASCII
           "echo." | Out-File -FilePath dist/package/start-omnia.bat -Append -Encoding ASCII
           "echo  =========================================" | Out-File -FilePath dist/package/start-omnia.bat -Append -Encoding ASCII
-          "echo   Omnia AIOS v2.0.0 (FastAPI)" | Out-File -FilePath dist/package/start-omnia.bat -Append -Encoding ASCII
+          "echo   Omnia AIOS v2.0.3 (FastAPI)" | Out-File -FilePath dist/package/start-omnia.bat -Append -Encoding ASCII
           "echo  =========================================" | Out-File -FilePath dist/package/start-omnia.bat -Append -Encoding ASCII
           "echo   Starting server..." | Out-File -FilePath dist/package/start-omnia.bat -Append -Encoding ASCII
           "echo   Open http://127.0.0.1:8765/license to activate" | Out-File -FilePath dist/package/start-omnia.bat -Append -Encoding ASCII
@@ -131,6 +152,7 @@ jobs:
           pip install fastapi uvicorn[standard] python-multipart
           pip install pydantic pydantic-settings pyyaml
           pip install httpx aiofiles requests psutil
+          pip install python-jose passlib bcrypt
       
       - name: Test Import
         run: |
@@ -165,6 +187,7 @@ jobs:
             --include-package=starlette.routing \
             --include-package=starlette.middleware \
             --include-package=starlette.middleware.cors \
+            --include-package=starlette.staticfiles \
             --include-package=pydantic \
             --include-package=pydantic_settings \
             --include-package=yaml \
@@ -175,6 +198,15 @@ jobs:
             --include-package=sqlite3 \
             --include-package=email.mime \
             --include-package=json \
+            --include-package=jose \
+            --include-package=passlib \
+            --include-package=bcrypt \
+            --include-package=src \
+            --include-package=src.omnia \
+            --include-package=src.omnia.routers \
+            --include-package=src.omnia.services \
+            --include-package=src.core \
+            --include-package=src.core.actuator \
             --no-progressbar \
             --assume-yes-for-downloads \
             --macos-create-app-bundle \
@@ -203,7 +235,7 @@ jobs:
           cat > dist/package/start-omnia.sh << 'LAUNCHER'
           #!/bin/bash
           echo "========================================="
-          echo "  Omnia AIOS v2.0.0 (FastAPI)"
+          echo "  Omnia AIOS v2.0.3 (FastAPI)"
           echo "========================================="
           echo "  Starting server..."
           echo "  Open http://127.0.0.1:8765/license to activate"
@@ -236,6 +268,7 @@ jobs:
           pip install fastapi uvicorn[standard] python-multipart
           pip install pydantic pydantic-settings pyyaml
           pip install httpx aiofiles requests psutil
+          pip install python-jose passlib bcrypt
       
       - name: Test Import
         run: |
@@ -270,6 +303,7 @@ jobs:
             --include-package=starlette.routing \
             --include-package=starlette.middleware \
             --include-package=starlette.middleware.cors \
+            --include-package=starlette.staticfiles \
             --include-package=pydantic \
             --include-package=pydantic_settings \
             --include-package=yaml \
@@ -280,6 +314,15 @@ jobs:
             --include-package=sqlite3 \
             --include-package=email.mime \
             --include-package=json \
+            --include-package=jose \
+            --include-package=passlib \
+            --include-package=bcrypt \
+            --include-package=src \
+            --include-package=src.omnia \
+            --include-package=src.omnia.routers \
+            --include-package=src.omnia.services \
+            --include-package=src.core \
+            --include-package=src.core.actuator \
             --no-progressbar \
             --assume-yes-for-downloads \
             src/omnia/standalone_main.py
@@ -307,7 +350,7 @@ jobs:
           cat > dist/package/start-omnia.sh << 'LAUNCHER'
           #!/bin/bash
           echo "========================================="
-          echo "  Omnia AIOS v2.0.0 (FastAPI)"
+          echo "  Omnia AIOS v2.0.3 (FastAPI)"
           echo "========================================="
           echo "  Starting server..."
           echo "  Open http://127.0.0.1:8765/license to activate"
@@ -350,9 +393,15 @@ jobs:
             dist/omnia-windows-amd64.zip
           generate_release_notes: true
           body: |
-            ## Omnia AIOS v2.0.0 - FastAPI Version
+            ## Omnia AIOS v2.0.3 - FastAPI Version (Fixed)
             
-            ### ✨ 主要更新
+            ### 🐛 Bug Fixes
+            - 修复 Nuitka 打包模式下的路径检测问题（Nuitka 使用 `__compiled__` 而非 `sys.frozen`）
+            - 添加缺失的依赖包：pydantic-settings, pyyaml, python-jose, passlib, bcrypt
+            - 添加完整的 src 子包到 Nuitka 打包配置
+            - 改进启动脚本版本号
+            
+            ### ✨ 主要特性
             - 从 Flask 迁移到 FastAPI 框架
             - 更高性能的异步处理
             - 优化的内存管理

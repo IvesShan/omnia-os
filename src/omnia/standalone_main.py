@@ -20,32 +20,51 @@ def is_port_in_use(port):
             return True
 
 
+def is_packed():
+    """
+    检测是否在打包模式下运行。
+    Nuitka: __compiled__ 属性存在
+    PyInstaller: sys.frozen 属性存在
+    """
+    return hasattr(sys, 'frozen') or hasattr(sys, '__compiled__')
+
+
 def setup_paths():
     """
     设置路径和环境变量，确保打包后能正确导入模块。
-    
+
     Nuitka --onefile 模式下：
     - sys.executable 指向 exe 文件
-    - __file__ 指向临时解压目录中的文件
-    - 需要将 src 目录加入 sys.path
+    - __file__ 指向临时解压目录中的 .py 文件
+    - 数据文件 (--include-data-dir) 解压到 sys.executable 同级目录
     """
-    if getattr(sys, 'frozen', False):
+    if is_packed():
         # 打包模式：base_path 是 exe 所在目录
         base_path = Path(sys.executable).parent
-        # Nuitka --standalone --onefile 会解压到临时目录
-        # __file__ 的父目录就是 src/omnia/，再往上两级是项目根
+
+        # Nuitka --onefile 会把模块解压到临时目录
+        # __file__ 的父目录就是 src/omnia/，再往上两级是临时根目录
         temp_root = Path(__file__).parent.parent.parent
-        
-        # 将两个路径都加入 sys.path
-        for p in [str(base_path), str(temp_root), str(temp_root / "src")]:
+
+        # 把临时目录和 src 子目录加入 sys.path（这样 import src.xxx 能找到）
+        paths_to_add = [
+            str(base_path),           # exe 所在目录
+            str(temp_root),           # 临时解压根目录
+            str(temp_root / "src"),   # 临时解压的 src 目录
+            str(Path(__file__).parent.parent),  # src/ 目录
+        ]
+        for p in paths_to_add:
             if p not in sys.path:
                 sys.path.insert(0, p)
-        
+
         # 设置环境变量供 config.py 使用
+        # OMNIA_ROOT 必须指向 exe 所在目录（数据文件在这里）
         os.environ["OMNIA_ROOT"] = str(base_path)
-        
-        print(f"[Omnia] 打包模式 - 可执行文件目录: {base_path}")
-        print(f"[Omnia] 临时解压目录: {temp_root}")
+
+        print(f"[Omnia] 打包模式")
+        print(f"  ├─ 可执行文件: {sys.executable}")
+        print(f"  ├─ 工作目录 (exe 所在): {base_path}")
+        print(f"  └─ 临时解压目录: {temp_root}")
     else:
         # 开发模式：项目根目录是 src/omnia 的父级
         project_root = Path(__file__).parent.parent.parent
@@ -53,14 +72,14 @@ def setup_paths():
         if src_path not in sys.path:
             sys.path.insert(0, src_path)
         os.environ["OMNIA_ROOT"] = str(project_root)
-        
+
         print(f"[Omnia] 开发模式 - 项目根目录: {project_root}")
 
 
 def main():
     # 1. 设置路径
     setup_paths()
-    
+
     # 2. 延迟导入 FastAPI app（路径设置后才能导入）
     try:
         from src.omnia.main import app
