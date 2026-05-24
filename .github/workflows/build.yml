@@ -25,8 +25,12 @@ jobs:
           python -m pip install --upgrade pip
           pip install pyarmor nuitka ordered-set zstandard
           pip install fastapi uvicorn[standard] python-multipart
-          pip install pydantic pydantic-settings
-          pip install pyyaml httpx aiofiles requests psutil
+          pip install pydantic pydantic-settings pyyaml
+          pip install httpx aiofiles requests psutil
+      
+      - name: Test Import
+        run: |
+          python -c "from src.omnia.main import app; print('FastAPI app imported successfully!')"
       
       - name: Obfuscate with PyArmor
         run: |
@@ -42,8 +46,21 @@ jobs:
             --include-data-dir=web=web `
             --include-package=fastapi `
             --include-package=uvicorn `
-            --include-package=sqlite3 `
-            --include-package=src `
+            --include-package=uvicorn.logging `
+            --include-package=uvicorn.loops `
+            --include-package=uvicorn.loops.auto `
+            --include-package=uvicorn.protocols `
+            --include-package=uvicorn.protocols.http `
+            --include-package=uvicorn.protocols.http.auto `
+            --include-package=uvicorn.protocols.websockets `
+            --include-package=uvicorn.protocols.websockets.auto `
+            --include-package=uvicorn.lifespan `
+            --include-package=uvicorn.lifespan.on `
+            --include-package=starlette `
+            --include-package=starlette.responses `
+            --include-package=starlette.routing `
+            --include-package=starlette.middleware `
+            --include-package=starlette.middleware.cors `
             --include-package=pydantic `
             --include-package=pydantic_settings `
             --include-package=yaml `
@@ -51,7 +68,9 @@ jobs:
             --include-package=aiofiles `
             --include-package=multipart `
             --include-package=psutil `
-            --include-package=starlette `
+            --include-package=sqlite3 `
+            --include-package=email.mime `
+            --include-package=json `
             --no-progressbar `
             --assume-yes-for-downloads `
             src/omnia/standalone_main.py
@@ -110,8 +129,12 @@ jobs:
           python -m pip install --upgrade pip
           pip install pyarmor nuitka ordered-set zstandard
           pip install fastapi uvicorn[standard] python-multipart
-          pip install pydantic pydantic-settings
-          pip install pyyaml httpx aiofiles requests psutil
+          pip install pydantic pydantic-settings pyyaml
+          pip install httpx aiofiles requests psutil
+      
+      - name: Test Import
+        run: |
+          python -c "from src.omnia.main import app; print('FastAPI app imported successfully!')"
       
       - name: Obfuscate with PyArmor
         run: |
@@ -127,8 +150,21 @@ jobs:
             --include-data-dir=web=web \
             --include-package=fastapi \
             --include-package=uvicorn \
-            --include-package=sqlite3 \
-            --include-package=src \
+            --include-package=uvicorn.logging \
+            --include-package=uvicorn.loops \
+            --include-package=uvicorn.loops.auto \
+            --include-package=uvicorn.protocols \
+            --include-package=uvicorn.protocols.http \
+            --include-package=uvicorn.protocols.http.auto \
+            --include-package=uvicorn.protocols.websockets \
+            --include-package=uvicorn.protocols.websockets.auto \
+            --include-package=uvicorn.lifespan \
+            --include-package=uvicorn.lifespan.on \
+            --include-package=starlette \
+            --include-package=starlette.responses \
+            --include-package=starlette.routing \
+            --include-package=starlette.middleware \
+            --include-package=starlette.middleware.cors \
             --include-package=pydantic \
             --include-package=pydantic_settings \
             --include-package=yaml \
@@ -136,7 +172,9 @@ jobs:
             --include-package=aiofiles \
             --include-package=multipart \
             --include-package=psutil \
-            --include-package=starlette \
+            --include-package=sqlite3 \
+            --include-package=email.mime \
+            --include-package=json \
             --no-progressbar \
             --assume-yes-for-downloads \
             --macos-create-app-bundle \
@@ -196,8 +234,12 @@ jobs:
           python -m pip install --upgrade pip
           pip install pyarmor nuitka ordered-set zstandard
           pip install fastapi uvicorn[standard] python-multipart
-          pip install pydantic pydantic-settings
-          pip install pyyaml httpx aiofiles requests psutil
+          pip install pydantic pydantic-settings pyyaml
+          pip install httpx aiofiles requests psutil
+      
+      - name: Test Import
+        run: |
+          python -c "from src.omnia.main import app; print('FastAPI app imported successfully!')"
       
       - name: Obfuscate with PyArmor
         run: |
@@ -213,8 +255,21 @@ jobs:
             --include-data-dir=web=web \
             --include-package=fastapi \
             --include-package=uvicorn \
-            --include-package=sqlite3 \
-            --include-package=src \
+            --include-package=uvicorn.logging \
+            --include-package=uvicorn.loops \
+            --include-package=uvicorn.loops.auto \
+            --include-package=uvicorn.protocols \
+            --include-package=uvicorn.protocols.http \
+            --include-package=uvicorn.protocols.http.auto \
+            --include-package=uvicorn.protocols.websockets \
+            --include-package=uvicorn.protocols.websockets.auto \
+            --include-package=uvicorn.lifespan \
+            --include-package=uvicorn.lifespan.on \
+            --include-package=starlette \
+            --include-package=starlette.responses \
+            --include-package=starlette.routing \
+            --include-package=starlette.middleware \
+            --include-package=starlette.middleware.cors \
             --include-package=pydantic \
             --include-package=pydantic_settings \
             --include-package=yaml \
@@ -222,7 +277,9 @@ jobs:
             --include-package=aiofiles \
             --include-package=multipart \
             --include-package=psutil \
-            --include-package=starlette \
+            --include-package=sqlite3 \
+            --include-package=email.mime \
+            --include-package=json \
             --no-progressbar \
             --assume-yes-for-downloads \
             src/omnia/standalone_main.py
@@ -299,6 +356,7 @@ jobs:
             - 从 Flask 迁移到 FastAPI 框架
             - 更高性能的异步处理
             - 优化的内存管理
+            - 完善的路径兼容性
             
             ### 📦 下载说明
             - **Windows**: 下载 `omnia-windows-amd64.zip`
