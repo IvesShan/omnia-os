@@ -138,8 +138,7 @@ def analyze_message(
     # 处理 content 可能是列表的情况（vision 多模态格式）
     if isinstance(user_message, list):
         texts = [item.get("text", "") for item in user_message if isinstance(item, dict) and item.get("type") == "text"]
-        user_message = "
-".join(texts)
+        user_message = "\n".join(texts)
 
     user_lower = user_message.lower()
     
