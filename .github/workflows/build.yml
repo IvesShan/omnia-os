@@ -43,9 +43,9 @@ jobs:
           python -m nuitka --standalone --onefile `
             --output-dir=dist/nuitka-build `
             --output-filename=omnia-backend.exe `
-            --include-data-dir=seeds;seeds `
-            --include-data-dir=config;config `
-            --include-data-dir=web;web `
+            --include-data-dir=seeds=seeds `
+            --include-data-dir=config=config `
+            --include-data-dir=web=web `
             --include-package=fastapi `
             --include-package=uvicorn `
             --include-package=uvicorn.logging `
@@ -426,3 +426,4 @@ jobs:
             4. 在 `/license` 页面输入激活码
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
