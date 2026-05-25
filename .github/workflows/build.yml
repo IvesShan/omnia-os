@@ -28,6 +28,7 @@ jobs:
           pip install pydantic pydantic-settings pyyaml
           pip install httpx aiofiles requests psutil
           pip install python-jose passlib bcrypt
+          pip install jinja2
       
       - name: Test Import
         run: |
@@ -63,6 +64,7 @@ jobs:
             --include-package=starlette.middleware `
             --include-package=starlette.middleware.cors `
             --include-package=starlette.staticfiles `
+            --include-package=starlette.templating `
             --include-package=pydantic `
             --include-package=pydantic_settings `
             --include-package=yaml `
@@ -76,6 +78,7 @@ jobs:
             --include-package=jose `
             --include-package=passlib `
             --include-package=bcrypt `
+            --include-package=jinja2 `
             --include-package=src `
             --include-package=src.omnia `
             --include-package=src.omnia.routers `
@@ -153,6 +156,7 @@ jobs:
           pip install pydantic pydantic-settings pyyaml
           pip install httpx aiofiles requests psutil
           pip install python-jose passlib bcrypt
+          pip install jinja2
       
       - name: Test Import
         run: |
@@ -188,6 +192,7 @@ jobs:
             --include-package=starlette.middleware \
             --include-package=starlette.middleware.cors \
             --include-package=starlette.staticfiles \
+            --include-package=starlette.templating \
             --include-package=pydantic \
             --include-package=pydantic_settings \
             --include-package=yaml \
@@ -201,6 +206,7 @@ jobs:
             --include-package=jose \
             --include-package=passlib \
             --include-package=bcrypt \
+            --include-package=jinja2 \
             --include-package=src \
             --include-package=src.omnia \
             --include-package=src.omnia.routers \
@@ -269,6 +275,7 @@ jobs:
           pip install pydantic pydantic-settings pyyaml
           pip install httpx aiofiles requests psutil
           pip install python-jose passlib bcrypt
+          pip install jinja2
       
       - name: Test Import
         run: |
@@ -304,6 +311,7 @@ jobs:
             --include-package=starlette.middleware \
             --include-package=starlette.middleware.cors \
             --include-package=starlette.staticfiles \
+            --include-package=starlette.templating \
             --include-package=pydantic \
             --include-package=pydantic_settings \
             --include-package=yaml \
@@ -317,6 +325,7 @@ jobs:
             --include-package=jose \
             --include-package=passlib \
             --include-package=bcrypt \
+            --include-package=jinja2 \
             --include-package=src \
             --include-package=src.omnia \
             --include-package=src.omnia.routers \
@@ -396,16 +405,14 @@ jobs:
             ## Omnia AIOS v2.0.3 - FastAPI Version (Fixed)
             
             ### 🐛 Bug Fixes
-            - 修复 Nuitka 打包模式下的路径检测问题（Nuitka 使用 `__compiled__` 而非 `sys.frozen`）
-            - 添加缺失的依赖包：pydantic-settings, pyyaml, python-jose, passlib, bcrypt
+            - 修复 jinja2 依赖缺失导致的构建失败
+            - 修复 Nuitka 打包模式下的路径检测问题
             - 添加完整的 src 子包到 Nuitka 打包配置
-            - 改进启动脚本版本号
             
             ### ✨ 主要特性
             - 从 Flask 迁移到 FastAPI 框架
             - 更高性能的异步处理
             - 优化的内存管理
-            - 完善的路径兼容性
             
             ### 📦 下载说明
             - **Windows**: 下载 `omnia-windows-amd64.zip`
