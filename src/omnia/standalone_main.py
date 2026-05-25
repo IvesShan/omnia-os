@@ -29,6 +29,41 @@ def is_packed():
     return hasattr(sys, 'frozen') or hasattr(sys, '__compiled__')
 
 
+def setup_module_aliases():
+    """
+    Nuitka 打包后模块路径是 src.core.*，但代码里用 core.* 导入。
+    创建导入钩子，让 core.xxx 自动映射到 src.core.xxx。
+    """
+    import importlib
+
+    original_import = __builtins__['__import__']
+
+    def aliased_import(name, globals=None, locals=None, fromlist=(), level=0):
+        # 拦截 core.xxx 的导入，重定向到 src.core.xxx
+        if name == 'core' or name.startswith('core.'):
+            src_name = 'src.' + name
+            try:
+                # 如果 src.core.xxx 还没加载，先加载它
+                if src_name not in sys.modules:
+                    original_import(src_name, globals, locals, fromlist, level)
+                # 创建 core.xxx 的别名指向 src.core.xxx
+                if src_name in sys.modules:
+                    sys.modules[name] = sys.modules[src_name]
+                    return sys.modules[src_name]
+            except ImportError:
+                pass  # src.core.xxx 也不存在，回退到原始导入
+        return original_import(name, globals, locals, fromlist, level)
+
+    __builtins__['__import__'] = aliased_import
+
+    # 预加载 src.core 并创建 core 别名
+    try:
+        src_core = importlib.import_module('src.core')
+        sys.modules['core'] = src_core
+    except ImportError:
+        pass
+
+
 def setup_paths():
     """
     设置路径和环境变量，确保打包后能正确导入模块。
@@ -57,6 +92,9 @@ def setup_paths():
             if p not in sys.path:
                 sys.path.insert(0, p)
 
+        # 创建 core -> src.core 的模块别名
+        setup_module_aliases()
+
         # 设置环境变量供 config.py 使用
         # OMNIA_ROOT 必须指向 exe 所在目录（数据文件在这里）
         os.environ["OMNIA_ROOT"] = str(base_path)
@@ -77,7 +115,7 @@ def setup_paths():
 
 
 def main():
-    # 1. 设置路径
+    # 1. 设置路径和模块别名
     setup_paths()
 
     # 2. 延迟导入 FastAPI app（路径设置后才能导入）

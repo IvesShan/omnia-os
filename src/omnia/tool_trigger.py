@@ -135,6 +135,12 @@ def analyze_message(
     """
     综合分析是否需要触发工具调用。
     """
+    # 处理 content 可能是列表的情况（vision 多模态格式）
+    if isinstance(user_message, list):
+        texts = [item.get("text", "") for item in user_message if isinstance(item, dict) and item.get("type") == "text"]
+        user_message = "
+".join(texts)
+
     user_lower = user_message.lower()
     
     # 0. 排除检查

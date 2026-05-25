@@ -392,7 +392,13 @@ class AgentEngine:
 
         for m in reversed(messages):
             if m.get("role") == "user":
-                original_user_message = m.get("content", "")
+                raw_content = m.get("content", "")
+                # 处理 vision 多模态格式（content 为列表）
+                if isinstance(raw_content, list):
+                    texts = [item.get("text", "") for item in raw_content if isinstance(item, dict) and item.get("type") == "text"]
+                    original_user_message = "\n".join(texts)
+                else:
+                    original_user_message = raw_content
                 break
 
         # 记录用户消息到记忆库
@@ -413,9 +419,16 @@ class AgentEngine:
             if tool_hint:
                 for i in range(len(messages) - 1, -1, -1):
                     if messages[i].get("role") == "user":
+                        raw_content = messages[i]["content"]
+                        if isinstance(raw_content, list):
+                            # vision 格式：在文本块后追加 tool_hint
+                            new_content = list(raw_content)
+                            new_content.append({"type": "text", "text": "\n" + tool_hint})
+                        else:
+                            new_content = raw_content + "\n" + tool_hint
                         messages[i] = {
                             "role": "user",
-                            "content": messages[i]["content"] + "\n" + tool_hint,
+                            "content": new_content,
                         }
                         break
 

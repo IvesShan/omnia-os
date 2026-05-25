@@ -748,6 +748,9 @@ async function sendMessage() {
     appendUser(text);
   }
   
+  // 保存图片数据用于发送（在清空前）
+  const imageToSend = selectedImage;
+  
   // 清空输入
   composer.value = '';
   selectedImage = null;
@@ -772,7 +775,12 @@ async function sendMessage() {
     const response = await fetch(`${API_BASE}/api/chat/stream`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: text, history: history, provider: currentApiProvider }),
+      body: JSON.stringify({ 
+        message: text, 
+        history: history, 
+        provider: currentApiProvider,
+        image: imageToSend
+      }),
       signal: window.currentAbortController?.signal,
     });
 

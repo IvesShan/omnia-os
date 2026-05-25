@@ -55,6 +55,28 @@ def _detect_provider_from_env() -> str:
     return "deepseek"  # 默认
 
 
+def _prepare_messages_with_image(messages: list, image: Optional[str] = None) -> list:
+    """如果有图片，构造多模态消息"""
+    if not image:
+        return messages
+    
+    # 创建副本
+    messages = list(messages)
+    
+    # 找到最后一条 user 消息
+    for i in range(len(messages) - 1, -1, -1):
+        if messages[i].get("role") == "user":
+            original_content = messages[i].get("content", "")
+            # 转换为 OpenAI vision 格式
+            messages[i]["content"] = [
+                {"type": "text", "text": original_content},
+                {"type": "image_url", "image_url": {"url": image}}
+            ]
+            break
+    
+    return messages
+
+
 @router.post("/chat", response_model=ChatResponse)
 async def chat(
     req: ChatRequest,
@@ -82,17 +104,6 @@ async def chat(
     else:
         messages.insert(0, {"role": "system", "content": identity})
 
-    # ===== 注入 Omnia 身份定义 =====
-    has_system = any(m.get("role") == "system" for m in messages)
-    identity = "你是Omnia，永不遗忘的操作系统。你是独立项目，不是OpenClaw网关，也不是Infinite。"
-    if has_system:
-        for m in messages:
-            if m.get("role") == "system":
-                m["content"] = identity + " " + m["content"]
-                break
-    else:
-        messages.insert(0, {"role": "system", "content": identity})
-
     # 检测 Provider
     provider = req.provider or settings.current_provider or _detect_provider_from_env()
 
@@ -105,6 +116,9 @@ async def chat(
     pass
 
     try:
+        # ===== 处理图片（如果有） =====
+        messages = _prepare_messages_with_image(messages, req.image)
+
         # ===== 使用 Agent 引擎处理工具调用（传入 session_id） =====
         result = await agent_engine.process_with_tools(
             llm_client=client,
@@ -155,6 +169,9 @@ async def chat_stream(
     # NOTE: 已禁用自动合并数据库历史，避免会话污染
     # 前端负责管理历史消息，后端只处理当前请求的消息
     pass
+
+    # ===== 处理图片（如果有） =====
+    messages = _prepare_messages_with_image(messages, req.image)
 
     async def generate():
         """生成 SSE 事件流"""

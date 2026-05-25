@@ -2,6 +2,7 @@
 LLM 客户端 - 异步版本
 支持：多 Provider、流式输出、工具调用
 """
+import asyncio
 import os
 import json
 import httpx

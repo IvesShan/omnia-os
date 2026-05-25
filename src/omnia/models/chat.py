@@ -13,6 +13,7 @@ class ChatRequest(BaseModel):
     provider: Optional[str] = Field(None, description="Provider 名称")
     tools: Optional[List[dict]] = Field(None, description="工具列表")
     stream: bool = Field(False, description="是否流式")
+    image: Optional[str] = Field(None, description="图片数据（base64）")
     
     def get_messages(self) -> List[dict]:
         """获取消息列表（兼容多种格式）

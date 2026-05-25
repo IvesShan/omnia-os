@@ -118,6 +118,11 @@ def analyze_message(
 
     优先级：排除 > 显式请求 > 关键词匹配 > 上下文触发 > 模糊匹配
     """
+    # 处理 content 可能是列表的情况（vision 多模态格式）
+    if isinstance(user_message, list):
+        texts = [item.get("text", "") for item in user_message if isinstance(item, dict) and item.get("type") == "text"]
+        user_message = "\n".join(texts)
+
     user_lower = user_message.lower()
 
     # 0. 排除检查
