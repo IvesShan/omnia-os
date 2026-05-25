@@ -5,6 +5,49 @@ import os
 import sys
 from pathlib import Path
 
+# ========== 模块别名注册（解决 core.xxx -> src.core.xxx）==========
+# 必须在任何 core.xxx 导入之前执行
+def _setup_core_aliases():
+    """
+    代码库中大量使用了 `from core.xxx` 导入，但项目结构是 src/core/xxx.py。
+    在开发模式和 GitHub Actions 中，需要把 core.xxx 映射到 src.core.xxx。
+    Nuitka 打包后 standalone_main.py 也会做同样的映射。
+    """
+    import importlib
+
+    # 如果 src.core 可导入但 core 不可导入，创建别名
+    try:
+        src_core = importlib.import_module('src.core')
+        if 'core' not in sys.modules:
+            sys.modules['core'] = src_core
+    except ImportError:
+        pass  # src.core 不存在，不处理
+
+    # 设置导入钩子
+    original_import = __builtins__['__import__']
+
+    def _aliased_import(name, globals=None, locals=None, fromlist=(), level=0):
+        if name == 'core' or name.startswith('core.'):
+            src_name = 'src.' + name
+            try:
+                # 如果 src.core.xxx 还没加载，先加载它
+                if src_name not in sys.modules:
+                    original_import(src_name, globals, locals, fromlist, level)
+                # 创建 core.xxx 的别名指向 src.core.xxx
+                if src_name in sys.modules:
+                    sys.modules[name] = sys.modules[src_name]
+                    return sys.modules[src_name]
+            except ImportError:
+                pass  # src.core.xxx 也不存在，回退到原始导入
+        return original_import(name, globals, locals, fromlist, level)
+
+    __builtins__['__import__'] = _aliased_import
+
+
+_setup_core_aliases()
+# ========== 别名注册结束 ==========
+
+
 # 打包模式：通过环境变量获取路径，避免 __file__ 指向错误位置
 _root = os.environ.get("OMNIA_ROOT")
 if _root:
