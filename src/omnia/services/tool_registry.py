@@ -37,6 +37,9 @@ class ToolRegistry:
         
         # MCP 工具
         self.mcp_tools: List[dict] = []
+        
+        # MCP 管理器引用（由 main.py lifespan 设置）
+        self.mcp_manager = None
 
     def register_tool(
         self,
@@ -90,6 +93,10 @@ class ToolRegistry:
         """注册 MCP 工具"""
         self.mcp_tools = tools
 
+    def set_mcp_manager(self, manager):
+        """设置 MCP 管理器引用，用于执行 MCP 工具"""
+        self.mcp_manager = manager
+
     def get_all_schemas(self) -> list[dict]:
         """获取所有工具 schema（不含内部字段）"""
         schemas = []
@@ -98,8 +105,14 @@ class ToolRegistry:
             clean = {k: v for k, v in tool.items() if not k.startswith("_")}
             schemas.append(clean)
         
-        # 添加 MCP 工具
-        schemas.extend(self.mcp_tools)
+        # 添加 MCP 工具，排除已经在 _tools 中的（避免重复）
+        existing_names = {tool.get("function", {}).get("name") for tool in schemas}
+        for tool_def in self.mcp_tools:
+            func_def = tool_def.get("function", {})
+            name = func_def.get("name")
+            if name and name not in existing_names:
+                clean = {k: v for k, v in tool_def.items() if not k.startswith("_")}
+                schemas.append(clean)
         
         return schemas
 
@@ -109,6 +122,17 @@ class ToolRegistry:
 
     def get_tool_count(self) -> int:
         """获取工具总数"""
+        # 添加 MCP 工具到 _tools（如果已注册）
+        if self.mcp_tools:
+            for tool_def in self.mcp_tools:
+                func_def = tool_def.get("function", {})
+                name = func_def.get("name")
+                if name and name not in self._tools:
+                    tool_def_copy = dict(tool_def)
+                    tool_def_copy["_module"] = "mcp"
+                    self._tools[name] = tool_def_copy
+            print(f"[ToolRegistry] MCP tools: {len(self.mcp_tools)} registered")
+
         return len(self._tools) + len(self.mcp_tools)
 
     def has_tool(self, name: str) -> bool:
@@ -137,6 +161,64 @@ class ToolRegistry:
                 mt = MemoryTools()
                 result = await mt.execute(name, args)
                 return {"name": name, "result": result}
+            elif module_name == "grep_search":
+                from src.omnia.tools.grep_search import GrepSearchTools
+                result = await GrepSearchTools.execute(name, args)
+                return {"name": name, "result": result}
+            elif module_name == "edit_diff":
+                from src.omnia.tools.edit_diff import EditDiffTools
+                result = await EditDiffTools.execute(name, args)
+                return {"name": name, "result": result}
+            elif module_name == "browser_fetch":
+                from src.omnia.tools.browser_fetch import BrowserFetchTools
+                result = await BrowserFetchTools.execute(name, args)
+                return {"name": name, "result": result}
+            elif module_name == "git_tools":
+                from src.omnia.tools.git_tools import GitTools
+                result = await GitTools.execute(name, args)
+                return {"name": name, "result": result}
+            elif module_name == "python_sandbox":
+                from src.omnia.tools.python_sandbox import PythonSandbox
+                result = await PythonSandbox.execute(name, args)
+                return {"name": name, "result": result}
+            elif module_name == "download_tools":
+                from src.omnia.tools.download_tools import DownloadTools
+                result = await DownloadTools.execute(name, args)
+                return {"name": name, "result": result}
+            elif module_name == "database_tools":
+                from src.omnia.tools.database_tools import DatabaseTools
+                result = await DatabaseTools.execute(name, args)
+                return {"name": name, "result": result}
+            elif module_name == "notification_tools":
+                from src.omnia.tools.notification_tools import NotificationTools
+                result = await NotificationTools.execute(name, args)
+                return {"name": name, "result": result}
+            elif module_name == "package_manager":
+                from src.omnia.tools.package_manager import PackageManagerTools
+                result = await PackageManagerTools.execute(name, args)
+                return {"name": name, "result": result}
+            elif module_name == "diff_tools":
+                from src.omnia.tools.diff_tools import DiffTools
+                result = await DiffTools.execute(name, args)
+                return {"name": name, "result": result}
+            elif module_name == "process_tools":
+                from src.omnia.tools.process_tools import ProcessTools
+                result = await ProcessTools.execute(name, args)
+                return {"name": name, "result": result}
+            elif module_name == "screenshot_tools":
+                from src.omnia.tools.screenshot_tools import ScreenshotTools
+                result = await ScreenshotTools.execute(name, args)
+                return {"name": name, "result": result}
+            elif module_name == "mcp":
+                # 使用 MCP 管理器执行
+                if self.mcp_manager:
+                    try:
+                        result = await self.mcp_manager.call_tool(name, args)
+                        return {"name": name, "result": result}
+                    except Exception as e:
+                        return {"name": name, "error": f"MCP执行失败: {e}"}
+                else:
+                    return {"name": name, "error": "MCP管理器未初始化"}
         
         # 3. 尝试 MCP 工具执行
         if self.mcp_tools:
@@ -194,6 +276,143 @@ class ToolRegistry:
             if name:
                 tool_def["_module"] = "memory"
                 self._tools[name] = tool_def
+
+        # 注册搜索工具
+        from src.omnia.tools.grep_search import GrepSearchTools
+        grep_defs = GrepSearchTools.get_definitions()
+        for tool_def in grep_defs:
+            func_def = tool_def.get("function", {})
+            name = func_def.get("name")
+            if name:
+                tool_def["_module"] = "grep_search"
+                self._tools[name] = tool_def
+
+        # 注册编辑工具
+        from src.omnia.tools.edit_diff import EditDiffTools
+        edit_defs = EditDiffTools.get_definitions()
+        for tool_def in edit_defs:
+            func_def = tool_def.get("function", {})
+            name = func_def.get("name")
+            if name:
+                tool_def["_module"] = "edit_diff"
+                self._tools[name] = tool_def
+
+        # 注册网页工具
+        from src.omnia.tools.browser_fetch import BrowserFetchTools
+        browser_defs = BrowserFetchTools.get_definitions()
+        for tool_def in browser_defs:
+            func_def = tool_def.get("function", {})
+            name = func_def.get("name")
+            if name:
+                tool_def["_module"] = "browser_fetch"
+                self._tools[name] = tool_def
+
+        # 注册 Git 工具
+        from src.omnia.tools.git_tools import GitTools
+        git_defs = GitTools.get_definitions()
+        for tool_def in git_defs:
+            func_def = tool_def.get("function", {})
+            name = func_def.get("name")
+            if name:
+                tool_def["_module"] = "git_tools"
+                self._tools[name] = tool_def
+
+        # 注册 Python 沙箱工具
+        from src.omnia.tools.python_sandbox import PythonSandbox
+        sandbox_defs = PythonSandbox.get_definitions()
+        for tool_def in sandbox_defs:
+            func_def = tool_def.get("function", {})
+            name = func_def.get("name")
+            if name:
+                tool_def["_module"] = "python_sandbox"
+                self._tools[name] = tool_def
+
+        # 注册下载工具
+        from src.omnia.tools.download_tools import DownloadTools
+        download_defs = DownloadTools.get_definitions()
+        for tool_def in download_defs:
+            func_def = tool_def.get("function", {})
+            name = func_def.get("name")
+            if name:
+                tool_def["_module"] = "download_tools"
+                self._tools[name] = tool_def
+
+        # 注册数据库工具
+        from src.omnia.tools.database_tools import DatabaseTools
+        db_defs = DatabaseTools.get_definitions()
+        for tool_def in db_defs:
+            func_def = tool_def.get("function", {})
+            name = func_def.get("name")
+            if name:
+                tool_def["_module"] = "database_tools"
+                self._tools[name] = tool_def
+
+        # 注册通知工具
+        from src.omnia.tools.notification_tools import NotificationTools
+        notify_defs = NotificationTools.get_definitions()
+        for tool_def in notify_defs:
+            func_def = tool_def.get("function", {})
+            name = func_def.get("name")
+            if name:
+                tool_def["_module"] = "notification_tools"
+                self._tools[name] = tool_def
+
+        # 注册包管理工具
+        from src.omnia.tools.package_manager import PackageManagerTools
+        pkg_defs = PackageManagerTools.get_definitions()
+        for tool_def in pkg_defs:
+            func_def = tool_def.get("function", {})
+            name = func_def.get("name")
+            if name:
+                tool_def["_module"] = "package_manager"
+                self._tools[name] = tool_def
+
+        # 注册文件对比工具
+        from src.omnia.tools.diff_tools import DiffTools
+        diff_defs = DiffTools.get_definitions()
+        for tool_def in diff_defs:
+            func_def = tool_def.get("function", {})
+            name = func_def.get("name")
+            if name:
+                tool_def["_module"] = "diff_tools"
+                self._tools[name] = tool_def
+
+        # 注册进程管理工具（可选，可能有平台限制）
+        try:
+            from src.omnia.tools.process_tools import ProcessTools
+            process_defs = ProcessTools.get_definitions()
+            for tool_def in process_defs:
+                func_def = tool_def.get("function", {})
+                name = func_def.get("name")
+                if name:
+                    tool_def["_module"] = "process_tools"
+                    self._tools[name] = tool_def
+        except ImportError:
+            pass
+
+        # 注册截屏工具（可选，可能有平台限制）
+        try:
+            from src.omnia.tools.screenshot_tools import ScreenshotTools
+            screen_defs = ScreenshotTools.get_definitions()
+            for tool_def in screen_defs:
+                func_def = tool_def.get("function", {})
+                name = func_def.get("name")
+                if name:
+                    tool_def["_module"] = "screenshot_tools"
+                    self._tools[name] = tool_def
+        except ImportError:
+            pass
+
+        # 添加 MCP 工具到 _tools（如果已注册）
+        if self.mcp_tools:
+            for tool_def in self.mcp_tools:
+                func_def = tool_def.get("function", {})
+                name = func_def.get("name")
+                if name and name not in self._tools:
+                    tool_def_copy = dict(tool_def)
+                    tool_def_copy["_module"] = "mcp"
+                    self._tools[name] = tool_def_copy
+            print(f"[ToolRegistry] MCP tools: {len(self.mcp_tools)} registered")
 
         return len(self._tools)
 

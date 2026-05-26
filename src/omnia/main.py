@@ -26,8 +26,15 @@ def _setup_core_aliases():
     # 设置导入钩子
     original_import = __builtins__['__import__']
 
+    _THIRD_PARTY_CORE = ('certifi', 'httpcore', 'httpx', 'anyio', 'h11', 'h2', 'hpack', 'hyperframe', 'sniffio', 'idna')
+    
     def _aliased_import(name, globals=None, locals=None, fromlist=(), level=0):
+        # 不拦截相对导入 (level > 0)
+        if level > 0:
+            return original_import(name, globals, locals, fromlist, level)
         if name == 'core' or name.startswith('core.'):
+            if name.startswith('core.') and name.split('.')[1] in _THIRD_PARTY_CORE:
+                return original_import(name, globals, locals, fromlist, level)
             src_name = 'src.' + name
             try:
                 # 如果 src.core.xxx 还没加载，先加载它
@@ -109,6 +116,19 @@ async def lifespan(app: FastAPI):
         print(f"[Omnia] Tool listing skipped: {e}")
         import traceback
         traceback.print_exc()
+
+    # 传递 MCP 管理器给工具注册表，让 MCP 工具可执行
+    try:
+        if mcp_manager and hasattr(mcp_manager, 'call_tool'):
+            tool_registry.set_mcp_manager(mcp_manager)
+            # 将 MCP 工具注册到 tool_registry
+            mcp_tools_list = mcp_manager.get_all_tools_schema()
+            tool_registry.mcp_tools = mcp_tools_list
+            # 重新初始化，确保 MCP 工具被注册到 _tools
+            await tool_registry.initialize_default_tools()
+            print(f"[Omnia] MCP tools registered: {len(mcp_tools_list)}")
+    except Exception as e:
+        print(f"[Omnia] MCP tool registration skipped: {e}")
 
     # 初始化 Agent 引擎
     try:

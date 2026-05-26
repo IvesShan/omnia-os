@@ -52,7 +52,7 @@ class AgentEngine:
             return
         self._initialized = True
 
-        self.max_tool_rounds = 200
+        self.max_tool_rounds = 5000
         self.tool_injection_enabled = True
         self.api_tool_providers = {"deepseek", "openai", "kimi", "xiaomi"}
         self._steps: List[Dict] = []

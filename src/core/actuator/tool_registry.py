@@ -6,6 +6,7 @@ Supports both native tools and external MCP servers.
 
 from __future__ import annotations
 
+import asyncio
 from core.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -34,7 +35,53 @@ except ImportError:
 
 ToolFunction = Callable[..., Dict[str, Any]]
 
+# Async tool executor type (for the new modular tool classes)
+AsyncToolExecutor = Any  # Object with async execute(name, args) method
+
 _WORKSPACE = Path.home() / ".openclaw" / "workspace"
+
+# ─────────────────────────────────────────────────────
+# Lazy-load async tool classes (avoid circular imports)
+# ─────────────────────────────────────────────────────
+
+_async_tool_classes: List[AsyncToolExecutor] = []
+
+
+def _load_async_tools():
+    """Lazily load all async tool classes from omnia.tools"""
+    global _async_tool_classes
+    if _async_tool_classes:
+        return
+
+    try:
+        from omnia.tools.edit_diff import EditDiffTools
+        from omnia.tools.grep_search import GrepSearchTools
+        from omnia.tools.git_tools import GitTools
+        from omnia.tools.python_sandbox import PythonSandbox
+        from omnia.tools.download_tools import DownloadTools
+        from omnia.tools.browser_fetch import BrowserFetchTools
+        from omnia.tools.package_manager import PackageManagerTools
+        from omnia.tools.notification_tools import NotificationTools
+        from omnia.tools.diff_tools import DiffTools
+        from omnia.tools.database_tools import DatabaseTools
+        from omnia.tools.memory_tools import MemoryTools
+
+        _async_tool_classes = [
+            EditDiffTools(),
+            GrepSearchTools(),
+            GitTools(),
+            PythonSandbox(),
+            DownloadTools(),
+            BrowserFetchTools(),
+            PackageManagerTools(),
+            NotificationTools(),
+            DiffTools(),
+            DatabaseTools(),
+            MemoryTools(),
+        ]
+        logger.info(f"[ToolRegistry] Loaded {len(_async_tool_classes)} async tool classes")
+    except ImportError as e:
+        logger.warning(f"[ToolRegistry] Failed to load some async tools: {e}")
 
 TOOLS_SCHEMA: List[Dict[str, Any]] = [
     {
@@ -458,7 +505,16 @@ def get_all_tools_schema() -> List[Dict[str, Any]]:
     This is the main entry point for tool discovery.
     """
     schemas = list(TOOLS_SCHEMA)  # Start with native tools
-    
+
+    # Add async tool schemas from omnia.tools modules
+    _load_async_tools()
+    for tool_class in _async_tool_classes:
+        try:
+            defs = tool_class.get_definitions()
+            schemas.extend(defs)
+        except Exception as e:
+            logger.warning(f"[ToolRegistry] Failed to get schema from {type(tool_class).__name__}: {e}")
+
     # Add MCP tools if available
     if _mcp_available and _mcp_registry:
         try:
@@ -466,17 +522,17 @@ def get_all_tools_schema() -> List[Dict[str, Any]]:
             schemas.extend(mcp_tools)
         except Exception as e:
             print(f"[MCP] Failed to get tools: {e}")
-    
+
     return schemas
 
 
 async def dispatch_tool(name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Dispatch a tool call to either native implementation or MCP server.
+    Dispatch a tool call to either native implementation, async tool class, or MCP server.
     """
     print(f"[dispatch_tool] Called with name='{name}', arguments={arguments}")
-    
-    # Try native tool first
+
+    # 1. Try native sync tool first
     fn = TOOL_MAP.get(name)
     if fn:
         print(f"[dispatch_tool] Found native tool: {name}")
@@ -487,8 +543,21 @@ async def dispatch_tool(name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
         except (TypeError, ValueError) as e:
             print(f"[dispatch_tool] Error: {e}")
             return {"error": f"Tool call failed: {e}. Arguments received: {arguments}"}
-    
-    # Try MCP tool
+
+    # 2. Try async tool classes
+    _load_async_tools()
+    for tool_class in _async_tool_classes:
+        try:
+            defs = tool_class.get_definitions()
+            tool_names = {d["function"]["name"] for d in defs}
+            if name in tool_names:
+                print(f"[dispatch_tool] Found async tool: {name} in {type(tool_class).__name__}")
+                result = await tool_class.execute(name, arguments)
+                return result
+        except Exception as e:
+            logger.warning(f"[dispatch_tool] Async tool error in {type(tool_class).__name__}: {e}")
+
+    # 3. Try MCP tool
     if _mcp_available and _mcp_registry:
         print(f"[dispatch_tool] Trying MCP tool: {name}")
         try:
@@ -496,7 +565,7 @@ async def dispatch_tool(name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
         except (ValueError) as e:
             print(f"[dispatch_tool] MCP error: {e}")
             return {"error": f"MCP tool error: {e}"}
-    
+
     print(f"[dispatch_tool] Unknown tool: '{name}'")
     return {"error": f"Unknown tool: {name}"}
 

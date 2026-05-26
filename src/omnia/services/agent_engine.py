@@ -54,7 +54,7 @@ class AgentEngine:
             return
         self._initialized = True
 
-        self.max_tool_rounds = 30  # [FIXED] 从1000改为30，防止空转
+        self.max_tool_rounds = 5000  # 用户修改为5000轮
         self._thinking_mode_active = False
         self._reasoning_buffer = ""
         self.tool_injection_enabled = True
@@ -136,19 +136,13 @@ class AgentEngine:
         if ide_prompt:
             tool_prompt += ide_prompt
 
-        last_ctx = load_last_context()
-        if last_ctx:
-            ctx_summary = f"""
-
-## 上次会话上下文
-
-📅 时间: {last_ctx.timestamp}
-📌 主题: {last_ctx.topic}
-📝 摘要: {last_ctx.summary}
-"""
-            if last_ctx.next_steps:
-                ctx_summary += f"➡️ 下一步: {', '.join(last_ctx.next_steps[:3])}"
-            tool_prompt += ctx_summary
+        # NOTE: 已移除 last_ctx 注入，防止上下文污染
+        # 上次会话上下文不应自动注入到每次新对话中
+        # 如需关联上下文，应通过前端显式传入 messages
+        # 
+        # last_ctx = load_last_context()
+        # if last_ctx:
+        #     ...
 
         has_system = any(m.get("role") == "system" for m in messages)
 
@@ -180,6 +174,7 @@ class AgentEngine:
         rounds = 0
         execution_history = []
         total_content = ""
+        validation_retry_count = 0  # 验证失败重试计数器
 
         # 记录用户消息到记忆库
         if session_id:
@@ -228,10 +223,27 @@ class AgentEngine:
                     tool_calls=[],
                     tool_results=[],
                     user_message=messages[-1].get("content", "") if messages else "",
+                    retry_count=validation_retry_count,
                 )
-                if not validation["valid"] and validation["false_claim"]:
+                
+                # 检查 text fallback（模型在文本中表达了工具调用）
+                if validation.get("text_fallback"):
+                    text_tool = validation["text_fallback"]
+                    tool_call = {
+                        "name": text_tool["name"],
+                        "arguments": text_tool["arguments"],
+                        "id": f"text_fallback_{rounds}",
+                    }
+                    # 继续执行工具调用（跳到后面的逻辑）
+                    validation["valid"] = True
+                    validation["should_retry"] = False
+                elif not validation["valid"] and validation.get("should_retry"):
+                    validation_retry_count += 1
                     current_messages.append({"role": "user", "content": validation["retry_hint"]})
                     continue
+                elif not validation["valid"] and not validation.get("should_retry"):
+                    # 超过最大 retry 次数，接受模型回答
+                    pass
 
                 # 记录助手回复到记忆库
                 if session_id and content:
@@ -340,16 +352,42 @@ class AgentEngine:
 
                 tool_calls_made += 1
                 
-                if len(current_messages) > MAX_HISTORY + 2:
-                    preserved = [current_messages[0]]
+                # 修复：截断时保留完整的 assistant+tool 消息对
+                # 如果截断边界在 assistant 消息后、tool 消息前，会导致模型困惑
+                # 策略：从后往前扫描，找到最后一个完整的 tool 调用链的起点
+                _MAX_HISTORY = 60
+                if len(current_messages) > _MAX_HISTORY + 2:
+                    preserved = [current_messages[0]]  # system message
+                    
+                    # 从末尾往前找，确保保留最后一个完整的 assistant->tool 链
+                    # 以及最后一条用户消息
+                    tail = current_messages[-_MAX_HISTORY:]
+                    
+                    # 检查 tail 是否以 assistant message 结尾（缺少 tool result）
+                    # 如果是，向后扩展直到包含下一个 tool message
+                    if tail and tail[-1].get("role") == "assistant" and "tool_calls" in tail[-1]:
+                        # 需要包含对应的 tool result
+                        # 向后扩展，找到所有匹配的 tool messages
+                        extended = tail[:]
+                        last_assistant_idx = len(current_messages) - len(tail) + len(tail) - 1
+                        for i in range(last_assistant_idx + 1, len(current_messages)):
+                            if i < len(current_messages):
+                                msg = current_messages[i]
+                                if msg.get("role") == "tool":
+                                    extended.append(msg)
+                                else:
+                                    break
+                        tail = extended[-_MAX_HISTORY:]  # 重新截断
+                    
+                    # 确保包含最后一条用户消息（如果不在 tail 中）
                     last_user_idx = 0
                     for i in range(len(current_messages) - 1, -1, -1):
                         if current_messages[i].get("role") == "user":
                             last_user_idx = i
                             break
-                    tail = current_messages[-MAX_HISTORY:]
                     if last_user_idx > 0 and current_messages[last_user_idx] not in tail:
                         tail.insert(0, current_messages[last_user_idx])
+                    
                     current_messages = preserved + tail
 
             except Exception as e:
@@ -386,6 +424,7 @@ class AgentEngine:
         rounds = 0
         total_tokens = 0
         self._steps = []
+        validation_retry_count = 0  # 验证失败重试计数器
         original_user_message = ""
         original_system_content = ""
         original_system_idx = None
@@ -546,26 +585,13 @@ class AgentEngine:
                         }
 
             if not tool_call:
-                # Safety net: detect pseudo-tool-calls like "I need to call xxx" without actual call
-                pseudo_patterns = [
-                    r'我需要调用\s+(\w+)',
-                    r'I need to call\s+(\w+)',
-                    r'让我调用\s+(\w+)',
-                    r'Let me call\s+(\w+)',
-                ]
-                for pattern in pseudo_patterns:
-                    match = re.search(pattern, full_content, re.IGNORECASE)
-                    if match:
-                        pseudo_tool = match.group(1)
-                        loop_msg = "检测到伪工具调用：模型声称要调用 '{}' 但没有真正调用。可能是模型不支持function calling格式。".format(pseudo_tool)
-                        yield {"type": "status", "message": "⚠️ " + loop_msg}
-                        yield {
-                            "type": "done",
-                            "full_content": full_content + "\n\n⚠️ " + loop_msg + "\n\n请直接回答用户问题，或尝试使用其他模型（如 DeepSeek/Xiaomi 对工具支持更好）。",
-                            "show_summary": False,
-                            "stats": {"rounds_executed": rounds, "tools_called": tool_calls_made},
-                        }
-                        return
+                # NOTE: 移除了过于激进的 safety net（伪工具调用检测）
+                # 原因：
+                # 1. 模型在 content 中表达"我要调用 xxx"但 API 未返回 tool_calls 时，
+                #    这不是"伪调用"，而是 API/模型兼容性问题
+                # 2. validator v2.0 已有 retry 限制（max=2）和 text fallback
+                # 3. 此 safety net 会导致多步任务在中途被错误终止
+                # 如果确实有问题，validator 的 false_claim 检测会处理
 
                 validation = validate_tool_execution(
                     response=full_content,
@@ -574,7 +600,20 @@ class AgentEngine:
                     user_message=original_user_message,
                 )
 
-                if not validation["valid"] and validation["false_claim"]:
+                # 检查 text fallback
+                if validation.get("text_fallback"):
+                    text_tool = validation["text_fallback"]
+                    tool_call = {
+                        "name": text_tool["name"],
+                        "arguments": text_tool["arguments"],
+                        "id": f"text_fallback_{rounds}",
+                    }
+                    has_api_tool_call = True
+                    pending_tool_calls = [tool_call]
+                    validation["valid"] = True
+                    validation["should_retry"] = False
+                elif not validation["valid"] and validation.get("should_retry"):
+                    validation_retry_count += 1
                     yield {"type": "validation_failed", "reason": validation["reason"]}
                     current_messages.append({"role": "user", "content": validation["retry_hint"]})
                     trigger_result = ToolTriggerResult(
@@ -584,6 +623,9 @@ class AgentEngine:
                         suggested_tools=[],
                     )
                     continue
+                elif not validation["valid"] and not validation.get("should_retry"):
+                    # 超过最大 retry，接受回答
+                    pass
 
                 try:
                     save_current_context(
@@ -728,16 +770,42 @@ class AgentEngine:
                 
                 # 修剪消息历史，防止 token 无限增长
                 MAX_HISTORY = 60
-                if len(current_messages) > MAX_HISTORY + 2:
-                    preserved = [current_messages[0]]
+                # 修复：截断时保留完整的 assistant+tool 消息对
+                # 如果截断边界在 assistant 消息后、tool 消息前，会导致模型困惑
+                # 策略：从后往前扫描，找到最后一个完整的 tool 调用链的起点
+                _MAX_HISTORY = 60
+                if len(current_messages) > _MAX_HISTORY + 2:
+                    preserved = [current_messages[0]]  # system message
+                    
+                    # 从末尾往前找，确保保留最后一个完整的 assistant->tool 链
+                    # 以及最后一条用户消息
+                    tail = current_messages[-_MAX_HISTORY:]
+                    
+                    # 检查 tail 是否以 assistant message 结尾（缺少 tool result）
+                    # 如果是，向后扩展直到包含下一个 tool message
+                    if tail and tail[-1].get("role") == "assistant" and "tool_calls" in tail[-1]:
+                        # 需要包含对应的 tool result
+                        # 向后扩展，找到所有匹配的 tool messages
+                        extended = tail[:]
+                        last_assistant_idx = len(current_messages) - len(tail) + len(tail) - 1
+                        for i in range(last_assistant_idx + 1, len(current_messages)):
+                            if i < len(current_messages):
+                                msg = current_messages[i]
+                                if msg.get("role") == "tool":
+                                    extended.append(msg)
+                                else:
+                                    break
+                        tail = extended[-_MAX_HISTORY:]  # 重新截断
+                    
+                    # 确保包含最后一条用户消息（如果不在 tail 中）
                     last_user_idx = 0
                     for i in range(len(current_messages) - 1, -1, -1):
                         if current_messages[i].get("role") == "user":
                             last_user_idx = i
                             break
-                    tail = current_messages[-MAX_HISTORY:]
                     if last_user_idx > 0 and current_messages[last_user_idx] not in tail:
                         tail.insert(0, current_messages[last_user_idx])
+                    
                     current_messages = preserved + tail
 
             except Exception as e:

@@ -44,15 +44,21 @@ class StatusResponse(BaseModel):
     timestamp: str
 
 
-def _daemon_status() -> bool:
-    """检查 FastAPI 服务状态（Flask Daemon 已移除）"""
-    import urllib.request
-    try:
-        req = urllib.request.Request("http://localhost:8765/health", method="GET")
-        with urllib.request.urlopen(req, timeout=3) as resp:
-            return resp.status == 200
-    except Exception:
-        return False
+async def _daemon_status_async() -> bool:
+    """检查 API 服务状态（已改为直接检测，避免自调用死锁）"""
+    import socket
+    def _check_port():
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(2)
+        try:
+            # 连接 127.0.0.1:8765 看是否通
+            result = sock.connect_ex(('127.0.0.1', 8765))
+            return result == 0
+        except Exception:
+            return False
+        finally:
+            sock.close()
+    return await asyncio.to_thread(_check_port)
 
 
 def _memory_counts() -> dict:
@@ -312,7 +318,7 @@ async def get_status(request: Request):
     provider_val = _current_provider()
     
     return {
-        "daemon_running": _daemon_status(),
+        "daemon_running": await _daemon_status_async(),
         "api_ready": api_ready,
         "memory": _memory_counts(),
         "skills": _skills_summary(),
@@ -338,7 +344,7 @@ async def get_status(request: Request):
 async def daemon_status():
     """守护进程状态"""
     return {
-        "running": _daemon_status(),
+        "running": await _daemon_status_async(),
         "pid_file": str(OMNIA_HOME / "daemon.pid")
     }
 
