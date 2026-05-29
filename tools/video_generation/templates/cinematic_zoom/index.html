@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cinematic Zoom</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;700;900&display=swap');
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  width: 720px;
+  height: 1280px;
+  overflow: hidden;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Noto Sans SC', sans-serif;
+}
+
+/* 电影感背景 */
+.bg-image {
+  position: absolute;
+  width: 100%; height: 100%;
+  background: 
+    radial-gradient(ellipse at center, transparent 0%, rgba(0,0,0,0.7) 70%, #000 100%),
+    linear-gradient(180deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+  animation: bgZoom 8s ease-in-out infinite alternate;
+}
+
+@keyframes bgZoom {
+  from { transform: scale(1); }
+  to { transform: scale(1.1); }
+}
+
+/* 胶片颗粒 */
+.grain {
+  position: absolute;
+  width: 100%; height: 100%;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  animation: grainMove 0.5s steps(5) infinite;
+}
+
+@keyframes grainMove {
+  0%, 100% { transform: translate(0, 0); }
+  10% { transform: translate(-2%, -2%); }
+  20% { transform: translate(2%, 2%); }
+  30% { transform: translate(-1%, 1%); }
+  40% { transform: translate(1%, -1%); }
+  50% { transform: translate(-2%, 2%); }
+}
+
+/* 电影上下黑边 */
+.letterbox-top,
+.letterbox-bottom {
+  position: absolute;
+  width: 100%;
+  height: 120px;
+  background: #000;
+  z-index: 20;
+}
+.letterbox-top { top: 0; animation: revealDown 1s ease forwards; }
+.letterbox-bottom { bottom: 0; animation: revealUp 1s ease forwards; }
+
+@keyframes revealDown { from { height: 50%; } to { height: 120px; } }
+@keyframes revealUp { from { height: 50%; } to { height: 120px; } }
+
+/* 内容容器 */
+.content {
+  position: relative;
+  z-index: 10;
+  text-align: center;
+  padding: 60px;
+}
+
+/* 顶部小字 */
+.pretitle {
+  font-size: 18px;
+  color: rgba(255,255,255,0.5);
+  letter-spacing: 8px;
+  text-transform: uppercase;
+  margin-bottom: 40px;
+  opacity: 0;
+  animation: fadeIn 1s ease forwards;
+  animation-delay: 1s;
+}
+
+/* 主标题 */
+.main-title {
+  font-size: 88px;
+  font-weight: 900;
+  color: #fff;
+  letter-spacing: 16px;
+  line-height: 1.2;
+  opacity: 0;
+  transform: scale(1.5);
+  animation: zoomIn 1.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation-delay: 0.5s;
+  text-shadow: 0 10px 40px rgba(0,0,0,0.5);
+}
+
+@keyframes zoomIn {
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes fadeIn {
+  to { opacity: 1; }
+}
+
+/* 分隔装饰 */
+.divider {
+  width: 0;
+  height: 1px;
+  background: rgba(255,255,255,0.3);
+  margin: 40px auto;
+  animation: lineGrow 1s ease forwards;
+  animation-delay: 1.5s;
+}
+
+@keyframes lineGrow {
+  to { width: 200px; }
+}
+
+/* 副标题 */
+.sub-title {
+  font-size: 28px;
+  font-weight: 300;
+  color: rgba(255,255,255,0.7);
+  letter-spacing: 6px;
+  opacity: 0;
+  animation: fadeIn 1s ease forwards;
+  animation-delay: 2s;
+}
+
+/* 角落标记 */
+.corner {
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  border: 1px solid rgba(255,255,255,0.2);
+  z-index: 15;
+}
+.corner-tl { top: 140px; left: 40px; border-right: 0; border-bottom: 0; }
+.corner-tr { top: 140px; right: 40px; border-left: 0; border-bottom: 0; }
+.corner-bl { bottom: 140px; left: 40px; border-right: 0; border-top: 0; }
+.corner-br { bottom: 140px; right: 40px; border-left: 0; border-top: 0; }
+
+.corner {
+  opacity: 0;
+  animation: fadeIn 0.5s ease forwards;
+  animation-delay: 2.2s;
+}
+</style>
+</head>
+<body>
+  <div class="bg-image"></div>
+  <div class="grain"></div>
+  
+  <div class="letterbox-top"></div>
+  <div class="letterbox-bottom"></div>
+  
+  <div class="corner corner-tl"></div>
+  <div class="corner corner-tr"></div>
+  <div class="corner corner-bl"></div>
+  <div class="corner corner-br"></div>
+  
+  <div class="content">
+    <div class="pretitle">Introducing</div>
+    <div class="main-title">OMNIA</div>
+    <div class="divider"></div>
+    <div class="sub-title">你的 AI 超级助手</div>
+  </div>
+</body>
+</html>

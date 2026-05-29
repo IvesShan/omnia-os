@@ -181,6 +181,56 @@ async def neural_graph_export(limit: int = Query(100, ge=1, le=1000)):
 
 # ========== Graph Visualization API ==========
 
+@router.get("/memory/neural-graph")
+async def memory_neural_graph():
+    """兼容前端 Memory.vue 的神经图谱数据接口
+    
+    前端请求: /api/memory/neural-graph
+    实际路由: /api/memory/neural-graph (via prefix=/api)
+    
+    返回 ForceGraph 需要的 {nodes: [...], links: [...]} 格式
+    """
+    try:
+        graph = await get_neural_graph()
+        data = graph.export_to_json(limit=200)
+        
+        # 转换为 ForceGraph 需要的格式
+        # nodes: {id, label, type}
+        # links: {source, target, type, weight}
+        nodes = [
+            {
+                "id": n["id"],
+                "label": n.get("canonical_name") or n["name"],
+                "type": n["type"],
+                "access_count": n.get("access_count", 0)
+            }
+            for n in data.get("nodes", [])
+        ]
+        
+        links = [
+            {
+                "source": e["source"],
+                "target": e["target"],
+                "type": e["relation"],
+                "weight": e.get("weight", 0.5)
+            }
+            for e in data.get("edges", [])
+        ]
+        
+        return {
+            "nodes": nodes,
+            "links": links
+        }
+    except Exception as e:
+        import traceback
+        return {
+            "nodes": [],
+            "links": [],
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }
+
+
 @router.get("/graph")
 async def graph_export(min_weight: float = Query(0.0, ge=0.0)):
     """导出图谱数据用于可视化"""

@@ -76,6 +76,34 @@ async def stream_chat(message: str, history: list = None, provider: str = None) 
     """
     history = history or []
     
+    # === 话题切换检测 ===
+    # 如果用户切换到新话题，截断旧历史，避免模型被旧话题锁定
+    if history:
+        try:
+            from src.core.topic_recognizer import TopicRecognizer
+            tr = TopicRecognizer()
+            shift = tr.detect_topic_shift(history + [{"role": "user", "content": message}], window_size=2)
+            if shift and shift.shift_detected:
+                print(f"[stream_chat] Topic shift detected: {shift.old_topic} -> {shift.new_topic} (confidence: {shift.confidence:.2f})")
+                # 截断旧历史：只保留 system prompt 和最近的用户消息
+                # 找到最后一条 system prompt，保留它和之后的消息
+                system_idx = -1
+                for i, msg in enumerate(history):
+                    if msg.get("role") == "system":
+                        system_idx = i
+                # 只保留 system prompt（如果有） + 当前消息
+                if system_idx >= 0:
+                    history = history[system_idx:system_idx+1]  # 只保留 system prompt
+                else:
+                    history = []  # 没有 system prompt，清空所有历史
+                # 添加话题切换提示
+                history.append({
+                    "role": "system",
+                    "content": f"[系统提示] 用户已切换到新话题：{shift.new_topic}。请专注于新话题，忽略之前的讨论。"
+                })
+        except Exception as e:
+            print(f"[stream_chat] Topic detection failed: {e}")
+    
     # === 优先检查本地模型模式 ===
     model_mode = os.environ.get("OMNIA_MODEL_MODE", "cloud")
     
@@ -279,6 +307,10 @@ async def _stream_chat_unified(
             # stream_options only supported by OpenAI, not DeepSeek/Kimi/Qianfan
             **({"stream_options": {"include_usage": True}} if provider == "openai" else {}),
         }
+        
+        # Kimi 工具调用循环修复：限制模型只调用一次工具
+        if provider in ("kimi", "moonshot"):
+            payload["parallel_tool_calls"] = False
         
         # 流式请求
         try:
@@ -497,6 +529,20 @@ async def _stream_chat_unified(
         if not has_tool_calls:
             # 没有工具调用，检查是否完成
             if finish_reason == "stop":
+                # Kimi 过早终止修复：如果之前调用过工具，强制模型继续
+                if provider in ("kimi", "moonshot") and iteration >= 1 and len(execution_history) > 0:
+                    # 限制强制继续次数，避免无限循环
+                    force_continue_key = f"_force_continue_{id(messages)}"
+                    force_continue_count = getattr(stream_chat, force_continue_key, 0)
+                    if force_continue_count < 2:
+                        setattr(stream_chat, force_continue_key, force_continue_count + 1)
+                        messages.append({
+                            "role": "user",
+                            "content": "请继续完成剩余任务。如果需要调用工具，请继续调用。"
+                        })
+                        iteration += 1
+                        continue
+                
                 # 正常完成，发送 done 事件
                 # 记录助手回复
                 if session_id and full_content:

@@ -163,11 +163,18 @@ def _git_snapshot() -> dict | None:
             timeout=5
         ).stdout.strip()
         
+        modified_count = len([l for l in lines if l.startswith(" M")])
+        staged_count = len([l for l in lines if l.startswith("M ") or l.startswith("A ")])
+        untracked_count = len([l for l in lines if l.startswith("??")])
+        uncommitted_count = modified_count + staged_count + untracked_count
+        
         return {
             "branch": branch,
-            "modified": len([l for l in lines if l.startswith(" M") or l.startswith("M ")]),
-            "untracked": len([l for l in lines if l.startswith("??")]),
-            "staged": len([l for l in lines if l.startswith("A ") or l.startswith("M ")]),
+            "modified": modified_count,
+            "untracked": untracked_count,
+            "staged": staged_count,
+            "uncommitted_count": uncommitted_count,
+            "recent_commits_24h": 0,  # TODO: 可后续实现
         }
     except Exception:
         return None

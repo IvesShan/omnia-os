@@ -89,19 +89,42 @@ watch(selectedLayer, () => {
 
 async function loadGraphData() {
   try {
-    // 从数据库加载节点和边
-    const response = await fetch('http://localhost:8765/api/memory/neural-graph')
-    if (response.ok) {
-      const data = await response.json()
+    // 从后端 API 加载图谱数据
+    // 先尝试主 API 端口（从配置或默认 8765）
+    const baseUrls = [
+      window.location.origin,                    // 同源（生产环境）
+      'http://localhost:8765',                    // 默认端口
+      'http://127.0.0.1:8765',
+    ]
+    
+    let data = null
+    for (const baseUrl of baseUrls) {
+      try {
+        const response = await fetch(`${baseUrl}/api/memory/neural-graph`, {
+          signal: AbortSignal.timeout(5000)
+        })
+        if (response.ok) {
+          data = await response.json()
+          if (data.nodes && data.nodes.length > 0) {
+            break
+          }
+        }
+      } catch (e) {
+        continue
+      }
+    }
+    
+    if (data && data.nodes && data.nodes.length > 0) {
       graphData = data
       nodeCount.value = data.nodes.length
-      edgeCount.value = data.links.length
+      edgeCount.value = data.links ? data.links.length : 0
+      console.log(`[Memory] Loaded ${nodeCount.value} nodes, ${edgeCount.value} edges`)
     } else {
-      // 使用模拟数据
+      console.log('[Memory] No graph data from API, using mock data')
       generateMockData()
     }
   } catch (error) {
-    console.log('Using mock data:', error.message)
+    console.error('[Memory] Failed to load graph:', error.message)
     generateMockData()
   }
 }
@@ -152,7 +175,7 @@ function initGraph() {
   
   graph = ForceGraph()(graphContainer.value)
     .graphData(graphData)
-    .nodeId('id')
+    .nodeId('name')
     .nodeLabel(node => `${node.label} (${node.type})`)
     .nodeColor(node => typeColors[node.type] || typeColors.DEFAULT)
     .nodeVal(node => {

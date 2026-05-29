@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Typewriter</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;700;900&family=JetBrains+Mono:wght@400;700&display=swap');
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  width: 720px;
+  height: 1280px;
+  overflow: hidden;
+  background: #0d1117;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Noto Sans SC', sans-serif;
+}
+
+/* 代码编辑器风格背景 */
+.editor-bg {
+  position: absolute;
+  width: 90%;
+  height: 80%;
+  background: #161b22;
+  border-radius: 16px;
+  border: 1px solid #30363d;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  overflow: hidden;
+}
+
+/* 标题栏 */
+.editor-header {
+  height: 50px;
+  background: #21262d;
+  border-bottom: 1px solid #30363d;
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  gap: 10px;
+}
+
+.dot { width: 14px; height: 14px; border-radius: 50%; }
+.dot-red { background: #ff5f56; }
+.dot-yellow { background: #ffbd2e; }
+.dot-green { background: #27c93f; }
+
+.filename {
+  margin-left: 20px;
+  color: #8b949e;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 16px;
+}
+
+/* 代码区域 */
+.editor-body {
+  padding: 40px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 24px;
+  line-height: 1.8;
+  color: #c9d1d9;
+}
+
+/* 语法高亮 */
+.keyword { color: #ff7b72; }
+.function { color: #d2a8ff; }
+.string { color: #a5d6ff; }
+.comment { color: #8b949e; }
+.number { color: #79c0ff; }
+
+/* 打字机区域 */
+.type-area {
+  margin-top: 60px;
+  padding: 40px;
+}
+
+.typed-text {
+  font-size: 48px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: 4px;
+  min-height: 70px;
+}
+
+.typed-text::after {
+  content: '|';
+  animation: blink 1s infinite;
+  color: #3fb950;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* 光标行高亮 */
+.line-highlight {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 70px;
+  background: rgba(48, 54, 61, 0.4);
+  border-left: 3px solid #3fb950;
+  transform: translateY(280px);
+  opacity: 0;
+  animation: showHighlight 0.3s ease forwards;
+  animation-delay: 3s;
+}
+
+@keyframes showHighlight {
+  to { opacity: 1; }
+}
+
+/* 底部状态栏 */
+.status-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 36px;
+  background: #007acc;
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  color: #fff;
+  font-size: 14px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.status-item {
+  margin-right: 30px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 品牌标识 */
+.brand-tag {
+  position: absolute;
+  bottom: 60px;
+  right: 40px;
+  background: rgba(0,122,204,0.15);
+  border: 1px solid rgba(0,122,204,0.3);
+  border-radius: 8px;
+  padding: 12px 24px;
+  color: #58a6ff;
+  font-size: 20px;
+  letter-spacing: 4px;
+  opacity: 0;
+  animation: fadeIn 0.5s ease forwards;
+  animation-delay: 4s;
+}
+
+@keyframes fadeIn {
+  to { opacity: 1; }
+}
+</style>
+</head>
+<body>
+<div class="editor-bg">
+  <div class="editor-header">
+    <div class="dot dot-red"></div>
+    <div class="dot dot-yellow"></div>
+    <div class="dot dot-green"></div>
+    <div class="filename">omnia.config.js</div>
+  </div>
+  
+  <div class="editor-body">
+    <div><span class="keyword">const</span> <span class="function">Omnia</span> = {</div>
+    <div>&nbsp;&nbsp;name: <span class="string">'AI Assistant'</span>,</div>
+    <div>&nbsp;&nbsp;version: <span class="number">2.0</span>,</div>
+    <div>&nbsp;&nbsp;features: [<span class="string">'memory'</span>, <span class="string">'voice'</span>, <span class="string">'video'</span>]</div>
+    <div>};</div>
+    <div>&nbsp;</div>
+    <div><span class="comment">// Initializing...</span></div>
+    <div class="line-highlight"></div>
+  </div>
+  
+  <div class="type-area">
+    <div class="typed-text" id="typewriter"></div>
+  </div>
+  
+  <div class="status-bar">
+    <div class="status-item">⚡ Ready</div>
+    <div class="status-item">UTF-8</div>
+    <div class="status-item">JavaScript</div>
+  </div>
+</div>
+
+<div class="brand-tag">OMNIA OS</div>
+
+<script>
+const text = '你的 AI 超级助手';
+const element = document.getElementById('typewriter');
+let index = 0;
+
+function type() {
+  if (index < text.length) {
+    element.textContent += text[index];
+    index++;
+    setTimeout(type, 150);
+  }
+}
+
+setTimeout(type, 500);
+</script>
+</body>
+</html>

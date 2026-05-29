@@ -1,0 +1,370 @@
+<template id="intro-template">
+  <div data-composition-id="intro" data-width="1920" data-height="1080" data-duration="4"
+       data-composition-variables='{"brand":{"type":"string","default":"UOSUN"},"tagline":{"type":"string","default":"DJI Drone Repair Training"},"cnSub":{"type":"string","default":"专业 · 严谨 · 值得信赖"}}'>
+
+    <!-- Layer 0: Deep gradient background -->
+    <div class="bg-layer"></div>
+
+    <!-- Layer 1: Grid lines (subtle tech grid) -->
+    <div class="grid-layer">
+      <div class="grid-h grid-h-1"></div>
+      <div class="grid-h grid-h-2"></div>
+      <div class="grid-h grid-h-3"></div>
+      <div class="grid-v grid-v-1"></div>
+      <div class="grid-v grid-v-2"></div>
+      <div class="grid-v grid-v-3"></div>
+    </div>
+
+    <!-- Layer 2: Floating orbs -->
+    <div class="orbs-layer">
+      <div class="orb orb-cyan"></div>
+      <div class="orb orb-purple"></div>
+      <div class="orb orb-pink"></div>
+    </div>
+
+    <!-- Layer 3: Scan line effect -->
+    <div class="scanline"></div>
+
+    <!-- Layer 4: Center content -->
+    <div class="center-stage">
+      <!-- Logo icon with glow ring -->
+      <div class="logo-container">
+        <div class="glow-ring"></div>
+        <div class="glow-ring ring-2"></div>
+        <div class="logo-icon">
+          <svg width="72" height="72" viewBox="0 0 72 72" fill="none">
+            <circle cx="36" cy="36" r="28" stroke="url(#grad1)" stroke-width="3" fill="none"/>
+            <circle cx="36" cy="36" r="16" stroke="url(#grad1)" stroke-width="2" fill="none" opacity="0.6"/>
+            <circle cx="36" cy="36" r="6" fill="url(#grad1)"/>
+            <line x1="36" y1="8" x2="36" y2="20" stroke="url(#grad1)" stroke-width="2" stroke-linecap="round"/>
+            <line x1="36" y1="52" x2="36" y2="64" stroke="url(#grad1)" stroke-width="2" stroke-linecap="round"/>
+            <line x1="8" y1="36" x2="20" y2="36" stroke="url(#grad1)" stroke-width="2" stroke-linecap="round"/>
+            <line x1="52" y1="36" x2="64" y2="36" stroke="url(#grad1)" stroke-width="2" stroke-linecap="round"/>
+            <defs>
+              <linearGradient id="grad1" x1="0" y1="0" x2="72" y2="72">
+                <stop offset="0%" stop-color="#00d4ff"/>
+                <stop offset="100%" stop-color="#8b5cf6"/>
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+      </div>
+
+      <!-- Brand text -->
+      <div class="text-block">
+        <div class="brand-name" id="brandTitle">OMNIA</div>
+        <div class="tagline-divider">
+          <span class="div-line"></span>
+          <span class="tagline" id="brandTagline">Your AI Super Assistant</span>
+          <span class="div-line"></span>
+        </div>
+        <div class="cn-sub" id="brandCnSub">全能 · 智能 · 记忆</div>
+      </div>
+    </div>
+
+    <!-- Layer 5: Corner accents -->
+    <div class="corner-accent top-left"></div>
+    <div class="corner-accent bottom-right"></div>
+
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;600;900&family=Noto+Sans+SC:wght@300;700&display=swap');
+
+      [data-composition-id="intro"] {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        font-family: 'Inter', 'Noto Sans SC', sans-serif;
+      }
+
+      /* === Background === */
+      .bg-layer {
+        position: absolute;
+        inset: 0;
+        background:
+          radial-gradient(ellipse 80% 60% at 50% 50%, rgba(13, 17, 23, 1) 0%, rgba(5, 5, 15, 1) 100%);
+      }
+
+      /* === Grid === */
+      .grid-layer {
+        position: absolute;
+        inset: 0;
+        opacity: 0;
+      }
+      .grid-h, .grid-v {
+        position: absolute;
+        background: rgba(0, 212, 255, 0.06);
+      }
+      .grid-h { width: 100%; height: 1px; }
+      .grid-v { height: 100%; width: 1px; }
+      .grid-h-1 { top: 25%; }
+      .grid-h-2 { top: 50%; }
+      .grid-h-3 { top: 75%; }
+      .grid-v-1 { left: 25%; }
+      .grid-v-2 { left: 50%; }
+      .grid-v-3 { left: 75%; }
+
+      /* === Orbs === */
+      .orb {
+        position: absolute;
+        border-radius: 50%;
+        filter: blur(80px);
+        opacity: 0;
+      }
+      .orb-cyan {
+        width: 400px; height: 400px;
+        top: 20%; left: 30%;
+        background: rgba(0, 212, 255, 0.15);
+      }
+      .orb-purple {
+        width: 350px; height: 350px;
+        top: 40%; right: 25%;
+        background: rgba(139, 92, 246, 0.12);
+      }
+      .orb-pink {
+        width: 250px; height: 250px;
+        bottom: 20%; left: 45%;
+        background: rgba(236, 72, 153, 0.08);
+      }
+
+      /* === Scanline === */
+      .scanline {
+        position: absolute;
+        top: -100%;
+        left: 0;
+        width: 100%;
+        height: 3px;
+        background: linear-gradient(90deg, transparent 0%, rgba(0, 212, 255, 0.4) 50%, transparent 100%);
+        box-shadow: 0 0 30px rgba(0, 212, 255, 0.3);
+        opacity: 0;
+      }
+
+      /* === Center stage === */
+      .center-stage {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 10;
+      }
+
+      /* Logo */
+      .logo-container {
+        position: relative;
+        width: 140px;
+        height: 140px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+      }
+      .glow-ring {
+        position: absolute;
+        inset: -20px;
+        border-radius: 50%;
+        border: 1px solid rgba(0, 212, 255, 0.15);
+        opacity: 0;
+      }
+      .ring-2 {
+        inset: -40px;
+        border-color: rgba(139, 92, 246, 0.1);
+      }
+      .logo-icon {
+        position: relative;
+        z-index: 2;
+      }
+
+      /* Text */
+      .text-block {
+        margin-top: 48px;
+        text-align: center;
+        opacity: 0;
+      }
+      .brand-name {
+        font-size: 120px;
+        font-weight: 900;
+        letter-spacing: 24px;
+        background: linear-gradient(135deg, #ffffff 0%, #00d4ff 50%, #8b5cf6 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        line-height: 1;
+      }
+      .tagline-divider {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 24px;
+        margin-top: 24px;
+      }
+      .div-line {
+        display: block;
+        width: 80px;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, rgba(0, 212, 255, 0.5), transparent);
+      }
+      .tagline {
+        font-size: 28px;
+        font-weight: 300;
+        color: rgba(255, 255, 255, 0.7);
+        letter-spacing: 6px;
+        text-transform: uppercase;
+      }
+      .cn-sub {
+        margin-top: 16px;
+        font-size: 22px;
+        font-weight: 300;
+        color: rgba(0, 212, 255, 0.6);
+        letter-spacing: 12px;
+      }
+
+      /* Corner accents */
+      .corner-accent {
+        position: absolute;
+        width: 80px;
+        height: 80px;
+        opacity: 0;
+      }
+      .top-left {
+        top: 40px; left: 40px;
+        border-top: 2px solid rgba(0, 212, 255, 0.3);
+        border-left: 2px solid rgba(0, 212, 255, 0.3);
+      }
+      .bottom-right {
+        bottom: 40px; right: 40px;
+        border-bottom: 2px solid rgba(139, 92, 246, 0.3);
+        border-right: 2px solid rgba(139, 92, 246, 0.3);
+      }
+    </style>
+
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script>
+      (function () {
+        // Try HyperFrames variables API first, then URL params, then defaults
+        let brand = 'UOSUN';
+        let tagline = 'DJI Drone Repair Training';
+        let cnSub = '专业 · 严谨 · 值得信赖';
+
+        try {
+          if (window.__hyperframes && window.__hyperframes.getVariables) {
+            const vars = window.__hyperframes.getVariables();
+            if (vars.brand) brand = vars.brand;
+            if (vars.tagline) tagline = vars.tagline;
+            if (vars.cnSub) cnSub = vars.cnSub;
+          }
+        } catch(e) {}
+
+        // Fallback to URL query params
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('brand')) brand = params.get('brand');
+        if (params.get('tagline')) tagline = params.get('tagline');
+        if (params.get('cn')) cnSub = params.get('cn');
+
+        document.getElementById('brandTitle').textContent = brand;
+        document.getElementById('brandTagline').textContent = tagline;
+        document.getElementById('brandCnSub').textContent = cnSub;
+
+        const tl = gsap.timeline({ paused: true });
+
+        // 1. Grid fade in (subtle, 0s)
+        tl.to('[data-composition-id="intro"] .grid-layer', {
+          opacity: 1,
+          duration: 1.5,
+          ease: 'power2.out'
+        }, 0);
+
+        // 2. Orbs float in (0s - 2s)
+        tl.to('[data-composition-id="intro"] .orb-cyan', {
+          opacity: 1,
+          x: 30,
+          y: -20,
+          duration: 2.5,
+          ease: 'power1.out'
+        }, 0);
+        tl.to('[data-composition-id="intro"] .orb-purple', {
+          opacity: 1,
+          x: -20,
+          y: 30,
+          duration: 2.5,
+          ease: 'power1.out'
+        }, 0.3);
+        tl.to('[data-composition-id="intro"] .orb-pink', {
+          opacity: 1,
+          x: 15,
+          y: -25,
+          duration: 2.5,
+          ease: 'power1.out'
+        }, 0.6);
+
+        // 3. Scan line sweep (0.2s)
+        tl.to('[data-composition-id="intro"] .scanline', {
+          opacity: 1,
+          top: '110%',
+          duration: 1.8,
+          ease: 'none'
+        }, 0.2);
+
+        // 4. Logo container scale in (0.3s)
+        tl.to('[data-composition-id="intro"] .logo-container', {
+          opacity: 1,
+          scale: 1,
+          duration: 1.0,
+          ease: 'back.out(1.4)'
+        }, 0.3);
+        // Glow rings pulse
+        tl.to('[data-composition-id="intro"] .glow-ring', {
+          opacity: 1,
+          scale: 1.1,
+          duration: 1.2,
+          ease: 'power2.out'
+        }, 0.5);
+        // 4s composition / 2s cycle = 2 repeats
+        tl.to('[data-composition-id="intro"] .ring-2', {
+          scale: 1.15,
+          duration: 2.0,
+          ease: 'sine.inOut',
+          yoyo: true,
+          repeat: Math.floor(4 / 2.0) - 1
+        }, 0.8);
+
+        // 5. Text block reveal (0.6s)
+        tl.to('[data-composition-id="intro"] .text-block', {
+          opacity: 1,
+          y: 0,
+          duration: 1.0,
+          ease: 'power3.out'
+        }, 0.6);
+
+        // 6. Corner accents (1.0s)
+        tl.to('[data-composition-id="intro"] .corner-accent', {
+          opacity: 1,
+          duration: 0.8,
+          ease: 'power2.out'
+        }, 1.0);
+
+        // Set initial states
+        gsap.set('[data-composition-id="intro"] .logo-container', { scale: 0.5 });
+        gsap.set('[data-composition-id="intro"] .text-block', { y: 40 });
+        gsap.set('[data-composition-id="intro"] .glow-ring', { scale: 0.8 });
+
+        // Exit: Fade everything out at 3.2s
+        tl.to('[data-composition-id="intro"] .center-stage', {
+          opacity: 0,
+          scale: 0.95,
+          duration: 0.6,
+          ease: 'power2.in'
+        }, 3.2);
+        tl.to('[data-composition-id="intro"] .corner-accent', {
+          opacity: 0,
+          duration: 0.4,
+          ease: 'power2.in'
+        }, 3.2);
+
+        window.__timelines = window.__timelines || {};
+        window.__timelines["intro"] = tl;
+      })();
+    </script>
+  </div>
+</template>

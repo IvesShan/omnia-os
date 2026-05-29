@@ -36,8 +36,15 @@ class LLMClient:
     API_TOOL_PROVIDERS = {"deepseek", "openai", "xiaomi", "qianfan", "kimi"}
     
     def __init__(self):
-        timeout = httpx.Timeout(connect=5.0, read=180.0, write=10.0, pool=10.0)
-        self.client = httpx.AsyncClient(timeout=timeout)
+        timeout = httpx.Timeout(connect=5.0, read=180.0, write=10.0, pool=5.0)
+        self.client = httpx.AsyncClient(
+            timeout=timeout,
+            limits=httpx.Limits(
+                max_connections=50,
+                max_keepalive_connections=10,
+                keepalive_expiry=30.0,  # 30秒后关闭空闲连接
+            ),
+        )
     
     async def close(self):
         """关闭客户端"""

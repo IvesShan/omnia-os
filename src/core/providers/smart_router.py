@@ -155,19 +155,20 @@ class SmartModelRouter:
     def _select_cloud_provider(self) -> str:
         """选择一个可用的云端 provider"""
         import os as _os
-        # 优先 Kimi → 千帆 → 注册表第一个
-        if _os.getenv("MOONSHOT_API_KEY") or _os.getenv("KIMI_API_KEY"):
-            return "kimi"
-        if _os.getenv("QIANFAN_API_KEY") or _os.getenv("BAIDU_API_KEY"):
-            return "qianfan"
+        # 优先小米 → DeepSeek → 千帆 → Kimi（Kimi key 已失效，放最后）
+        if _os.getenv("MIMO_API_KEY"):
+            return "xiaomi"
         if _os.getenv("DEEPSEEK_API_KEY"):
             return "deepseek"
+        if _os.getenv("QIANFAN_API_KEY") or _os.getenv("BAIDU_API_KEY"):
+            return "qianfan"
+        if _os.getenv("MOONSHOT_API_KEY") or _os.getenv("KIMI_API_KEY"):
+            return "kimi"
         # 从注册表里找一个非 local 的
         for name in self._provider_registry:
             if name != "local":
                 return name
-        return "kimi"  # 无可用时仍返回 kimi，让调用方报错
-
+        return "xiaomi"  # 默认返回小米，让调用方报错也更合理
     # ─────────────────────────────────────────────
     # 模式切换
     # ─────────────────────────────────────────────

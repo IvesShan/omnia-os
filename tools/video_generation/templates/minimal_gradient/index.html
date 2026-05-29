@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Minimal Gradient</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;700;900&display=swap');
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  width: 720px;
+  height: 1280px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Noto Sans SC', sans-serif;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+  background-size: 400% 400%;
+  animation: gradientShift 8s ease infinite;
+}
+
+@keyframes gradientShift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* 玻璃态卡片 */
+.glass-card {
+  background: rgba(255,255,255,0.1);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 30px;
+  padding: 80px 60px;
+  text-align: center;
+  box-shadow: 
+    0 8px 32px rgba(0,0,0,0.1),
+    inset 0 0 0 1px rgba(255,255,255,0.1);
+  animation: cardFloat 3s ease-in-out infinite;
+}
+
+@keyframes cardFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+/* 主标题 */
+.main-title {
+  font-size: 80px;
+  font-weight: 900;
+  color: #fff;
+  letter-spacing: 20px;
+  margin-bottom: 30px;
+  opacity: 0;
+  transform: translateY(40px);
+  animation: revealUp 1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes revealUp {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* 分隔线 */
+.divider {
+  width: 60px;
+  height: 4px;
+  background: rgba(255,255,255,0.8);
+  border-radius: 2px;
+  margin: 0 auto 30px;
+  opacity: 0;
+  animation: revealUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation-delay: 0.3s;
+}
+
+/* 副标题 */
+.sub-title {
+  font-size: 36px;
+  font-weight: 300;
+  color: rgba(255,255,255,0.9);
+  letter-spacing: 8px;
+  opacity: 0;
+  animation: revealUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation-delay: 0.5s;
+}
+
+/* 装饰圆点 */
+.dots {
+  margin-top: 40px;
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.5);
+  opacity: 0;
+  animation: dotAppear 0.5s ease forwards;
+}
+
+.dot:nth-child(1) { animation-delay: 0.8s; background: #fff; }
+.dot:nth-child(2) { animation-delay: 0.9s; }
+.dot:nth-child(3) { animation-delay: 1.0s; }
+
+@keyframes dotAppear {
+  from { opacity: 0; transform: scale(0); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* 光晕效果 */
+.glow {
+  position: absolute;
+  width: 400px;
+  height: 400px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%);
+  animation: glowPulse 4s ease-in-out infinite;
+}
+
+.glow-1 { top: -100px; left: -100px; animation-delay: 0s; }
+.glow-2 { bottom: -150px; right: -100px; animation-delay: 2s; }
+
+@keyframes glowPulse {
+  0%, 100% { transform: scale(1); opacity: 0.5; }
+  50% { transform: scale(1.2); opacity: 0.8; }
+}
+</style>
+</head>
+<body>
+  <div class="glow glow-1"></div>
+  <div class="glow glow-2"></div>
+  
+  <div class="glass-card">
+    <div class="main-title">OMNIA</div>
+    <div class="divider"></div>
+    <div class="sub-title">你的 AI 超级助手</div>
+    <div class="dots">
+      <div class="dot"></div>
+      <div class="dot"></div>
+      <div class="dot"></div>
+    </div>
+  </div>
+</body>
+</html>

@@ -449,6 +449,10 @@ def _call_model_messages(api_key: str, provider: str, messages: list, tools: lis
         if tool_choice:
             payload["tool_choice"] = tool_choice
             print(f"[_call_model_messages] Tool choice: {tool_choice}")
+        
+        # Kimi 工具调用循环修复：限制模型只调用一次工具
+        if provider in ("kimi", "moonshot"):
+            payload["parallel_tool_calls"] = False
     else:
         print(f"[_call_model_messages] No tools passed")
 
