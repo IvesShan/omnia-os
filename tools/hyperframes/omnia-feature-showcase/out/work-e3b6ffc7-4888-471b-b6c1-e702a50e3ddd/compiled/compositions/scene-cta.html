@@ -1,0 +1,241 @@
+<template id="scene-cta-template">
+  <div data-composition-id="scene-cta" data-width="1920" data-height="1080" data-duration="7">
+
+    <!-- Background -->
+    <div class="bg-layer"></div>
+
+    <!-- Gradient orbs -->
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+
+    <!-- Center content -->
+    <div class="center-content">
+      <div class="cta-title" id="ctaTitle">OMNIA</div>
+      <div class="cta-subtitle" id="ctaSubtitle">有记忆的 AI 助手</div>
+      <div class="cta-tagline" id="ctaTagline">它不只是回答问题，它记住你是谁</div>
+
+      <!-- Download button -->
+      <div class="cta-button" id="ctaButton">
+        <span>立即体验</span>
+        <div class="button-glow"></div>
+      </div>
+
+      <!-- Stats -->
+      <div class="cta-stats">
+        <div class="stat-item">
+          <div class="stat-number">100%</div>
+          <div class="stat-label">本地运行</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-number">∞</div>
+          <div class="stat-label">记忆容量</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-number">40+</div>
+          <div class="stat-label">工具能力</div>
+        </div>
+      </div>
+    </div>
+
+    <style>
+      @import url('../assets/fonts/fonts.css');
+
+      [data-composition-id="scene-cta"] {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        font-family: 'Inter', 'Noto Sans SC', sans-serif;
+      }
+
+      .bg-layer {
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(ellipse 80% 60% at 50% 50%, rgba(13, 17, 23, 1) 0%, rgba(5, 5, 15, 1) 100%);
+      }
+
+      .orb {
+        position: absolute;
+        border-radius: 50%;
+        filter: blur(100px);
+        opacity: 0;
+      }
+
+      .orb-1 {
+        width: 400px;
+        height: 400px;
+        top: 20%;
+        left: 30%;
+        background: rgba(0, 212, 255, 0.15);
+      }
+
+      .orb-2 {
+        width: 350px;
+        height: 350px;
+        top: 40%;
+        right: 25%;
+        background: rgba(139, 92, 246, 0.12);
+      }
+
+      .orb-3 {
+        width: 300px;
+        height: 300px;
+        bottom: 20%;
+        left: 40%;
+        background: rgba(236, 72, 153, 0.08);
+      }
+
+      .center-content {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 10;
+      }
+
+      .cta-title {
+        font-size: 160px;
+        font-weight: 900;
+        letter-spacing: 32px;
+        background: linear-gradient(135deg, #ffffff 0%, #00d4ff 50%, #8b5cf6 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        line-height: 1;
+        opacity: 0;
+      }
+
+      .cta-subtitle {
+        font-size: 40px;
+        font-weight: 300;
+        color: rgba(255, 255, 255, 0.8);
+        margin-top: 24px;
+        letter-spacing: 12px;
+        opacity: 0;
+      }
+
+      .cta-tagline {
+        font-size: 28px;
+        font-weight: 300;
+        color: rgba(255, 255, 255, 0.6);
+        margin-top: 24px;
+        opacity: 0;
+      }
+
+      .cta-button {
+        position: relative;
+        margin-top: 48px;
+        padding: 20px 60px;
+        background: linear-gradient(135deg, #00d4ff 0%, #8b5cf6 100%);
+        border-radius: 50px;
+        font-size: 24px;
+        font-weight: 600;
+        color: #fff;
+        cursor: pointer;
+        opacity: 0;
+      }
+
+      .button-glow {
+        position: absolute;
+        inset: -4px;
+        border-radius: 54px;
+        background: linear-gradient(135deg, #00d4ff 0%, #8b5cf6 100%);
+        opacity: 0.3;
+        filter: blur(15px);
+        z-index: -1;
+      }
+
+      .cta-stats {
+        display: flex;
+        gap: 80px;
+        margin-top: 64px;
+        opacity: 0;
+      }
+
+      .stat-item {
+        text-align: center;
+      }
+
+      .stat-number {
+        font-size: 48px;
+        font-weight: 900;
+        color: #00d4ff;
+      }
+
+      .stat-label {
+        font-size: 18px;
+        font-weight: 300;
+        color: rgba(255, 255, 255, 0.5);
+        margin-top: 8px;
+      }
+    </style>
+
+    <script>
+      (function() {
+        const tl = gsap.timeline({ paused: true });
+
+        // Orbs float in
+        tl.to('.orb-1', { opacity: 1, x: 30, y: -20, duration: 2.5, ease: 'power1.out' }, 0);
+        tl.to('.orb-2', { opacity: 1, x: -20, y: 30, duration: 2.5, ease: 'power1.out' }, 0.3);
+        tl.to('.orb-3', { opacity: 1, x: 15, y: -25, duration: 2.5, ease: 'power1.out' }, 0.6);
+
+        // Title appears
+        tl.fromTo('.cta-title',
+          { opacity: 0, scale: 0.8 },
+          { opacity: 1, scale: 1, duration: 1.2, ease: 'back.out(1.4)' },
+          0.5
+        );
+
+        // Subtitle appears
+        tl.fromTo('.cta-subtitle',
+          { opacity: 0, y: 20 },
+          { opacity: 1, y: 0, duration: 1.0, ease: 'power3.out' },
+          1.2
+        );
+
+        // Tagline appears
+        tl.fromTo('.cta-tagline',
+          { opacity: 0, y: 20 },
+          { opacity: 1, y: 0, duration: 1.0, ease: 'power3.out' },
+          1.8
+        );
+
+        // Button appears
+        tl.fromTo('.cta-button',
+          { opacity: 0, y: 20 },
+          { opacity: 1, y: 0, duration: 0.8, ease: 'back.out(1.4)' },
+          2.5
+        );
+
+        // Button pulse
+        tl.to('.cta-button', {
+          scale: 1.05,
+          duration: 1.5,
+          ease: 'sine.inOut',
+          yoyo: true,
+          repeat: 2
+        }, 3.0);
+
+        // Stats appear
+        tl.fromTo('.cta-stats',
+          { opacity: 0, y: 20 },
+          { opacity: 1, y: 0, duration: 1.0, ease: 'power3.out' },
+          3.5
+        );
+
+        // Final fade
+        tl.to('.center-content', {
+          opacity: 0,
+          duration: 0.8,
+          ease: 'power2.in'
+        }, 6.2);
+
+        window.__timelines = window.__timelines || {};
+        window.__timelines["scene-cta"] = tl;
+      })();
+    </script>
+  </div>
+</template>

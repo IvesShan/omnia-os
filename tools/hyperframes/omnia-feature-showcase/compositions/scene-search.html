@@ -1,0 +1,66 @@
+<template id="scene-search-template">
+  <div data-composition-id="scene-search" data-width="1920" data-height="1080" data-duration="6">
+    <div class="search-container">
+      <div class="search-box" id="searchBox">
+        <div class="search-icon">🔍</div>
+        <div class="search-text">记忆搜索</div>
+        <div class="search-desc">所有对话都有迹可循</div>
+      </div>
+    </div>
+
+    <style>
+      @font-face { font-family: 'Noto Sans SC'; src: url('../assets/fonts/noto-sans-sc.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'Inter'; src: url('../assets/fonts/inter-latin.woff2') format('woff2'); font-display: swap; }
+      [data-composition-id="scene-search"] {
+        background: linear-gradient(135deg, #0a0f19 0%, #1a1a2e 100%);
+        font-family: 'Inter', 'Noto Sans SC', sans-serif;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .search-container {
+        text-align: center;
+      }
+
+      .search-box {
+        opacity: 0;
+        padding: 60px;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 24px;
+        border: 1px solid rgba(0, 212, 255, 0.2);
+      }
+
+      .search-icon {
+        font-size: 80px;
+        margin-bottom: 20px;
+      }
+
+      .search-text {
+        font-size: 96px;
+        font-weight: 900;
+        background: linear-gradient(135deg, #00d4ff 0%, #8b5cf6 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+
+      .search-desc {
+        font-size: 42px;
+        font-weight: 300;
+        color: rgba(255, 255, 255, 0.8);
+        margin-top: 20px;
+      }
+    </style>
+
+    <script>
+      (function() {
+        const tl = gsap.timeline({ paused: true });
+        tl.fromTo('#searchBox', { opacity: 0, scale: 0.9 }, { opacity: 1, scale: 1, duration: 1.5, ease: 'power3.out' }, 0.5);
+        tl.to('#searchBox', { opacity: 0, duration: 0.5 }, 5.5);
+        window.__timelines = window.__timelines || {};
+        window.__timelines["scene-search"] = tl;
+      })();
+    </script>
+  </div>
+</template>

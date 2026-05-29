@@ -1,0 +1,207 @@
+<template id="scene-multiturn-template">
+  <div data-composition-id="scene-multiturn" data-width="1920" data-height="1080" data-duration="8">
+
+    <!-- Background -->
+    <div class="bg-layer"></div>
+
+    <!-- Chat history visualization -->
+    <div class="chat-history">
+      <div class="chat-msg msg-1">
+        <div class="msg-indicator user"></div>
+        <div class="msg-text">我正在做一个电商项目</div>
+        <div class="msg-time">3天前</div>
+      </div>
+      <div class="chat-msg msg-2">
+        <div class="msg-indicator ai"></div>
+        <div class="msg-text">好的，我记住了</div>
+        <div class="msg-time">3天前</div>
+      </div>
+      <div class="chat-msg msg-3">
+        <div class="msg-indicator user"></div>
+        <div class="msg-text">用的是 React + Node.js</div>
+        <div class="msg-time">2天前</div>
+      </div>
+      <div class="chat-msg msg-4">
+        <div class="msg-indicator ai"></div>
+        <div class="msg-text">技术栈：React + Node.js</div>
+        <div class="msg-time">2天前</div>
+      </div>
+      <div class="chat-msg msg-5">
+        <div class="msg-indicator user"></div>
+        <div class="msg-text">我上次说的项目进展如何？</div>
+        <div class="msg-time">现在</div>
+      </div>
+      <div class="chat-msg msg-6 highlight">
+        <div class="msg-indicator ai"></div>
+        <div class="msg-text">你的电商项目，使用 React + Node.js 技术栈...</div>
+        <div class="msg-time">现在</div>
+      </div>
+    </div>
+
+    <!-- Text overlay -->
+    <div class="text-overlay">
+      <div class="section-title" id="multiturnTitle">多轮记忆</div>
+      <div class="section-desc" id="multiturnDesc">不会聊到一半就忘了你是谁</div>
+      <div class="section-detail" id="multiturnDetail">
+        跨会话记忆保持<br/>
+        上下文无缝衔接
+      </div>
+    </div>
+
+    <style>
+      @import url('../assets/fonts/fonts.css');
+
+      [data-composition-id="scene-multiturn"] {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        font-family: 'Inter', 'Noto Sans SC', sans-serif;
+      }
+
+      .bg-layer {
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(ellipse 80% 60% at 50% 50%, rgba(13, 17, 23, 1) 0%, rgba(5, 5, 15, 1) 100%);
+      }
+
+      .chat-history {
+        position: absolute;
+        left: 150px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 700px;
+      }
+
+      .chat-msg {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 20px;
+        padding: 16px 20px;
+        background: rgba(255, 255, 255, 0.03);
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        opacity: 0;
+      }
+
+      .chat-msg.highlight {
+        background: rgba(0, 212, 255, 0.05);
+        border-color: rgba(0, 212, 255, 0.2);
+      }
+
+      .msg-indicator {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        flex-shrink: 0;
+      }
+
+      .msg-indicator.user {
+        background: #8b5cf6;
+      }
+
+      .msg-indicator.ai {
+        background: #00d4ff;
+      }
+
+      .msg-text {
+        font-size: 20px;
+        color: rgba(255, 255, 255, 0.9);
+        flex: 1;
+      }
+
+      .msg-time {
+        font-size: 14px;
+        color: rgba(255, 255, 255, 0.4);
+        flex-shrink: 0;
+      }
+
+      .text-overlay {
+        position: absolute;
+        right: 100px;
+        top: 50%;
+        transform: translateY(-50%);
+        text-align: right;
+      }
+
+      .section-title {
+        font-size: 72px;
+        font-weight: 900;
+        background: linear-gradient(135deg, #00d4ff 0%, #8b5cf6 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        opacity: 0;
+      }
+
+      .section-desc {
+        font-size: 32px;
+        font-weight: 300;
+        color: rgba(255, 255, 255, 0.7);
+        margin-top: 24px;
+        opacity: 0;
+      }
+
+      .section-detail {
+        font-size: 24px;
+        font-weight: 300;
+        color: rgba(255, 255, 255, 0.5);
+        margin-top: 32px;
+        line-height: 1.6;
+        opacity: 0;
+      }
+    </style>
+
+    <script>
+      (function() {
+        const tl = gsap.timeline({ paused: true });
+
+        // Title appears
+        tl.fromTo('#multiturnTitle',
+          { opacity: 0, x: 50 },
+          { opacity: 1, x: 0, duration: 1.0, ease: 'power3.out' },
+          0.3
+        );
+
+        // Description appears
+        tl.fromTo('#multiturnDesc',
+          { opacity: 0, x: 50 },
+          { opacity: 1, x: 0, duration: 1.0, ease: 'power3.out' },
+          0.8
+        );
+
+        // Chat messages appear one by one
+        tl.fromTo('.chat-msg',
+          { opacity: 0, x: -30 },
+          { opacity: 1, x: 0, duration: 0.6, ease: 'power3.out', stagger: 0.4 },
+          1.5
+        );
+
+        // Highlight the last message
+        tl.to('.highlight', {
+          scale: 1.02,
+          duration: 0.5,
+          ease: 'power2.out'
+        }, 3.5);
+
+        // Detail text appears
+        tl.fromTo('#multiturnDetail',
+          { opacity: 0, x: 50 },
+          { opacity: 1, x: 0, duration: 1.0, ease: 'power3.out' },
+          4.0
+        );
+
+        // Fade out at end
+        tl.to('.chat-history, .text-overlay', {
+          opacity: 0,
+          duration: 0.5,
+          ease: 'power2.in'
+        }, 7.5);
+
+        window.__timelines = window.__timelines || {};
+        window.__timelines["scene-multiturn"] = tl;
+      })();
+    </script>
+  </div>
+</template>

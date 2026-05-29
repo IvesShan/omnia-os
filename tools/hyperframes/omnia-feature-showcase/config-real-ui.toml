@@ -1,0 +1,67 @@
+# Omnia Feature Showcase
+# 30-60秒竖版产品宣传片 | 1080x1920 | 抖音/小红书
+# 真实 UI 截图版本
+
+[project]
+name = "Omnia 功能展示"
+version = "1.0.0"
+description = "永不遗忘的 AI 操作系统"
+orientation = "vertical"
+resolution = "1080x1920"
+fps = 30
+
+[scenes]
+count = 8
+names = ["hook", "memory_palace", "neural_graph", "tools", "streaming", "multi_turn", "memory_search", "cta"]
+
+[scenes.hook]
+duration = 4
+transition_in = "fade"
+transition_out = "slide_up"
+
+[scenes.memory_palace]
+duration = 8
+transition_in = "slide_up"
+transition_out = "slide_left"
+
+[scenes.neural_graph]
+duration = 8
+transition_in = "slide_left"
+transition_out = "slide_left"
+
+[scenes.tools]
+duration = 8
+transition_in = "slide_left"
+transition_out = "slide_left"
+
+[scenes.streaming]
+duration = 6
+transition_in = "slide_left"
+transition_out = "slide_left"
+
+[scenes.multi_turn]
+duration = 6
+transition_in = "slide_left"
+transition_out = "slide_left"
+
+[scenes.memory_search]
+duration = 6
+transition_in = "slide_left"
+transition_out = "fade"
+
+[scenes.cta]
+duration = 4
+transition_in = "fade"
+transition_out = "fade"
+
+[audio]
+bgm = "assets/audio/bgm.mp3"
+bgm_volume = 0.3
+voiceover = "assets/audio/voiceover.mp3"
+voiceover_volume = 1.0
+
+[export]
+format = "mp4"
+codec = "h264"
+bitrate = "8M"
+output = "output/omnia-showcase.mp4"

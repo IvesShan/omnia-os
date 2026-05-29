@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      @font-face { font-family: 'Noto Sans SC'; src: url('./assets/fonts/noto-sans-sc.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'Inter'; src: url('./assets/fonts/inter-latin.woff2') format('woff2'); font-display: swap; }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body {
+        margin: 0;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: #000;
+        font-family: 'Inter', 'Noto Sans SC', sans-serif;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="main"
+      data-start="0"
+      data-duration="90"
+      data-width="1920"
+      data-height="1080"
+    >
+      <!-- Scene 1: Hook (0-3s) -->
+      <div id="scene-hook" class="clip" data-composition-id="scene-hook" data-start="0" data-duration="3" data-track-index="1"
+           data-composition-src="compositions/scene-hook.html"></div>
+
+      <!-- Scene 2: Intro (3-8s) -->
+      <div id="scene-intro" class="clip" data-composition-id="scene-intro" data-start="3" data-duration="5" data-track-index="1"
+           data-composition-src="compositions/scene-intro.html"></div>
+
+      <!-- Scene 3: Memory Palace (8-20s) -->
+      <div id="scene-memory" class="clip" data-composition-id="scene-memory" data-start="8" data-duration="12" data-track-index="1"
+           data-composition-src="compositions/scene-memory.html"></div>
+
+      <!-- Scene 4: Neural Graph (20-32s) -->
+      <div id="scene-graph" class="clip" data-composition-id="scene-graph" data-start="20" data-duration="12" data-track-index="1"
+           data-composition-src="compositions/scene-graph.html"></div>
+
+      <!-- Scene 5: Tools (32-44s) -->
+      <div id="scene-tools" class="clip" data-composition-id="scene-tools" data-start="32" data-duration="12" data-track-index="1"
+           data-composition-src="compositions/scene-tools.html"></div>
+
+      <!-- Scene 6: Streaming (44-50s) -->
+      <div id="scene-streaming" class="clip" data-composition-id="scene-streaming" data-start="44" data-duration="6" data-track-index="1"
+           data-composition-src="compositions/scene-streaming.html"></div>
+
+      <!-- Scene 7: Multi-turn (50-58s) -->
+      <div id="scene-multiturn" class="clip" data-composition-id="scene-multiturn" data-start="50" data-duration="8" data-track-index="1"
+           data-composition-src="compositions/scene-multiturn.html"></div>
+
+      <!-- Scene 8: CTA (58-65s) -->
+      <div id="scene-cta" class="clip" data-composition-id="scene-cta" data-start="58" data-duration="7" data-track-index="1"
+           data-composition-src="compositions/scene-cta.html"></div>
+    </div>
+
+    <script>
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      window.__timelines["main"] = tl;
+    </script>
+  </body>
+</html>

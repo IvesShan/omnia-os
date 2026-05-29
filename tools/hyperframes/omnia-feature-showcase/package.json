@@ -1,0 +1,14 @@
+{
+  "name": "omnia-feature-showcase",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "hyperframes preview",
+    "check": "hyperframes lint",
+    "render": "hyperframes render --output out/video.mp4",
+    "publish": "hyperframes publish"
+  },
+  "devDependencies": {
+    "hyperframes": "^0.6.55"
+  }
+}

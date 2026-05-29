@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { width: 1920px; height: 1080px; overflow: hidden; background: #000; }
+    </style>
+</head>
+<body>
+    <template id="scene-hook-template">
+  <div data-composition-id="scene-hook" data-width="1920" data-height="1080" data-duration="3">
+
+    <!-- Dark background -->
+    <div class="bg-layer"></div>
+
+    <!-- Center text -->
+    <div class="center-content">
+      <div class="hook-text" id="hookText">
+        关掉聊天窗口，它还记得你说过的每一句话
+      </div>
+      <div class="hook-sub" id="hookSub">这不是普通的 AI</div>
+    </div>
+
+    <!-- Corner accents -->
+    <div class="corner top-left"></div>
+    <div class="corner bottom-right"></div>
+
+    <style>
+      @import url('../assets/fonts/fonts.css');
+
+      [data-composition-id="scene-hook"] {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+      }
+
+      .bg-layer {
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(ellipse 80% 60% at 50% 50%, rgba(13, 17, 23, 1) 0%, rgba(5, 5, 15, 1) 100%);
+      }
+
+      .center-content {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 10;
+      }
+
+      .hook-text {
+        font-size: 64px;
+        font-weight: 900;
+        color: #fff;
+        text-align: center;
+        max-width: 1200px;
+        line-height: 1.4;
+        opacity: 0;
+      }
+
+      .hook-sub {
+        font-size: 32px;
+        font-weight: 300;
+        color: rgba(0, 212, 255, 0.8);
+        margin-top: 24px;
+        letter-spacing: 8px;
+        opacity: 0;
+      }
+
+      .corner {
+        position: absolute;
+        width: 80px;
+        height: 80px;
+        opacity: 0;
+      }
+
+      .top-left {
+        top: 40px;
+        left: 40px;
+        border-top: 2px solid rgba(0, 212, 255, 0.3);
+        border-left: 2px solid rgba(0, 212, 255, 0.3);
+      }
+
+      .bottom-right {
+        bottom: 40px;
+        right: 40px;
+        border-bottom: 2px solid rgba(139, 92, 246, 0.3);
+        border-right: 2px solid rgba(139, 92, 246, 0.3);
+      }
+    </style>
+
+    <script>
+      (function() {
+        const tl = gsap.timeline({ paused: true });
+
+        tl.fromTo('#hookText',
+          { opacity: 0, y: 30 },
+          { opacity: 1, y: 0, duration: 1.5, ease: 'power3.out' },
+          0.3
+        );
+
+        tl.fromTo('#hookSub',
+          { opacity: 0, y: 20 },
+          { opacity: 1, y: 0, duration: 1.0, ease: 'power3.out' },
+          1.0
+        );
+
+        tl.to('.corner', {
+          opacity: 1,
+          duration: 0.5,
+          ease: 'power2.out'
+        }, 0.5);
+
+        tl.to('.center-content', {
+          opacity: 0,
+          duration: 0.3,
+          ease: 'power2.in'
+        }, 2.7);
+
+        window.__timelines = window.__timelines || {};
+        window.__timelines["scene-hook"] = tl;
+      })();
+    </script>
+  </div>
+</template>
+
+    <script>
+        // Extract and execute the scene script
+        const scripts = document.querySelectorAll('script');
+        scripts.forEach(s => {
+            if (s.textContent.includes('__timelines')) {
+                eval(s.textContent);
+            }
+        });
+        // Start the timeline
+        const tl = window.__timelines["scene-hook"];
+        if (tl) {
+            tl.totalDuration(3);
+            tl.play();
+        }
+    </script>
+</body>
+</html>

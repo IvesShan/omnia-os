@@ -1,0 +1,52 @@
+<template id="scene-hook-template">
+  <div data-composition-id="scene-hook" data-width="1920" data-height="1080" data-duration="4">
+    <div class="hook-container">
+      <div class="hook-text" id="hookText">
+        你有没有想过<br/>
+        <span class="highlight">如果 AI 能记住你说过的每一句话？</span>
+      </div>
+    </div>
+
+    <style>
+      @font-face { font-family: 'Noto Sans SC'; src: url('../assets/fonts/noto-sans-sc.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'Inter'; src: url('../assets/fonts/inter-latin.woff2') format('woff2'); font-display: swap; }
+      [data-composition-id="scene-hook"] {
+        background: linear-gradient(135deg, #0a0f19 0%, #1a1a2e 100%);
+        font-family: 'Inter', 'Noto Sans SC', sans-serif;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .hook-container {
+        text-align: center;
+      }
+
+      .hook-text {
+        font-size: 64px;
+        font-weight: 300;
+        color: rgba(255, 255, 255, 0.9);
+        line-height: 1.5;
+        opacity: 0;
+      }
+
+      .highlight {
+        font-weight: 700;
+        background: linear-gradient(135deg, #00d4ff 0%, #8b5cf6 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+    </style>
+
+    <script>
+      (function() {
+        const tl = gsap.timeline({ paused: true });
+        tl.fromTo('#hookText', { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 1.5, ease: 'power3.out' }, 0.5);
+        tl.to('#hookText', { opacity: 0, duration: 0.5 }, 3.5);
+        window.__timelines = window.__timelines || {};
+        window.__timelines["scene-hook"] = tl;
+      })();
+    </script>
+  </div>
+</template>

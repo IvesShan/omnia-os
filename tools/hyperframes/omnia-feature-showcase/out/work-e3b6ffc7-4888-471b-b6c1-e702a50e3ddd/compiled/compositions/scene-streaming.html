@@ -1,0 +1,190 @@
+<template id="scene-streaming-template">
+  <div data-composition-id="scene-streaming" data-width="1920" data-height="1080" data-duration="6">
+
+    <!-- Background -->
+    <div class="bg-layer"></div>
+
+    <!-- Chat interface mockup -->
+    <div class="chat-container">
+      <!-- User message -->
+      <div class="message user-msg">
+        <div class="msg-avatar">你</div>
+        <div class="msg-content">帮我分析一下这个项目的技术栈</div>
+      </div>
+
+      <!-- AI response with streaming effect -->
+      <div class="message ai-msg">
+        <div class="msg-avatar">OMNIA</div>
+        <div class="msg-content">
+          <span class="stream-text" id="streamText">这个项目使用了...</span>
+          <span class="cursor">|</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Text overlay -->
+    <div class="text-overlay">
+      <div class="section-title" id="streamTitle">流式对话</div>
+      <div class="section-desc" id="streamDesc">像人一样，一个字一个字打出来</div>
+    </div>
+
+    <style>
+      @import url('../assets/fonts/fonts.css');
+
+      [data-composition-id="scene-streaming"] {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        font-family: 'Inter', 'Noto Sans SC', sans-serif;
+      }
+
+      .bg-layer {
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(ellipse 80% 60% at 50% 50%, rgba(13, 17, 23, 1) 0%, rgba(5, 5, 15, 1) 100%);
+      }
+
+      .chat-container {
+        position: absolute;
+        left: 150px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 800px;
+      }
+
+      .message {
+        display: flex;
+        align-items: flex-start;
+        gap: 20px;
+        margin-bottom: 30px;
+        opacity: 0;
+      }
+
+      .msg-avatar {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+        font-weight: 600;
+        flex-shrink: 0;
+      }
+
+      .user-msg .msg-avatar {
+        background: rgba(139, 92, 246, 0.2);
+        border: 1px solid rgba(139, 92, 246, 0.3);
+        color: #8b5cf6;
+      }
+
+      .ai-msg .msg-avatar {
+        background: rgba(0, 212, 255, 0.2);
+        border: 1px solid rgba(0, 212, 255, 0.3);
+        color: #00d4ff;
+      }
+
+      .msg-content {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 16px;
+        padding: 20px 24px;
+        font-size: 24px;
+        color: rgba(255, 255, 255, 0.9);
+        line-height: 1.5;
+      }
+
+      .stream-text {
+        opacity: 0;
+      }
+
+      .cursor {
+        color: #00d4ff;
+        opacity: 0;
+        animation: blink 1s infinite;
+      }
+
+      @keyframes blink {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0; }
+      }
+
+      .text-overlay {
+        position: absolute;
+        right: 100px;
+        top: 50%;
+        transform: translateY(-50%);
+        text-align: right;
+      }
+
+      .section-title {
+        font-size: 72px;
+        font-weight: 900;
+        background: linear-gradient(135deg, #00d4ff 0%, #8b5cf6 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        opacity: 0;
+      }
+
+      .section-desc {
+        font-size: 32px;
+        font-weight: 300;
+        color: rgba(255, 255, 255, 0.7);
+        margin-top: 24px;
+        opacity: 0;
+      }
+    </style>
+
+    <script>
+      (function() {
+        const tl = gsap.timeline({ paused: true });
+
+        // Title appears
+        tl.fromTo('#streamTitle',
+          { opacity: 0, x: 50 },
+          { opacity: 1, x: 0, duration: 1.0, ease: 'power3.out' },
+          0.3
+        );
+
+        // Description appears
+        tl.fromTo('#streamDesc',
+          { opacity: 0, x: 50 },
+          { opacity: 1, x: 0, duration: 1.0, ease: 'power3.out' },
+          0.8
+        );
+
+        // User message appears
+        tl.fromTo('.user-msg',
+          { opacity: 0, x: -30 },
+          { opacity: 1, x: 0, duration: 0.8, ease: 'power3.out' },
+          1.5
+        );
+
+        // AI message container appears
+        tl.fromTo('.ai-msg',
+          { opacity: 0, x: -30 },
+          { opacity: 1, x: 0, duration: 0.8, ease: 'power3.out' },
+          2.0
+        );
+
+        // Stream text appears
+        tl.to('.stream-text', { opacity: 1, duration: 0.3 }, 2.3);
+
+        // Cursor appears
+        tl.to('.cursor', { opacity: 1, duration: 0.3 }, 2.5);
+
+        // Fade out at end
+        tl.to('.chat-container, .text-overlay', {
+          opacity: 0,
+          duration: 0.5,
+          ease: 'power2.in'
+        }, 5.5);
+
+        window.__timelines = window.__timelines || {};
+        window.__timelines["scene-streaming"] = tl;
+      })();
+    </script>
+  </div>
+</template>
