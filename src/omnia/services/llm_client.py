@@ -36,7 +36,7 @@ class LLMClient:
     API_TOOL_PROVIDERS = {"deepseek", "openai", "xiaomi", "qianfan", "kimi"}
     
     def __init__(self):
-        timeout = httpx.Timeout(connect=5.0, read=180.0, write=10.0, pool=5.0)
+        timeout = httpx.Timeout(connect=5.0, read=90.0, write=10.0, pool=5.0)
         self.client = httpx.AsyncClient(
             timeout=timeout,
             limits=httpx.Limits(
@@ -287,6 +287,32 @@ class LLMClient:
         except Exception as e:
             error_msg = f"请求异常: {str(e)}"
             yield {"type": "error", "message": error_msg}
+    
+    async def _stream_with_timeout(self, provider: str, url: str, body: dict, headers: dict, total_timeout: float = 120.0) -> AsyncGenerator[dict, None]:
+        """
+        包裹 httpx stream，添加总超时保护。
+        防止 xiaomi 等 API 连接挂死阻塞 uvicorn 事件循环。
+        
+        实现方式：用 httpx 的 read timeout 替代 total_timeout，
+        因为 asyncio.wait_for 无法直接包裹 async generator。
+        当连接建立后如果超过 read timeout 没有新数据，httpx 会自动断开。
+        """
+        try:
+            async with self.client.stream("POST", url, json=body, headers=headers) as response:
+                response.raise_for_status()
+                async for event in self._stream_openai(response):
+                    yield event
+        except httpx.ReadTimeout:
+            error_msg = f"请求超时: {provider} API 读取超时 ({self.client.timeout.read}s)，已自动断开"
+            print(f"[LLMClient] READ TIMEOUT: {provider} after {self.client.timeout.read}s")
+            yield {"type": "error", "message": error_msg}
+        except httpx.ConnectTimeout:
+            error_msg = f"连接超时: 无法连接到 {provider} API"
+            print(f"[LLMClient] CONNECT TIMEOUT: {provider}")
+            yield {"type": "error", "message": error_msg}
+        except Exception as e:
+            # 重新抛出，让上层处理
+            raise
     
     async def _stream_openai(self, response) -> AsyncGenerator[dict, None]:
         """解析 OpenAI 格式 SSE（DeepSeek/Xiaomi/QianFan/OpenAI）"""
