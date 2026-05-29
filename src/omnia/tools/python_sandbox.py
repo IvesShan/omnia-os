@@ -11,6 +11,7 @@ import signal
 import threading
 from typing import Dict, Any
 from contextlib import contextmanager
+import asyncio
 
 
 @contextmanager
@@ -122,7 +123,7 @@ class PythonSandbox:
         import subprocess
         try:
             # 使用子进程隔离执行，更安全
-            result = subprocess.run(
+            result = await asyncio.to_thread(subprocess.run, 
                 [sys.executable, "-c", code],
                 capture_output=True,
                 text=True,
@@ -168,7 +169,7 @@ class PythonSandbox:
             cmd.extend(args_str.split())
 
         try:
-            result = subprocess.run(
+            result = await asyncio.to_thread(subprocess.run, 
                 cmd,
                 capture_output=True,
                 text=True,

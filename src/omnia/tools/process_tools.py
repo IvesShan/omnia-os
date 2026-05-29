@@ -1,3 +1,4 @@
+import asyncio
 """
 process_tools.py — 进程管理工具
 
@@ -153,7 +154,7 @@ class ProcessTools:
         if system in ("Linux", "Darwin"):
             # 使用 ps 命令
             cmd = ["ps", "aux", "--sort=-%cpu"] if system == "Linux" else ["ps", "aux"]
-            result = ProcessTools._run_cmd(cmd)
+            result = await asyncio.to_thread(ProcessTools._run_cmd, cmd)
 
             if result.get("error"):
                 return result
@@ -189,7 +190,7 @@ class ProcessTools:
 
         elif system == "Windows":
             cmd = ["tasklist", "/FO", "CSV", "/NH"]
-            result = ProcessTools._run_cmd(cmd)
+            result = await asyncio.to_thread(ProcessTools._run_cmd, cmd)
 
             if result.get("error"):
                 return result
@@ -222,14 +223,14 @@ class ProcessTools:
             # 先查找 PID
             if system in ("Linux", "Darwin"):
                 cmd = ["pgrep", "-f", name]
-                result = ProcessTools._run_cmd(cmd)
+                result = await asyncio.to_thread(ProcessTools._run_cmd, cmd)
                 if result.get("stdout", "").strip():
                     pid = int(result["stdout"].strip().split("\n")[0])
                 else:
                     return {"error": f"未找到进程: {name}", "success": False}
             elif system == "Windows":
                 cmd = ["tasklist", "/FI", f"IMAGENAME eq {name}", "/FO", "CSV", "/NH"]
-                result = ProcessTools._run_cmd(cmd)
+                result = await asyncio.to_thread(ProcessTools._run_cmd, cmd)
                 if result.get("stdout", "").strip():
                     first_line = result["stdout"].strip().split("\n")[0]
                     pid = int(first_line.split(",")[1].strip('"'))
@@ -241,7 +242,7 @@ class ProcessTools:
 
         if system in ("Linux", "Darwin"):
             cmd = ["ps", "-p", str(pid), "-o", "pid,ppid,user,%cpu,%mem,vsz,rss,stat,start,etime,command"]
-            result = ProcessTools._run_cmd(cmd)
+            result = await asyncio.to_thread(ProcessTools._run_cmd, cmd)
 
             if result.get("error"):
                 return result
@@ -266,7 +267,7 @@ class ProcessTools:
 
         elif system == "Windows":
             cmd = ["tasklist", "/FI", f"PID eq {pid}", "/FO", "LIST", "/V"]
-            result = ProcessTools._run_cmd(cmd)
+            result = await asyncio.to_thread(ProcessTools._run_cmd, cmd)
             return {
                 "success": True,
                 "pid": pid,
@@ -293,20 +294,20 @@ class ProcessTools:
                     cmd = ["taskkill", "/PID", str(pid)]
                     if force:
                         cmd.append("/F")
-                    result = ProcessTools._run_cmd(cmd)
+                    result = await asyncio.to_thread(ProcessTools._run_cmd, cmd)
                     if result.get("exit_code", 1) != 0:
                         return {"error": result.get("stderr", "终止失败"), "success": False}
             elif name:
                 if system in ("Linux", "Darwin"):
                     cmd = ["pkill", "-f", name] if not force else ["pkill", "-9", "-f", name]
-                    result = ProcessTools._run_cmd(cmd)
+                    result = await asyncio.to_thread(ProcessTools._run_cmd, cmd)
                     if result.get("exit_code", 1) != 0:
                         return {"error": f"终止 '{name}' 失败: {result.get('stderr', '')}", "success": False}
                 elif system == "Windows":
                     cmd = ["taskkill", "/IM", name]
                     if force:
                         cmd.append("/F")
-                    result = ProcessTools._run_cmd(cmd)
+                    result = await asyncio.to_thread(ProcessTools._run_cmd, cmd)
                     if result.get("exit_code", 1) != 0:
                         return {"error": result.get("stderr", "终止失败"), "success": False}
 
@@ -331,19 +332,19 @@ class ProcessTools:
 
         if system == "Linux":
             cmd = ["ss", "-tlnp", f"sport = :{port}"]
-            result = ProcessTools._run_cmd(cmd)
+            result = await asyncio.to_thread(ProcessTools._run_cmd, cmd)
             if not result.get("stdout", "").strip():
                 # fallback 到 lsof
                 cmd = ["lsof", "-i", f":{port}", "-P", "-n"]
-                result = ProcessTools._run_cmd(cmd)
+                result = await asyncio.to_thread(ProcessTools._run_cmd, cmd)
 
         elif system == "Darwin":
             cmd = ["lsof", "-i", f":{port}", "-P", "-n"]
-            result = ProcessTools._run_cmd(cmd)
+            result = await asyncio.to_thread(ProcessTools._run_cmd, cmd)
 
         elif system == "Windows":
             cmd = ["netstat", "-ano", "-p", "tcp"]
-            result = ProcessTools._run_cmd(cmd)
+            result = await asyncio.to_thread(ProcessTools._run_cmd, cmd)
             if result.get("stdout"):
                 lines = result["stdout"].strip().split("\n")
                 filtered = [l for l in lines if f":{port}" in l]

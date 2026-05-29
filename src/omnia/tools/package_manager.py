@@ -1,3 +1,4 @@
+import asyncio
 """
 package_manager.py — 包管理工具
 
@@ -318,7 +319,7 @@ class PackageManagerTools:
         if extra_args:
             cmd.extend(extra_args.split())
 
-        result = PackageManagerTools._run_cmd(cmd, timeout=180)
+        result = await asyncio.to_thread(PackageManagerTools._run_cmd, cmd, timeout=180)
         result["mirror"] = mirror
         result["mirror_url"] = mirror_url
         return result
@@ -328,7 +329,7 @@ class PackageManagerTools:
         """pip 卸载"""
         cmd = [sys.executable, "-m", "pip", "uninstall", "-y"]
         cmd.extend(packages.split())
-        return PackageManagerTools._run_cmd(cmd)
+        return await asyncio.to_thread(PackageManagerTools._run_cmd, cmd)
 
     @staticmethod
     async def _pip_list(filter: str = "", outdated: bool = False) -> Dict[str, Any]:
@@ -338,7 +339,7 @@ class PackageManagerTools:
             cmd.append("--outdated")
         if filter:
             cmd.extend(["--format", "columns", "--filter", filter])
-        return PackageManagerTools._run_cmd(cmd)
+        return await asyncio.to_thread(PackageManagerTools._run_cmd, cmd)
 
     @staticmethod
     async def _npm_install(
@@ -364,7 +365,7 @@ class PackageManagerTools:
 
         cmd.extend(packages.split())
 
-        result = PackageManagerTools._run_cmd(cmd, timeout=180, cwd=workdir or None)
+        result = await asyncio.to_thread(PackageManagerTools._run_cmd, cmd, timeout=180, cwd=workdir or None)
         result["mirror"] = mirror
         result["mirror_url"] = mirror_url
         return result
@@ -381,7 +382,7 @@ class PackageManagerTools:
         if global_:
             cmd.append("-g")
         cmd.extend(packages.split())
-        return PackageManagerTools._run_cmd(cmd, cwd=workdir or None)
+        return await asyncio.to_thread(PackageManagerTools._run_cmd, cmd, cwd=workdir or None)
 
     @staticmethod
     async def _npm_list(
@@ -395,7 +396,7 @@ class PackageManagerTools:
         if global_:
             cmd.append("-g")
         cmd.extend(["--depth", str(depth)])
-        return PackageManagerTools._run_cmd(cmd, cwd=workdir or None)
+        return await asyncio.to_thread(PackageManagerTools._run_cmd, cmd, cwd=workdir or None)
 
     @staticmethod
     async def _poetry_install(
@@ -416,7 +417,7 @@ class PackageManagerTools:
                 cmd.append("--group dev")
             cmd.extend(packages.split())
 
-        result = PackageManagerTools._run_cmd(cmd, timeout=180, cwd=workdir or None)
+        result = await asyncio.to_thread(PackageManagerTools._run_cmd, cmd, timeout=180, cwd=workdir or None)
 
         # 如果 poetry 不可用，提示安装
         if result.get("error") and "未找到" in result.get("error", ""):
@@ -428,7 +429,7 @@ class PackageManagerTools:
     async def _pip_freeze(output_file: str = "") -> Dict[str, Any]:
         """pip freeze"""
         cmd = [sys.executable, "-m", "pip", "freeze"]
-        result = PackageManagerTools._run_cmd(cmd)
+        result = await asyncio.to_thread(PackageManagerTools._run_cmd, cmd)
 
         if output_file and result.get("stdout"):
             try:

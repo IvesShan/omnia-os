@@ -318,7 +318,10 @@ async def _stream_chat_unified(
             # 发送API调用状态
             yield f"data: {json.dumps({'type': 'status', 'message': '等待AI响应...'})}\n\n"
             
-            response = requests.post(url, headers=headers, json=payload, stream=True, timeout=120)
+            # [FIXED] 将同步 requests.post 包装到线程中，防止阻塞 uvicorn 事件循环
+            response = await asyncio.to_thread(
+                requests.post, url, headers=headers, json=payload, stream=True, timeout=120
+            )
         except ImportError:
             yield f"data: {json.dumps({'type': 'error', 'message': 'requests module not available'})}\n\n"
             return

@@ -1,3 +1,4 @@
+import asyncio
 """
 git_tools.py — Git 操作工具
 
@@ -262,13 +263,13 @@ class GitTools:
     async def _git_status(path: str = None) -> Dict[str, Any]:
         """查看 Git 状态"""
         cwd = path or os.getcwd()
-        result = GitTools._run_git(["status", "--short", "--branch"], cwd)
+        result = await asyncio.to_thread(GitTools._run_git, ["status", "--short", "--branch"], cwd)
 
         if result.get("error"):
             return result
 
         # 同时获取远程同步状态
-        ahead_behind = GitTools._run_git(
+        ahead_behind = await asyncio.to_thread(GitTools._run_git, 
             ["rev-list", "--left-right", "--count", "HEAD...@{upstream}"],
             cwd
         )
@@ -283,7 +284,7 @@ class GitTools:
     async def _git_log(path: str = None, count: int = 10) -> Dict[str, Any]:
         """查看 Git 日志"""
         cwd = path or os.getcwd()
-        result = GitTools._run_git([
+        result = await asyncio.to_thread(GitTools._run_git, [
             "log", f"--oneline", f"-{count}",
             "--format=%h | %an | %ar | %s"
         ], cwd)
@@ -307,7 +308,7 @@ class GitTools:
         if file:
             cmd.append(file)
 
-        result = GitTools._run_git(cmd, cwd)
+        result = await asyncio.to_thread(GitTools._run_git, cmd, cwd)
 
         if result.get("error"):
             return result
@@ -318,7 +319,7 @@ class GitTools:
             stat_cmd.append("--staged")
         if file:
             stat_cmd.append(file)
-        stat_result = GitTools._run_git(stat_cmd, cwd)
+        stat_result = await asyncio.to_thread(GitTools._run_git, stat_cmd, cwd)
 
         return {
             "diff": result["stdout"] or "(无差异)",
@@ -332,11 +333,11 @@ class GitTools:
         cwd = path or os.getcwd()
 
         if add_all:
-            add_result = GitTools._run_git(["add", "-A"], cwd)
+            add_result = await asyncio.to_thread(GitTools._run_git, ["add", "-A"], cwd)
             if add_result.get("error"):
                 return add_result
 
-        result = GitTools._run_git(["commit", "-m", message], cwd)
+        result = await asyncio.to_thread(GitTools._run_git, ["commit", "-m", message], cwd)
 
         if result.get("error"):
             return result
@@ -353,7 +354,7 @@ class GitTools:
         cmd = ["push", remote]
         if branch:
             cmd.append(branch)
-        result = GitTools._run_git(cmd, cwd)
+        result = await asyncio.to_thread(GitTools._run_git, cmd, cwd)
 
         return {
             "output": result.get("stdout", "") + result.get("stderr", ""),
@@ -367,7 +368,7 @@ class GitTools:
         cmd = ["pull", remote]
         if branch:
             cmd.append(branch)
-        result = GitTools._run_git(cmd, cwd)
+        result = await asyncio.to_thread(GitTools._run_git, cmd, cwd)
 
         return {
             "output": result.get("stdout", "") + result.get("stderr", ""),
@@ -380,25 +381,25 @@ class GitTools:
         cwd = path or os.getcwd()
 
         if action == "list":
-            result = GitTools._run_git(["branch", "-a", "-v"], cwd)
+            result = await asyncio.to_thread(GitTools._run_git, ["branch", "-a", "-v"], cwd)
             return {"branches": result.get("stdout", ""), "exit_code": result.get("exit_code", 1)}
 
         elif action == "create":
             if not branch_name:
                 return {"error": "创建分支需要指定 branch_name"}
-            result = GitTools._run_git(["checkout", "-b", branch_name], cwd)
+            result = await asyncio.to_thread(GitTools._run_git, ["checkout", "-b", branch_name], cwd)
             return {"output": result.get("stdout", ""), "exit_code": result.get("exit_code", 1)}
 
         elif action == "switch":
             if not branch_name:
                 return {"error": "切换分支需要指定 branch_name"}
-            result = GitTools._run_git(["checkout", branch_name], cwd)
+            result = await asyncio.to_thread(GitTools._run_git, ["checkout", branch_name], cwd)
             return {"output": result.get("stdout", ""), "exit_code": result.get("exit_code", 1)}
 
         elif action == "delete":
             if not branch_name:
                 return {"error": "删除分支需要指定 branch_name"}
-            result = GitTools._run_git(["branch", "-D", branch_name], cwd)
+            result = await asyncio.to_thread(GitTools._run_git, ["branch", "-D", branch_name], cwd)
             return {"output": result.get("stdout", ""), "exit_code": result.get("exit_code", 1)}
 
         return {"error": f"未知的分支操作: {action}"}
@@ -409,19 +410,19 @@ class GitTools:
         cwd = path or os.getcwd()
 
         if action == "list":
-            result = GitTools._run_git(["remote", "-v"], cwd)
+            result = await asyncio.to_thread(GitTools._run_git, ["remote", "-v"], cwd)
             return {"remotes": result.get("stdout", ""), "exit_code": result.get("exit_code", 1)}
 
         elif action == "add":
             if not remote_name or not url:
                 return {"error": "添加远程仓库需要 remote_name 和 url"}
-            result = GitTools._run_git(["remote", "add", remote_name, url], cwd)
+            result = await asyncio.to_thread(GitTools._run_git, ["remote", "add", remote_name, url], cwd)
             return {"output": result.get("stdout", ""), "exit_code": result.get("exit_code", 1)}
 
         elif action == "set_url":
             if not remote_name or not url:
                 return {"error": "设置 URL 需要 remote_name 和 url"}
-            result = GitTools._run_git(["remote", "set-url", remote_name, url], cwd)
+            result = await asyncio.to_thread(GitTools._run_git, ["remote", "set-url", remote_name, url], cwd)
             return {"output": result.get("stdout", ""), "exit_code": result.get("exit_code", 1)}
 
         return {"error": f"未知的远程操作: {action}"}

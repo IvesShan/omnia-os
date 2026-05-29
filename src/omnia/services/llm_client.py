@@ -296,6 +296,8 @@ class LLMClient:
         实现方式：创建一个内部 async generator，然后用 asyncio.wait_for 包裹 __anext__ 调用，
         确保即使 httpx stream 卡死也能超时退出。
         """
+        start_time = asyncio.get_event_loop().time()
+
         async def _inner_stream():
             async with self.client.stream("POST", url, json=body, headers=headers) as response:
                 response.raise_for_status()
@@ -305,13 +307,18 @@ class LLMClient:
         stream_gen = _inner_stream()
         try:
             while True:
+                # 递减式全局超时：确保整个流在 total_timeout 内必须结束
+                elapsed = asyncio.get_event_loop().time() - start_time
+                remaining = total_timeout - elapsed
+                if remaining <= 0:
+                    raise asyncio.TimeoutError()
                 try:
-                    event = await asyncio.wait_for(stream_gen.__anext__(), timeout=total_timeout)
+                    event = await asyncio.wait_for(stream_gen.__anext__(), timeout=remaining)
                     yield event
                 except StopAsyncIteration:
                     break
         except asyncio.TimeoutError:
-            error_msg = f"请求超时: {provider} API 未在 {total_timeout}s 内响应，已自动断开"
+            error_msg = f"请求超时: {provider} API 流式响应总时间超过 {total_timeout}s，已自动断开"
             print(f"[LLMClient] TOTAL TIMEOUT: {provider} after {total_timeout}s")
             yield {"type": "error", "message": error_msg}
         except httpx.ReadTimeout:
@@ -326,7 +333,7 @@ class LLMClient:
             # 重新抛出，让上层处理
             raise
         finally:
-            # 确保 stream generator 被关闭
+            # 确保 stream generator 被关闭，释放 httpx 底层连接
             await stream_gen.aclose()
     
     async def _stream_openai(self, response) -> AsyncGenerator[dict, None]:

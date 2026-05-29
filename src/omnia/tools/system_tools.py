@@ -156,8 +156,10 @@ class SystemTools:
     async def _execute_shell(command: str, workspace: str = None) -> Dict[str, Any]:
         """执行 Shell 命令"""
         try:
+            import asyncio
             cwd = workspace or os.getcwd()
-            result = subprocess.run(
+            result = await asyncio.to_thread(
+                subprocess.run,
                 command,
                 shell=True,
                 capture_output=True,
