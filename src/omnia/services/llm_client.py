@@ -268,16 +268,9 @@ class LLMClient:
         
         try:
             print(f"[LLMClient] Starting stream request to {provider}, timeout: {self.client.timeout}")
-            async with self.client.stream("POST", url, json=body, headers=headers) as response:
-                response.raise_for_status()
-                
-                # Kimi/Anthropic 格式 SSE vs OpenAI 格式 SSE
-                if provider == "kimi":
-                    async for event in self._stream_openai(response):
-                        yield event
-                else:
-                    async for event in self._stream_openai(response):
-                        yield event
+            # 使用 _stream_with_timeout 包裹，防止连接挂死阻塞事件循环
+            async for event in self._stream_with_timeout(provider, url, body, headers):
+                yield event
                     
         except httpx.HTTPStatusError as e:
             error_msg = f"API 调用失败: {e.response.status_code}"
@@ -286,6 +279,10 @@ class LLMClient:
                 error_msg += f" - {err_body.decode('utf-8', errors='replace')[:500]}"
             except:
                 pass
+            yield {"type": "error", "message": error_msg}
+        except asyncio.TimeoutError:
+            error_msg = f"请求超时: {provider} API 未在120秒内响应，已自动断开"
+            print(f"[LLMClient] TIMEOUT: stream request to {provider} exceeded 120s")
             yield {"type": "error", "message": error_msg}
         except Exception as e:
             error_msg = f"请求异常: {str(e)}"
