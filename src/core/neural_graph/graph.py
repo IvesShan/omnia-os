@@ -380,3 +380,340 @@ class NeuralGraph:
                             queue.append((neighbor_id, current_depth + 1))
         
         return {"nodes": result_nodes, "edges": result_edges}
+    
+    # ==================== 高级查询方法（供 Router 调用） ====================
+    
+    def get_node(self, name: str) -> Optional[Dict]:
+        """获取单个节点详情"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            
+            # 先尝试精确匹配
+            cursor.execute("""
+                SELECT id, entity_type, entity_name, canonical_name, properties, 
+                       access_count, created_at, last_accessed
+                FROM neural_nodes
+                WHERE entity_name = ? OR canonical_name = ?
+                LIMIT 1
+            """, (name, name))
+            row = cursor.fetchone()
+            
+            if not row:
+                # 模糊匹配
+                cursor.execute("""
+                    SELECT id, entity_type, entity_name, canonical_name, properties,
+                           access_count, created_at, last_accessed
+                    FROM neural_nodes
+                    WHERE entity_name LIKE ? OR canonical_name LIKE ?
+                    LIMIT 1
+                """, (f"%{name}%", f"%{name}%"))
+                row = cursor.fetchone()
+            
+            if not row:
+                return None
+            
+            node_id = row[0]
+            
+            # 获取相关边
+            cursor.execute("""
+                SELECT source_name, target_name, relation_type, weight
+                FROM neural_edges
+                WHERE source_id = ? OR target_id = ?
+                ORDER BY weight DESC
+                LIMIT 20
+            """, (node_id, node_id))
+            
+            edges = []
+            for edge in cursor.fetchall():
+                edges.append({
+                    "source": edge[0],
+                    "target": edge[1],
+                    "relation": edge[2],
+                    "weight": edge[3]
+                })
+            
+            return {
+                "id": row[0],
+                "type": row[1],
+                "name": row[2],
+                "canonical_name": row[3],
+                "properties": json.loads(row[4]) if row[4] else {},
+                "access_count": row[5] or 0,
+                "created_at": row[6],
+                "last_accessed": row[7],
+                "connections": edges
+            }
+    
+    def get_related(self, name: str, max_depth: int = 2) -> List[Dict]:
+        """获取与指定节点相关的所有节点（BFS 1-2 层）"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            
+            # 找到节点
+            cursor.execute("""
+                SELECT id FROM neural_nodes 
+                WHERE entity_name = ? OR canonical_name = ?
+                LIMIT 1
+            """, (name, name))
+            row = cursor.fetchone()
+            
+            if not row:
+                return []
+            
+            node_id = row[0]
+            visited = {node_id}
+            result = []
+            
+            queue = [(node_id, 0)]
+            while queue:
+                current_id, depth = queue.pop(0)
+                if depth >= max_depth:
+                    continue
+                
+                # 双向查找
+                cursor.execute("""
+                    SELECT id, source_id, target_id, source_name, target_name, 
+                           relation_type, weight
+                    FROM neural_edges
+                    WHERE source_id = ? OR target_id = ?
+                    ORDER BY weight DESC
+                    LIMIT 10
+                """, (current_id, current_id))
+                
+                for edge in cursor.fetchall():
+                    edge_id = edge[0]
+                    neighbor_id = edge[2] if edge[1] == current_id else edge[1]
+                    neighbor_name = edge[4] if edge[1] == current_id else edge[3]
+                    relation = edge[5]
+                    weight = edge[6]
+                    
+                    if neighbor_id not in visited:
+                        visited.add(neighbor_id)
+                        
+                        # 获取邻居节点详情
+                        cursor.execute("""
+                            SELECT entity_type, entity_name, canonical_name
+                            FROM neural_nodes WHERE id = ?
+                        """, (neighbor_id,))
+                        node_info = cursor.fetchone()
+                        
+                        if node_info:
+                            result.append({
+                                "id": neighbor_id,
+                                "type": node_info[0],
+                                "name": node_info[1],
+                                "canonical_name": node_info[2],
+                                "relation": relation,
+                                "weight": weight,
+                                "depth": depth + 1
+                            })
+                            
+                            if depth + 1 < max_depth:
+                                queue.append((neighbor_id, depth + 1))
+            
+            # 按权重排序
+            result.sort(key=lambda x: x["weight"], reverse=True)
+            return result
+    
+    def find_path(self, source: str, target: str, max_depth: int = 4) -> Optional[List[Dict]]:
+        """查找两个节点之间的最短路径（代理到 NeuralGraphAlgorithms）"""
+        from src.core.neural_graph_algorithms import NeuralGraphAlgorithms
+        
+        # 先找到节点 ID
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            
+            cursor.execute("""
+                SELECT id FROM neural_nodes 
+                WHERE entity_name = ? OR canonical_name = ? LIMIT 1
+            """, (source, source))
+            source_row = cursor.fetchone()
+            
+            cursor.execute("""
+                SELECT id FROM neural_nodes 
+                WHERE entity_name = ? OR canonical_name = ? LIMIT 1
+            """, (target, target))
+            target_row = cursor.fetchone()
+        
+        if not source_row or not target_row:
+            return None
+        
+        algo = NeuralGraphAlgorithms(db_path=self.db_path)
+        return algo.find_path(source_row[0], target_row[0], max_depth=max_depth)
+    
+    def find_all_paths(self, source: str, target: str, max_depth: int = 3, limit: int = 5) -> List[List[Dict]]:
+        """查找两个节点之间的所有路径（代理到 NeuralGraphAlgorithms）"""
+        from src.core.neural_graph_algorithms import NeuralGraphAlgorithms
+        
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            
+            cursor.execute("""
+                SELECT id FROM neural_nodes 
+                WHERE entity_name = ? OR canonical_name = ? LIMIT 1
+            """, (source, source))
+            source_row = cursor.fetchone()
+            
+            cursor.execute("""
+                SELECT id FROM neural_nodes 
+                WHERE entity_name = ? OR canonical_name = ? LIMIT 1
+            """, (target, target))
+            target_row = cursor.fetchone()
+        
+        if not source_row or not target_row:
+            return []
+        
+        algo = NeuralGraphAlgorithms(db_path=self.db_path)
+        return algo.find_all_paths(source_row[0], target_row[0], max_depth=max_depth, limit=limit)
+    
+    def degree_centrality(self, top_k: int = 20) -> Dict[str, float]:
+        """计算度中心性（代理到 NeuralGraphAlgorithms）"""
+        from src.core.neural_graph_algorithms import NeuralGraphAlgorithms
+        
+        algo = NeuralGraphAlgorithms(db_path=self.db_path)
+        results = algo.get_degree_centrality(top_k=top_k)
+        return {r["name"]: r["total"] for r in results}
+    
+    def pagerank(self, top_k: int = 20) -> Dict[str, float]:
+        """计算 PageRank（代理到 NeuralGraphAlgorithms）"""
+        from src.core.neural_graph_algorithms import NeuralGraphAlgorithms
+        
+        algo = NeuralGraphAlgorithms(db_path=self.db_path)
+        results = algo.get_pagerank(top_k=top_k)
+        return {r["name"]: r["pagerank"] for r in results}
+    
+    def betweenness_centrality(self, top_k: int = 20) -> Dict[str, float]:
+        """计算介数中心性（代理到 NeuralGraphAlgorithms）"""
+        from src.core.neural_graph_algorithms import NeuralGraphAlgorithms
+        
+        algo = NeuralGraphAlgorithms(db_path=self.db_path)
+        results = algo.get_betweenness_centrality(top_k=top_k)
+        return {r["name"]: r["betweenness"] for r in results}
+    
+    def find_communities(self) -> List[Dict]:
+        """发现社区结构（代理到 NeuralGraphAlgorithms）"""
+        from src.core.neural_graph_algorithms import NeuralGraphAlgorithms
+        
+        algo = NeuralGraphAlgorithms(db_path=self.db_path)
+        return algo.find_communities()
+    
+    def get_neighbors(self, node_id_or_name: str, depth: int = 1) -> Dict:
+        """获取节点邻居（代理到 NeuralGraphAlgorithms）"""
+        from src.core.neural_graph_algorithms import NeuralGraphAlgorithms
+        
+        # 如果传入的是名称，先找到 ID
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT id FROM neural_nodes 
+                WHERE entity_name = ? OR canonical_name = ? OR id = ?
+                LIMIT 1
+            """, (node_id_or_name, node_id_or_name, node_id_or_name))
+            row = cursor.fetchone()
+        
+        if not row:
+            return {"error": "Node not found"}
+        
+        algo = NeuralGraphAlgorithms(db_path=self.db_path)
+        return algo.get_neighbors(row[0], depth=depth)
+    
+    def recognize_intent(self, query: str) -> Dict:
+        """简单意图识别（基于关键词匹配）"""
+        query_lower = query.lower()
+        
+        intent_patterns = {
+            "search": ["搜索", "查找", "寻找", "找", "search", "find", "查询"],
+            "build": ["构建", "建立", "创建图谱", "build", "create"],
+            "analyze": ["分析", "统计", "分析图谱", "analyze", "stats"],
+            "visualize": ["可视化", "展示", "显示图谱", "visualize", "show"],
+            "navigate": ["导航", "路径", "关系", "navigate", "path", "related"],
+            "memory": ["记忆", "回忆", "记住", "memory", "remember"],
+        }
+        
+        detected_intent = "general"
+        confidence = 0.0
+        entities = []
+        
+        for intent, keywords in intent_patterns.items():
+            for kw in keywords:
+                if kw in query_lower:
+                    detected_intent = intent
+                    confidence = max(confidence, 0.7)
+                    break
+        
+        # 提取已知实体
+        for entity_type, names in self.KNOWN_ENTITIES.items():
+            for name in names:
+                if name.lower() in query_lower:
+                    entities.append(name)
+                    confidence = max(confidence, 0.9)
+        
+        if not entities:
+            # 从图谱中搜索可能的实体
+            words = query.split()
+            for word in words:
+                if len(word) > 2:
+                    results = self.search_nodes(word, limit=1)
+                    if results:
+                        entities.append(results[0]["name"])
+                        confidence = max(confidence, 0.5)
+        
+        return {
+            "intent": detected_intent,
+            "confidence": round(confidence or 0.3, 2),
+            "entities": entities
+        }
+    
+    def extract_entities(self, text: str) -> List[Entity]:
+        """从文本中提取实体（基于规则匹配）"""
+        entities = []
+        seen = set()
+        
+        # 1. 匹配已知实体
+        for entity_type, names in self.KNOWN_ENTITIES.items():
+            for name in names:
+                if name.lower() in text.lower() and name not in seen:
+                    seen.add(name)
+                    entities.append(Entity(
+                        type=entity_type,
+                        name=name,
+                        canonical_name=name,
+                        confidence=0.9
+                    ))
+        
+        # 2. 基于规则提取
+        import re
+        
+        # 提取文件名
+        file_pattern = r'[\w\-]+\.(py|js|ts|json|md|yml|yaml|toml|sh|sql|html|css|vue)'
+        for match in re.finditer(file_pattern, text):
+            fname = match.group(0)
+            if fname not in seen:
+                seen.add(fname)
+                entities.append(Entity(type="FILE", name=fname, confidence=0.7))
+        
+        # 提取 URL
+        url_pattern = r'https?://[^\s\)\]]+'
+        for match in re.finditer(url_pattern, text):
+            url = match.group(0)
+            if url not in seen:
+                seen.add(url)
+                entities.append(Entity(type="URL", name=url, confidence=0.8))
+        
+        # 提取日期
+        date_pattern = r'\d{4}[-/]\d{1,2}[-/]\d{1,2}'
+        for match in re.finditer(date_pattern, text):
+            date = match.group(0)
+            if date not in seen:
+                seen.add(date)
+                entities.append(Entity(type="DATE", name=date, confidence=0.8))
+        
+        # 提取项目名（大写开头的英文词组）
+        project_pattern = r'\b[A-Z][a-zA-Z]{2,}(?:\s+[A-Z][a-zA-Z]+)*\b'
+        for match in re.finditer(project_pattern, text):
+            name = match.group(0)
+            if name not in seen and len(name) > 3 and name not in ('This', 'That', 'What', 'When', 'Where', 'How', 'The'):
+                seen.add(name)
+                entities.append(Entity(type="PROJECT", name=name, confidence=0.5))
+        
+        return entities
