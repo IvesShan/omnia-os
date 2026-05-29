@@ -289,10 +289,12 @@ class NeuralGraphAlgorithms:
             for node_id in node_ids:
                 neighbor_labels = defaultdict(int)
                 for neighbor, _, _ in edges.get(node_id, []):
-                    neighbor_labels[labels[neighbor]] += 1
+                    if neighbor in labels:
+                        neighbor_labels[labels[neighbor]] += 1
                 
                 for neighbor, _, _ in graph["reverse_edges"].get(node_id, []):
-                    neighbor_labels[labels[neighbor]] += 1
+                    if neighbor in labels:
+                        neighbor_labels[labels[neighbor]] += 1
                 
                 if neighbor_labels:
                     max_count = max(neighbor_labels.values())
