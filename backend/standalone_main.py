@@ -90,6 +90,11 @@ from src.omnia.license import (
     encrypt_api_key,
     decrypt_api_key,
     get_api_key_masked,
+    activate_online,
+    deactivate_online,
+    start_background_verifier,
+    get_update_info,
+    is_online_verified,
     LICENSE_FILE,
     LICENSE_DB,
 )
@@ -708,6 +713,9 @@ def main():
             logger.warning("访问 http://127.0.0.1:{}/license 进行激活".format(args.port))
         else:
             logger.info(f"✅ 授权状态: {status}")
+            # 启动后台在线验证 + 自动更新检测
+            start_background_verifier()
+            logger.info("🔄 后台验证线程已启动")
     else:
         logger.info("🔓 授权检查已跳过（开发模式）")
 
@@ -737,6 +745,13 @@ def main():
 
     # 启动服务
     logger.info(f"Starting Omnia Backend on {args.host}:{args.port}")
+    
+    # 显示更新信息
+    update_info = get_update_info()
+    if update_info:
+        print(f"\n🆕 新版本可用: v{update_info['version']}")
+        print(f"   下载地址: {update_info['url']}\n")
+    
     app.run(host=args.host, port=args.port, debug=False, threaded=True)
 
 if __name__ == '__main__':

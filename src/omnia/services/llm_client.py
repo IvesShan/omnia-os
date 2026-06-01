@@ -266,10 +266,20 @@ class LLMClient:
         
         headers = self._build_headers(api_key, provider)
         
+        # Provider 特定的流式超时：小米模型推理较慢，需要更多时间
+        provider_timeout = {
+            "xiaomi": 300.0,    # 小米模型推理慢，给 5 分钟
+            "deepseek": 180.0,  # DeepSeek 思考模式可能较长
+            "kimi": 120.0,
+            "qianfan": 120.0,
+            "openai": 120.0,
+        }
+        total_timeout = provider_timeout.get(provider, 120.0)
+        
         try:
-            print(f"[LLMClient] Starting stream request to {provider}, timeout: {self.client.timeout}")
+            print(f"[LLMClient] Starting stream request to {provider}, timeout: {self.client.timeout}, total_timeout: {total_timeout}s")
             # 使用 _stream_with_timeout 包裹，防止连接挂死阻塞事件循环
-            async for event in self._stream_with_timeout(provider, url, body, headers):
+            async for event in self._stream_with_timeout(provider, url, body, headers, total_timeout=total_timeout):
                 yield event
                     
         except httpx.HTTPStatusError as e:

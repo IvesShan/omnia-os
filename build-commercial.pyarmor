@@ -1,0 +1,42 @@
+# Omnia Commercial Build Configuration
+# PyArmor 配置用于 Python 字节码加密
+# 使用方法: pyarmor gen --config build-commercial.pyarmor src/omnia/
+
+# 基本配置
+[builder]
+name = "omnia-commercial"
+target = "dist/protected"
+
+# 加密选项
+[encryption]
+# 加密模式：AES-256-CBC
+mode = "aes-256-cbc"
+# 启用代码混淆
+obf_code = 2
+# 启用字符串加密
+obf_mod = 2
+# 反调试
+anti-debug = true
+
+# 排除不需要加密的文件
+[exclude]
+patterns = [
+    "*.test.*",
+    "*_test.py",
+    "test_*",
+    "*.bak",
+    "*.backup.*",
+    "__pycache__",
+    "*.pyc",
+    "web/*",
+    "templates/*",
+    "seeds/*",
+    "tools/*",
+]
+
+# 运行时绑定
+[runtime]
+# 绑定到特定机器（分发时使用）
+bind_license_key = false
+# 启用到期检查
+expired_check = true

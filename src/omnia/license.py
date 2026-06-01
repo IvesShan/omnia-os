@@ -1,11 +1,14 @@
 """
-Omnia 统一授权系统 v3.0
+Omnia 统一授权系统 v4.0
 =====================
 统一的卡密验证 + 试用期 + 机器绑定 + API Key 加密存储
++ 在线验证 + 离线宽限期 + 自动更新检测
 
 卡密格式：OMNI-XXXX-XXXX-XXXX-XXXX (20位，不含易混淆字符)
 试用期：1 天
 机器绑定：基于 machine-id / IOPlatformUUID / Registry
+在线验证：每 24 小时向激活服务器验证一次
+离线宽限期：7 天（超过后需要联网验证）
 """
 
 import hashlib
@@ -15,6 +18,8 @@ import platform
 import secrets
 import sqlite3
 import subprocess
+import threading
+import time
 import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -30,6 +35,15 @@ LICENSE_FILE = USER_DATA_DIR / "license.dat"
 LICENSE_DB = USER_DATA_DIR / "license.db"
 CONFIG_DIR = USER_DATA_DIR / "config"
 API_KEY_FILE = CONFIG_DIR / "api_key.enc"
+
+# 在线激活服务器
+ACTIVATION_SERVER = os.getenv("OMNIA_ACTIVATION_SERVER", "https://activate.omnia-ai.com")
+VERIFY_INTERVAL = 3600 * 24  # 24 小时验证一次
+OFFLINE_GRACE_DAYS = 7  # 离线宽限期
+
+# 自动更新
+UPDATE_CHECK_INTERVAL = 3600 * 6  # 6 小时检查一次
+UPDATE_CHECK_URL = os.getenv("OMNIA_UPDATE_URL", "https://api.github.com/repos/omnia-ai/omnia/releases/latest")
 
 # 授权类型
 LICENSE_TYPES = {
@@ -465,6 +479,279 @@ def get_full_status() -> dict:
             result["remaining_days"] = 0
 
     return result
+
+
+# ============================================================
+# 🌐 在线激活
+# ============================================================
+
+def activate_online(license_key: str) -> Tuple[bool, str]:
+    """
+    在线激活卡密
+    向激活服务器发送激活请求，成功后本地保存许可证
+    """
+    import urllib.request
+    import urllib.error
+
+    try:
+        url = f"{ACTIVATION_SERVER}/api/v1/activate"
+        payload = json.dumps({
+            "license_key": license_key.strip().upper(),
+            "machine_id": get_machine_id(),
+            "machine_name": platform.node(),
+            "os_type": platform.system(),
+        }).encode("utf-8")
+
+        req = urllib.request.Request(
+            url,
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST"
+        )
+
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+
+        if data.get("success"):
+            # 保存本地许可证
+            license_data = {
+                "license_key": license_key.strip().upper(),
+                "type": data.get("type"),
+                "type_label": data.get("type_label"),
+                "expire_time": data.get("expire_at"),
+                "activate_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "machine_id": get_machine_id(),
+                "online_verified": True,
+                "last_verify": datetime.now().isoformat(),
+            }
+            save_license(license_data)
+            _save_license_key(license_key.strip().upper())
+            return True, data.get("message", "激活成功")
+
+        return False, data.get("detail", "激活失败")
+
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", errors="replace")
+        try:
+            detail = json.loads(body).get("detail", body)
+        except Exception:
+            detail = body
+        return False, f"服务器错误: {detail}"
+    except urllib.error.URLError:
+        return False, "无法连接激活服务器，请检查网络"
+    except Exception as e:
+        return False, f"激活失败: {str(e)}"
+
+
+def verify_online(license_key: str) -> Tuple[bool, str, Optional[dict]]:
+    """
+    在线验证授权状态
+    向激活服务器发送验证请求
+    """
+    import urllib.request
+    import urllib.error
+
+    try:
+        url = f"{ACTIVATION_SERVER}/api/v1/verify"
+        payload = json.dumps({
+            "license_key": license_key,
+            "machine_id": get_machine_id(),
+        }).encode("utf-8")
+
+        req = urllib.request.Request(
+            url,
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST"
+        )
+
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+
+        return data.get("valid", False), data.get("message", ""), data
+
+    except Exception:
+        return False, "在线验证失败", None
+
+
+def deactivate_online(license_key: str) -> Tuple[bool, str]:
+    """
+    在线停用授权（设备迁移）
+    """
+    import urllib.request
+
+    try:
+        url = f"{ACTIVATION_SERVER}/api/v1/deactivate"
+        payload = json.dumps({
+            "license_key": license_key,
+            "machine_id": get_machine_id(),
+        }).encode("utf-8")
+
+        req = urllib.request.Request(
+            url,
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST"
+        )
+
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+
+        if data.get("success"):
+            # 清除本地许可证
+            deactivate_license()
+
+        return data.get("success", False), data.get("message", "")
+
+    except Exception as e:
+        return False, f"停用失败: {str(e)}"
+
+
+def _save_license_key(key: str):
+    """保存卡密到本地（用于在线验证）"""
+    try:
+        _ensure_dirs()
+        key_file = CONFIG_DIR / "license_key.dat"
+        key_file.write_text(key, encoding="utf-8")
+    except Exception:
+        pass
+
+
+def _load_license_key() -> Optional[str]:
+    """读取本地保存的卡密"""
+    try:
+        key_file = CONFIG_DIR / "license_key.dat"
+        if key_file.exists():
+            return key_file.read_text(encoding="utf-8").strip()
+    except Exception:
+        pass
+    return None
+
+
+# ============================================================
+# ⏰ 后台验证线程
+# ============================================================
+
+class _BackgroundVerifier:
+    """后台定期在线验证 + 自动更新检测"""
+
+    def __init__(self):
+        self._thread: Optional[threading.Thread] = None
+        self._stop_event = threading.Event()
+        self._update_info: Optional[dict] = None
+        self._last_verify_ok = True
+        self._verify_fail_count = 0
+
+    @property
+    def update_info(self) -> Optional[dict]:
+        return self._update_info
+
+    @property
+    def last_verify_ok(self) -> bool:
+        return self._last_verify_ok
+
+    def start(self):
+        """启动后台验证线程"""
+        if self._thread and self._thread.is_alive():
+            return
+        self._stop_event.clear()
+        self._thread = threading.Thread(target=self._run, daemon=True, name="omnia-verifier")
+        self._thread.start()
+
+    def stop(self):
+        """停止后台验证"""
+        self._stop_event.set()
+
+    def _run(self):
+        """线程主循环"""
+        while not self._stop_event.is_set():
+            try:
+                self._do_verify()
+                self._do_update_check()
+            except Exception:
+                pass
+            # 每小时检查一次
+            self._stop_event.wait(3600)
+
+    def _do_verify(self):
+        """执行在线验证"""
+        license_key = _load_license_key()
+        if not license_key:
+            return
+
+        is_valid, message, data = verify_online(license_key)
+
+        if is_valid:
+            self._last_verify_ok = True
+            self._verify_fail_count = 0
+            # 更新本地许可证信息
+            if data and data.get("expire_at"):
+                license_data = load_license()
+                if license_data:
+                    license_data["expire_time"] = data["expire_at"]
+                    license_data["last_verify"] = datetime.now().isoformat()
+                    license_data["online_verified"] = True
+                    save_license(license_data)
+        else:
+            self._verify_fail_count += 1
+            if self._verify_fail_count >= 3:
+                self._last_verify_ok = False
+
+    def _do_update_check(self):
+        """检查是否有新版本"""
+        try:
+            import urllib.request
+            req = urllib.request.Request(UPDATE_CHECK_URL, headers={"User-Agent": "Omnia-Client/1.0"})
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+
+            remote_tag = data.get("tag_name", "").lstrip("v")
+            if remote_tag and remote_tag != _get_current_version():
+                self._update_info = {
+                    "version": remote_tag,
+                    "url": data.get("html_url", ""),
+                    "body": data.get("body", "")[:500],
+                    "published_at": data.get("published_at", ""),
+                }
+            else:
+                self._update_info = None
+        except Exception:
+            pass
+
+
+def _get_current_version() -> str:
+    """获取当前版本号"""
+    try:
+        ver_file = Path(__file__).parent.parent.parent / "VERSION"
+        if ver_file.exists():
+            return ver_file.read_text().strip()
+    except Exception:
+        pass
+    return "2.0.0"
+
+
+# 全局单例
+_verifier = _BackgroundVerifier()
+
+
+def start_background_verifier():
+    """启动后台验证（应用启动时调用）"""
+    _verifier.start()
+
+
+def stop_background_verifier():
+    """停止后台验证"""
+    _verifier.stop()
+
+
+def get_update_info() -> Optional[dict]:
+    """获取更新信息"""
+    return _verifier.update_info
+
+
+def is_online_verified() -> bool:
+    """是否通过在线验证"""
+    return _verifier.last_verify_ok
 
 
 # ============================================================
