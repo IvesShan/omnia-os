@@ -91,10 +91,14 @@ jobs:
       
       - name: Verify Binary
         run: |
-          $binary = Get-ChildItem -Path dist/nuitka-build -Filter "omnia-backend.exe" -Recurse | Select-Object -First 1
+          Write-Host "=== Looking for binary ==="
+          Get-ChildItem -Path dist/nuitka-build -Recurse -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_.FullName }
+          $binary = Get-ChildItem -Path dist/nuitka-build -Filter "omnia-backend*" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $binary) {
+            $binary = Get-ChildItem -Path dist/nuitka-build -Filter "standalone_main*" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+          }
           if (-not $binary) {
             Write-Error "❌ Binary not found!"
-            Get-ChildItem -Path dist/nuitka-build -Recurse | ForEach-Object { Write-Host $_.FullName }
             exit 1
           }
           Write-Host "✅ Binary found: $($binary.FullName)"
@@ -103,9 +107,14 @@ jobs:
       - name: Find and Package Binary
         run: |
           mkdir -p dist/package
-          $binary = Get-ChildItem -Path dist/nuitka-build -Filter "omnia-backend.exe" -Recurse | Select-Object -First 1
+          Write-Host "=== Looking for binary in dist/nuitka-build ==="
+          Get-ChildItem -Path dist/nuitka-build -Recurse -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_.FullName }
+          $binary = Get-ChildItem -Path dist/nuitka-build -Filter "omnia-backend*" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $binary) {
+            $binary = Get-ChildItem -Path dist/nuitka-build -Filter "standalone_main*" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+          }
           if ($binary) {
-            Copy-Item $binary.FullName dist/package/
+            Copy-Item $binary.FullName dist/package/omnia-backend.exe
           } else {
             Write-Error "Binary not found!"
             exit 1
@@ -114,7 +123,7 @@ jobs:
           Copy-Item -Recurse config dist/package/
           Copy-Item -Recurse web dist/package/
           New-Item -ItemType Directory -Path dist/package/tools -Force
-          Copy-Item tools/license_system.py dist/package/tools/
+          # license_system.py removed
           Copy-Item tools/keygen.py dist/package/tools/
           Copy-Item LICENSE.txt dist/package/ -ErrorAction SilentlyContinue
           Copy-Item README.md dist/package/ -ErrorAction SilentlyContinue
@@ -123,7 +132,7 @@ jobs:
           "cd /d `"%~dp0`"" | Out-File -FilePath dist/package/start-omnia.bat -Append -Encoding ASCII
           "echo." | Out-File -FilePath dist/package/start-omnia.bat -Append -Encoding ASCII
           "echo  =========================================" | Out-File -FilePath dist/package/start-omnia.bat -Append -Encoding ASCII
-          "echo   Omnia AIOS v2.0.3 (FastAPI)" | Out-File -FilePath dist/package/start-omnia.bat -Append -Encoding ASCII
+          "echo   Omnia AIOS v2.0.4 (FastAPI)" | Out-File -FilePath dist/package/start-omnia.bat -Append -Encoding ASCII
           "echo  =========================================" | Out-File -FilePath dist/package/start-omnia.bat -Append -Encoding ASCII
           "echo   Starting server..." | Out-File -FilePath dist/package/start-omnia.bat -Append -Encoding ASCII
           "echo   Open http://127.0.0.1:8765/license to activate" | Out-File -FilePath dist/package/start-omnia.bat -Append -Encoding ASCII
@@ -220,28 +229,44 @@ jobs:
       
       - name: Find and Package Binary
         run: |
+          set -x
           mkdir -p dist/package
-          BINARY=$(find dist/nuitka-build -name "omnia-backend" -type f | head -1)
+          echo "=== Looking for binary in dist/nuitka-build ==="
+          ls -la dist/nuitka-build/ || true
+          # Try multiple possible locations
+          BINARY=""
+          for candidate in dist/nuitka-build/omnia-backend dist/nuitka-build/standalone_main.dist/omnia-backend dist/nuitka-build/omnia-backend.bin; do
+            if [ -e "$candidate" ]; then
+              BINARY="$candidate"
+              echo "Found: $BINARY"
+              break
+            fi
+          done
           if [ -z "$BINARY" ]; then
+            # Fallback: find any executable
+            BINARY=$(find dist/nuitka-build -name "omnia-backend*" -o -name "standalone_main*" | head -5)
+            echo "Fallback search found: $BINARY"
+          fi
+          if [ -z "$BINARY" ] || [ ! -e "$BINARY" ]; then
             echo "Error: Binary not found!"
-            find dist/nuitka-build -type f
+            find dist/nuitka-build -maxdepth 3 2>/dev/null || true
             exit 1
           fi
-          cp "$BINARY" dist/package/
+          cp "$BINARY" dist/package/omnia-backend
           chmod +x dist/package/omnia-backend
+          ls -la dist/package/omnia-backend
           cp -r seeds dist/package/
           cp -r config dist/package/
           cp -r web dist/package/
           mkdir -p dist/package/tools
-          cp tools/license_system.py dist/package/tools/
-          cp tools/keygen.py dist/package/tools/
+          cp tools/keygen.py dist/package/tools/ 2>/dev/null || true
           cp LICENSE.txt dist/package/ 2>/dev/null || true
           cp README.md dist/package/ 2>/dev/null || true
           
           cat > dist/package/start-omnia.sh << 'LAUNCHER'
           #!/bin/bash
           echo "========================================="
-          echo "  Omnia AIOS v2.0.3 (FastAPI)"
+          echo "  Omnia AIOS v2.0.4 (FastAPI)"
           echo "========================================="
           echo "  Starting server..."
           echo "  Open http://127.0.0.1:8765/license to activate"
@@ -338,28 +363,44 @@ jobs:
       
       - name: Find and Package Binary
         run: |
+          set -x
           mkdir -p dist/package
-          BINARY=$(find dist/nuitka-build -name "omnia-backend" -type f | head -1)
+          echo "=== Looking for binary in dist/nuitka-build ==="
+          ls -la dist/nuitka-build/ || true
+          # Try multiple possible locations
+          BINARY=""
+          for candidate in dist/nuitka-build/omnia-backend dist/nuitka-build/standalone_main.dist/omnia-backend dist/nuitka-build/omnia-backend.bin; do
+            if [ -e "$candidate" ]; then
+              BINARY="$candidate"
+              echo "Found: $BINARY"
+              break
+            fi
+          done
           if [ -z "$BINARY" ]; then
+            # Fallback: find any executable
+            BINARY=$(find dist/nuitka-build -name "omnia-backend*" -o -name "standalone_main*" | head -5)
+            echo "Fallback search found: $BINARY"
+          fi
+          if [ -z "$BINARY" ] || [ ! -e "$BINARY" ]; then
             echo "Error: Binary not found!"
-            find dist/nuitka-build -type f
+            find dist/nuitka-build -maxdepth 3 2>/dev/null || true
             exit 1
           fi
-          cp "$BINARY" dist/package/
+          cp "$BINARY" dist/package/omnia-backend
           chmod +x dist/package/omnia-backend
+          ls -la dist/package/omnia-backend
           cp -r seeds dist/package/
           cp -r config dist/package/
           cp -r web dist/package/
           mkdir -p dist/package/tools
-          cp tools/license_system.py dist/package/tools/
-          cp tools/keygen.py dist/package/tools/
+          cp tools/keygen.py dist/package/tools/ 2>/dev/null || true
           cp LICENSE.txt dist/package/ 2>/dev/null || true
           cp README.md dist/package/ 2>/dev/null || true
           
           cat > dist/package/start-omnia.sh << 'LAUNCHER'
           #!/bin/bash
           echo "========================================="
-          echo "  Omnia AIOS v2.0.3 (FastAPI)"
+          echo "  Omnia AIOS v2.0.4 (FastAPI)"
           echo "========================================="
           echo "  Starting server..."
           echo "  Open http://127.0.0.1:8765/license to activate"
@@ -402,7 +443,7 @@ jobs:
             dist/omnia-windows-amd64.zip
           generate_release_notes: true
           body: |
-            ## Omnia AIOS v2.0.3 - FastAPI Version (Fixed)
+            ## Omnia AIOS v2.0.4 - FastAPI Version
             
             ### 🐛 Bug Fixes
             - 修复 jinja2 依赖缺失导致的构建失败
