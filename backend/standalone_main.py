@@ -71,208 +71,42 @@ logger.info(f"App root: {APP_ROOT}")
 logger.info(f"User data: {USER_DATA_DIR}")
 logger.info(f"Seeds dir: {SEEDS_DIR}")
 
-# ============ 🔐 授权系统 ============
+# ============ 🔐 授权系统（统一使用 src/omnia/license.py）===========
 
-# 签名密钥（与 tools/keygen.py 和 src/omnia/license.py 保持一致）
-LICENSE_MASTER_KEY = "Omnia-Commercial-License-2025-SecretKey-Change-Me!"
+# 添加 src 到 sys.path，确保可以导入统一的授权模块
+_src_path = str(APP_ROOT / "src")
+if _src_path not in sys.path:
+    sys.path.insert(0, str(APP_ROOT))
 
-# 授权类型
-LICENSE_TYPES = {
-    "M": {"type": "monthly", "days": 30, "label": "月卡"},
-    "Q": {"type": "quarterly", "days": 90, "label": "季卡"},
-    "Y": {"type": "yearly", "days": 365, "label": "年卡"},
-    "T": {"type": "trial", "days": 3, "label": "试用"},
-}
-
-LICENSE_FILE = USER_DATA_DIR / "license.dat"
-LICENSE_DB = USER_DATA_DIR / "license.db"
-
-
-def get_machine_id() -> str:
-    """获取机器唯一标识"""
-    try:
-        if platform.system() == "Windows":
-            import winreg
-            key = winreg.OpenKey(
-                winreg.HKEY_LOCAL_MACHINE,
-                r"SOFTWARE\Microsoft\Cryptography"
-            )
-            machine_guid = winreg.QueryValueEx(key, "MachineGuid")[0]
-            winreg.CloseKey(key)
-            return machine_guid
-        elif platform.system() == "Darwin":
-            import subprocess
-            result = subprocess.run(
-                ["ioreg", "-rd1", "-c", "IOPlatformExpertDevice"],
-                capture_output=True, text=True, timeout=5
-            )
-            for line in result.stdout.split('\n'):
-                if 'IOPlatformUUID' in line:
-                    return line.split('"')[-2]
-        else:
-            machine_id_files = [
-                Path("/etc/machine-id"),
-                Path("/var/lib/dbus/machine-id"),
-            ]
-            for f in machine_id_files:
-                if f.exists():
-                    return f.read_text().strip()
-        return str(uuid.getnode())
-    except Exception as e:
-        logger.warning(f"获取 machine_id 失败: {e}")
-        return str(uuid.getnode())
-
-
-def verify_license_key(key: str) -> tuple:
-    """验证卡密，返回 (is_valid, message, info_dict)"""
-    try:
-        clean_key = key.strip().upper().replace("-", "").replace(" ", "")
-        if len(clean_key) != 16:
-            return False, "卡密格式无效（需要16位）", {}
-
-        random_part = clean_key[:8]
-        type_char = clean_key[8]
-        signature = clean_key[9:]
-
-        if type_char not in LICENSE_TYPES:
-            return False, "卡密类型无效", {}
-
-        license_info = LICENSE_TYPES[type_char]
-
-        # 验证签名
-        expected_sig_data = f"{random_part}{type_char}{LICENSE_MASTER_KEY}"
-        expected_sig = hashlib.sha256(expected_sig_data.encode()).hexdigest()[:10].upper()
-        if not signature.startswith(expected_sig[:4]):
-            return False, "卡密签名无效", {}
-
-        activate_time = datetime.now()
-        expire_time = activate_time + timedelta(days=license_info["days"])
-
-        return True, "卡密验证成功", {
-            "type": license_info["type"],
-            "type_label": license_info["label"],
-            "activate_time": activate_time.strftime("%Y-%m-%d %H:%M:%S"),
-            "expire_time": expire_time.strftime("%Y-%m-%d %H:%M:%S"),
-            "machine_id": get_machine_id(),
-        }
-    except Exception as e:
-        return False, f"验证失败: {str(e)}", {}
-
-
-def save_license(license_data: dict) -> bool:
-    """保存许可证到本地"""
-    try:
-        LICENSE_FILE.parent.mkdir(parents=True, exist_ok=True)
-        license_data["machine_id"] = get_machine_id()
-        data_str = json.dumps(license_data, sort_keys=True)
-        license_data["checksum"] = hashlib.sha256(
-            (data_str + LICENSE_MASTER_KEY).encode()
-        ).hexdigest()
-        with open(LICENSE_FILE, "w", encoding="utf-8") as f:
-            json.dump(license_data, f, indent=2, ensure_ascii=False)
-        return True
-    except Exception as e:
-        logger.error(f"保存许可证失败: {e}")
-        return False
-
-
-def load_license() -> Optional[dict]:
-    """加载本地许可证"""
-    try:
-        if not LICENSE_FILE.exists():
-            return None
-        with open(LICENSE_FILE, "r", encoding="utf-8") as f:
-            license_data = json.load(f)
-        saved_checksum = license_data.pop("checksum", None)
-        if saved_checksum is None:
-            return None
-        data_str = json.dumps(license_data, sort_keys=True)
-        expected_checksum = hashlib.sha256(
-            (data_str + LICENSE_MASTER_KEY).encode()
-        ).hexdigest()
-        if saved_checksum != expected_checksum:
-            return None
-        if license_data.get("machine_id") != get_machine_id():
-            return None
-        return license_data
-    except Exception as e:
-        logger.error(f"加载许可证失败: {e}")
-        return None
-
-
-def check_license_status() -> tuple:
-    """检查许可证状态，返回 (is_valid, status_msg, license_data)"""
-    license_data = load_license()
-    if license_data is None:
-        return False, "未激活", None
-    try:
-        expire_time = datetime.strptime(license_data["expire_time"], "%Y-%m-%d %H:%M:%S")
-    except Exception:
-        return False, "许可证数据损坏", None
-    if datetime.now() > expire_time:
-        return False, "已过期", license_data
-    remaining = (expire_time - datetime.now()).days
-    return True, f"有效 (剩余 {remaining} 天)", license_data
-
+from src.omnia.license import (
+    get_machine_id,
+    verify_license_key,
+    save_license,
+    load_license,
+    check_license_status,
+    activate_trial,
+    is_trial_used,
+    get_full_status,
+    encrypt_api_key,
+    decrypt_api_key,
+    get_api_key_masked,
+    LICENSE_FILE,
+    LICENSE_DB,
+)
 
 def init_trial_if_needed():
-    """首次运行时自动创建试用许可"""
+    """首次运行时自动创建试用许可（调用统一授权模块）"""
     is_valid, status, _ = check_license_status()
     if is_valid:
         return  # 已有有效许可
-
-    # 检查是否已经用过试用
-    try:
-        if LICENSE_DB.exists():
-            conn = sqlite3.connect(LICENSE_DB)
-            cursor = conn.cursor()
-            cursor.execute(
-                "SELECT COUNT(*) FROM trial_used WHERE machine_id = ?",
-                (get_machine_id(),)
-            )
-            count = cursor.fetchone()[0]
-            conn.close()
-            if count > 0:
-                logger.info("试用期已使用过，需要购买授权")
-                return
-    except Exception:
-        pass
-
-    # 创建试用许可
-    logger.info("首次运行，创建3天试用许可...")
-    trial_type = LICENSE_TYPES["T"]
-    activate_time = datetime.now()
-    expire_time = activate_time + timedelta(days=trial_type["days"])
-
-    trial_data = {
-        "type": trial_type["type"],
-        "type_label": trial_type["label"],
-        "activate_time": activate_time.strftime("%Y-%m-%d %H:%M:%S"),
-        "expire_time": expire_time.strftime("%Y-%m-%d %H:%M:%S"),
-        "machine_id": get_machine_id(),
-    }
-
-    if save_license(trial_data):
-        # 记录已使用试用
-        try:
-            LICENSE_DB.parent.mkdir(parents=True, exist_ok=True)
-            conn = sqlite3.connect(LICENSE_DB)
-            cursor = conn.cursor()
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS trial_used (
-                    machine_id TEXT PRIMARY KEY,
-                    used_at TEXT
-                )
-            """)
-            cursor.execute(
-                "INSERT OR IGNORE INTO trial_used (machine_id, used_at) VALUES (?, ?)",
-                (get_machine_id(), datetime.now().isoformat())
-            )
-            conn.commit()
-            conn.close()
-        except Exception as e:
-            logger.warning(f"记录试用状态失败: {e}")
-        logger.info(f"✅ 试用许可已创建，有效期至 {expire_time.strftime('%Y-%m-%d %H:%M:%S')}")
+    if not is_trial_used():
+        success, msg = activate_trial()
+        if success:
+            logger.info(f"✅ {msg}")
+        else:
+            logger.info(f"试用激活失败: {msg}")
+    else:
+        logger.info("试用期已使用过，需要购买授权")
 
 
 # ============ Flask 应用 ============
@@ -364,7 +198,7 @@ LICENSE_PAGE_HTML = """
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans SC", sans-serif;
             background: linear-gradient(135deg, #0a0a1a 0%, #1a1a3e 50%, #0a0a2a 100%);
             color: #e0e0e0;
             min-height: 100vh;
@@ -460,6 +294,26 @@ LICENSE_PAGE_HTML = """
         .message.error { display: block; background: rgba(244,67,54,0.15); color: #e57373; }
         .info { font-size: 12px; color: #666; text-align: center; margin-top: 16px; }
         .machine-id { font-family: monospace; font-size: 11px; color: #555; word-break: break-all; }
+        .api-key-section { margin-top: 24px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.1); }
+        .api-key-section h3 { font-size: 14px; color: #aaa; margin-bottom: 12px; }
+        .provider-select {
+            width: 100%;
+            padding: 10px 12px;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 8px;
+            color: #fff;
+            font-size: 14px;
+            margin-bottom: 12px;
+            outline: none;
+        }
+        .provider-select option { background: #1a1a3e; color: #fff; }
+        .btn-sm {
+            padding: 10px 20px;
+            font-size: 14px;
+            width: auto;
+            display: inline-block;
+        }
     </style>
 </head>
 <body>
@@ -476,10 +330,28 @@ LICENSE_PAGE_HTML = """
         <div id="activateForm">
             <div class="input-group">
                 <label>请输入授权卡密</label>
-                <input type="text" id="licenseKey" placeholder="XXXX-XXXX-XXXX-XXXX" maxlength="19" autocomplete="off" />
+                <input type="text" id="licenseKey" placeholder="OMNI-XXXX-XXXX-XXXX-XXXX" maxlength="24" autocomplete="off" />
             </div>
             <button class="btn btn-primary" onclick="activate()">激活授权</button>
-            <button class="btn btn-trial" onclick="startTrial()">免费试用 3 天</button>
+            <button class="btn btn-trial" onclick="startTrial()">免费试用 1 天</button>
+        </div>
+
+        <div class="api-key-section" id="apiKeySection">
+            <h3>🔑 AI 服务商配置</h3>
+            <select class="provider-select" id="providerSelect">
+                <option value="kimi">Kimi (Moonshot)</option>
+                <option value="deepseek">DeepSeek</option>
+                <option value="openai">OpenAI</option>
+                <option value="claude">Claude (Anthropic)</option>
+                <option value="qwen">通义千问 (阿里)</option>
+                <option value="zhipu">智谱 AI (GLM)</option>
+            </select>
+            <div class="input-group">
+                <label>API Key</label>
+                <input type="password" id="apiKeyInput" placeholder="sk-..." autocomplete="off" />
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="saveApiKey()">保存 API Key</button>
+            <div id="apiKeyStatus" style="font-size: 12px; color: #888; margin-top: 8px; text-align: center;"></div>
         </div>
 
         <div class="info">
@@ -524,7 +396,7 @@ LICENSE_PAGE_HTML = """
                 const data = await resp.json();
                 if (data.success) {
                     showMsg(data.message, 'success');
-                    setTimeout(() => checkStatus(), 1000);
+                    setTimeout(() => { checkStatus(); window.location.href = '/'; }, 2000);
                 } else {
                     showMsg(data.message, 'error');
                 }
@@ -539,12 +411,34 @@ LICENSE_PAGE_HTML = """
                 const data = await resp.json();
                 if (data.success) {
                     showMsg(data.message, 'success');
-                    setTimeout(() => checkStatus(), 1000);
+                    setTimeout(() => { checkStatus(); window.location.href = '/'; }, 2000);
                 } else {
                     showMsg(data.message, 'error');
                 }
             } catch(e) {
                 showMsg('请求失败', 'error');
+            }
+        }
+
+        async function saveApiKey() {
+            const provider = document.getElementById('providerSelect').value;
+            const apiKey = document.getElementById('apiKeyInput').value.trim();
+            if (!apiKey) { showMsg('请输入 API Key', 'error'); return; }
+            try {
+                const resp = await fetch('/api/config/api-key', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({provider: provider, api_key: apiKey})
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    document.getElementById('apiKeyStatus').textContent = '✅ API Key 已安全保存 (' + (data.masked || '****') + ')';
+                    document.getElementById('apiKeyInput').value = '';
+                } else {
+                    showMsg(data.message || '保存失败', 'error');
+                }
+            } catch(e) {
+                showMsg('保存失败', 'error');
             }
         }
 
@@ -558,6 +452,11 @@ LICENSE_PAGE_HTML = """
         document.getElementById('licenseKey').addEventListener('input', function(e) {
             let v = e.target.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
             let parts = [];
+            // OMNI- 前缀
+            if (v.startsWith('OMNI')) {
+                parts.push('OMNI');
+                v = v.substring(4);
+            }
             for (let i = 0; i < v.length && i < 16; i += 4) {
                 parts.push(v.substring(i, Math.min(i+4, v.length)));
             }
@@ -570,6 +469,13 @@ LICENSE_PAGE_HTML = """
         fetch('/api/license/machine-id').then(r=>r.json()).then(d=>{
             document.getElementById('machineId').textContent = 'Machine ID: ' + d.machine_id;
         });
+
+        // 检查 API Key 状态
+        fetch('/api/config').then(r=>r.json()).then(d=>{
+            if (d.has_api_key) {
+                document.getElementById('apiKeyStatus').textContent = '✅ 已配置 API Key';
+            }
+        });
     </script>
 </body>
 </html>
@@ -578,31 +484,24 @@ LICENSE_PAGE_HTML = """
 @app.route('/api/license/status')
 def license_status_api():
     """获取授权状态"""
-    is_valid, status, license_data = check_license_status()
-    if license_data is None:
-        return jsonify({"is_valid": False, "status": "inactive", "message": status})
-    if not is_valid:
+    status = get_full_status()
+    if not status.get("is_valid"):
         return jsonify({
             "is_valid": False,
-            "status": "expired" if status == "已过期" else "inactive",
-            "message": status,
-            "expire_time": license_data.get("expire_time"),
-            "type_label": license_data.get("type_label"),
+            "status": "expired" if status.get("status") == "已过期" else "inactive",
+            "message": status.get("status", "未激活"),
+            "expire_time": status.get("expire_time"),
+            "type_label": status.get("type_label"),
         })
-    try:
-        expire_time = datetime.strptime(license_data["expire_time"], "%Y-%m-%d %H:%M:%S")
-        remaining_days = (expire_time - datetime.now()).days
-    except Exception:
-        remaining_days = 0
     return jsonify({
         "is_valid": True,
         "status": "active",
-        "message": status,
-        "type": license_data.get("type"),
-        "type_label": license_data.get("type_label"),
-        "activate_time": license_data.get("activate_time"),
-        "expire_time": license_data.get("expire_time"),
-        "remaining_days": remaining_days,
+        "message": status.get("status"),
+        "type": status.get("type"),
+        "type_label": status.get("type_label"),
+        "activate_time": status.get("activate_time"),
+        "expire_time": status.get("expire_time"),
+        "remaining_days": status.get("remaining_days", 0),
     })
 
 
@@ -627,61 +526,14 @@ def license_activate_api():
 
 @app.route('/api/license/trial', methods=['POST'])
 def license_trial_api():
-    """获取试用许可"""
-    # 检查是否已有有效许可
+    """获取试用许可（调用统一授权模块）"""
     is_valid, _, _ = check_license_status()
     if is_valid:
         return jsonify({"success": False, "message": "您已有有效授权，无需试用"})
-
-    # 检查试用是否已使用
-    try:
-        if LICENSE_DB.exists():
-            conn = sqlite3.connect(LICENSE_DB)
-            cursor = conn.cursor()
-            cursor.execute(
-                "SELECT COUNT(*) FROM trial_used WHERE machine_id = ?",
-                (get_machine_id(),)
-            )
-            count = cursor.fetchone()[0]
-            conn.close()
-            if count > 0:
-                return jsonify({"success": False, "message": "试用期已使用，请购买授权"})
-    except Exception:
-        pass
-
-    # 创建试用
-    trial_type = LICENSE_TYPES["T"]
-    activate_time = datetime.now()
-    expire_time = activate_time + timedelta(days=trial_type["days"])
-    trial_data = {
-        "type": trial_type["type"],
-        "type_label": trial_type["label"],
-        "activate_time": activate_time.strftime("%Y-%m-%d %H:%M:%S"),
-        "expire_time": expire_time.strftime("%Y-%m-%d %H:%M:%S"),
-        "machine_id": get_machine_id(),
-    }
-    if save_license(trial_data):
-        try:
-            LICENSE_DB.parent.mkdir(parents=True, exist_ok=True)
-            conn = sqlite3.connect(LICENSE_DB)
-            cursor = conn.cursor()
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS trial_used (
-                    machine_id TEXT PRIMARY KEY,
-                    used_at TEXT
-                )
-            """)
-            cursor.execute(
-                "INSERT OR IGNORE INTO trial_used (machine_id, used_at) VALUES (?, ?)",
-                (get_machine_id(), datetime.now().isoformat())
-            )
-            conn.commit()
-            conn.close()
-        except Exception as e:
-            logger.warning(f"记录试用状态失败: {e}")
-        return jsonify({"success": True, "message": f"试用许可已激活，有效期至 {expire_time.strftime('%Y-%m-%d %H:%M:%S')}"})
-    else:
-        return jsonify({"success": False, "message": "试用许可创建失败"})
+    if is_trial_used():
+        return jsonify({"success": False, "message": "试用期已使用，请购买授权"})
+    success, msg = activate_trial()
+    return jsonify({"success": success, "message": msg})
 
 
 @app.route('/api/license/machine-id')
@@ -694,6 +546,22 @@ def license_machine_id_api():
 def license_page():
     """授权激活页面"""
     return render_template_string(LICENSE_PAGE_HTML)
+
+
+@app.route('/api/config/api-key', methods=['POST'])
+def save_api_key_api():
+    """安全存储 API Key（加密存储）"""
+    try:
+        body = request.json
+        api_key = body.get("api_key", "").strip()
+        if not api_key:
+            return jsonify({"success": False, "message": "请输入 API Key"})
+        if encrypt_api_key(api_key):
+            return jsonify({"success": True, "masked": get_api_key_masked()})
+        else:
+            return jsonify({"success": False, "message": "API Key 存储失败"})
+    except Exception as e:
+        return jsonify({"success": False, "message": f"存储失败: {str(e)}"})
 
 
 # ============ 原有 API 路由 ============

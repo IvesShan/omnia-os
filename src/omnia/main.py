@@ -71,6 +71,7 @@ else:
         sys.path.insert(0, _src_path)
 
 from contextlib import asynccontextmanager
+from datetime import datetime
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -383,7 +384,16 @@ async def new_session():
 
 @app.get("/")
 async def root():
-    """根路径 - 返回前端页面"""
+    """根路径 - 检查是否首次运行，决定跳转到 Setup Wizard 还是主界面"""
+    # 检查是否已完成初始配置
+    setup_done_file = settings.project_root / ".omnia" / "config" / ".setup_done"
+    if not setup_done_file.exists():
+        # 首次运行，跳转到 Setup Wizard
+        wizard_path = web_dir / "setup-wizard.html"
+        if wizard_path.exists():
+            return FileResponse(str(wizard_path))
+    
+    # 已完成配置，返回主界面
     index_path = web_dir / "index.html"
     if index_path.exists():
         return FileResponse(str(index_path))
@@ -394,6 +404,27 @@ async def root():
         "docs": "/docs",
         "redoc": "/redoc"
     }
+
+
+@app.get("/setup-wizard")
+async def setup_wizard():
+    """Setup Wizard 页面"""
+    wizard_path = web_dir / "setup-wizard.html"
+    if wizard_path.exists():
+        return FileResponse(str(wizard_path))
+    return JSONResponse(
+        status_code=404,
+        content={"detail": "Setup wizard not found"}
+    )
+
+
+@app.post("/api/setup/complete")
+async def complete_setup():
+    """标记初始配置完成"""
+    setup_done_file = settings.project_root / ".omnia" / "config" / ".setup_done"
+    setup_done_file.parent.mkdir(parents=True, exist_ok=True)
+    setup_done_file.write_text(datetime.now().isoformat())
+    return {"ok": True, "message": "Setup completed"}
 
 
 @app.get("/{filename:path}")

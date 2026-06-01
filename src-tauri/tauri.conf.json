@@ -42,7 +42,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["deb", "appimage"],
+    "targets": ["deb", "appimage", "msi", "nsis", "dmg", "app"],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -51,6 +51,17 @@
       "icons/256x256@2x.png",
       "icons/512x512.png"
     ],
+    "windows": {
+      "nsis": {
+        "displayLanguage": "2052",
+        "installerIcon": "icons/icon.ico",
+        "languages": ["SimpChinese", "English"]
+      },
+      "wix": null
+    },
+    "macOS": {
+      "minimumSystemVersion": "10.15"
+    },
     "resources": [
       "../web/**/*",
       "../seeds/**/*",

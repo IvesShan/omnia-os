@@ -1,0 +1,233 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g., v1.2.0)'
+        required: true
+
+env:
+  APP_NAME: Omnia
+  APP_VERSION: ${{ github.event.inputs.version || github.ref_name }}
+
+jobs:
+  # ==========================================
+  # 构建 Python 后端（Nuitka 打包）
+  # ==========================================
+  build-backend:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+            arch: x86_64
+            target: x86_64-unknown-linux-gnu
+          - os: macos-latest
+            platform: macos
+            arch: x86_64
+            target: x86_64-apple-darwin
+          - os: macos-latest
+            platform: macos
+            arch: aarch64
+            target: aarch64-apple-darwin
+          - os: windows-latest
+            platform: windows
+            arch: x86_64
+            target: x86_64-pc-windows-msvc
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install nuitka ordered-set
+
+      - name: Build with Nuitka (${{ matrix.platform }}-${{ matrix.arch }})
+        run: |
+          python -m nuitka \
+            --standalone \
+            --onefile \
+            --output-filename=omnia-backend \
+            --output-dir=dist/backend \
+            --include-package=src \
+            --include-package=core \
+            --include-module=flask \
+            --include-module=flask_cors \
+            --include-module=uvicorn \
+            --include-data-dir=seeds=seeds \
+            --include-data-dir=config=config \
+            --include-data-dir=web=web \
+            --noinclude-default-plugin \
+            backend/standalone_main.py
+
+      - name: Upload backend artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-${{ matrix.platform }}-${{ matrix.arch }}
+          path: dist/backend/omnia-backend*
+          retention-days: 7
+
+  # ==========================================
+  # 构建 Tauri 桌面应用
+  # ==========================================
+  build-tauri:
+    needs: build-backend
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+            arch: x86_64
+            rust_target: x86_64-unknown-linux-gnu
+            ext: ''
+          - os: macos-latest
+            platform: macos
+            arch: x86_64
+            rust_target: x86_64-apple-darwin
+            ext: ''
+          - os: macos-latest
+            platform: macos
+            arch: aarch64
+            rust_target: aarch64-apple-darwin
+            ext: ''
+          - os: windows-latest
+            platform: windows
+            arch: x86_64
+            rust_target: x86_64-pc-windows-msvc
+            ext: '.exe'
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_target }}
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - name: Download backend binary
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-${{ matrix.platform }}-${{ matrix.arch }}
+          path: src-tauri/binaries/
+
+      - name: Prepare backend binary
+        run: |
+          cd src-tauri/binaries
+          # Rename to Tauri expected format: <name>-<target-triple><ext>
+          if [ "${{ matrix.platform }}" = "windows" ]; then
+            mv omnia-backend.exe omnia-backend-${{ matrix.rust_target }}.exe
+          else
+            mv omnia-backend omnia-backend-${{ matrix.rust_target }}
+            chmod +x omnia-backend-${{ matrix.rust_target }}
+          fi
+        shell: bash
+
+      - name: Install system dependencies (Linux)
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-3-dev \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf
+
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
+        with:
+          projectPath: src-tauri
+          args: --target ${{ matrix.rust_target }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+      - name: Upload desktop artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.platform }}-${{ matrix.arch }}
+          path: |
+            src-tauri/target/${{ matrix.rust_target }}/release/bundle/**/*.deb
+            src-tauri/target/${{ matrix.rust_target }}/release/bundle/**/*.AppImage
+            src-tauri/target/${{ matrix.rust_target }}/release/bundle/**/*.msi
+            src-tauri/target/${{ matrix.rust_target }}/release/bundle/**/*.exe
+            src-tauri/target/${{ matrix.rust_target }}/release/bundle/**/*.dmg
+            src-tauri/target/${{ matrix.rust_target }}/release/bundle/**/*.app
+          retention-days: 7
+
+  # ==========================================
+  # 创建 GitHub Release
+  # ==========================================
+  release:
+    needs: build-tauri
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - name: List artifacts
+        run: find artifacts/ -type f | head -50
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: "Omnia ${{ env.APP_VERSION }}"
+          body: |
+            ## Omnia AIOS ${{ env.APP_VERSION }}
+
+            ### 下载说明
+
+            | 平台 | 文件 | 说明 |
+            |------|------|------|
+            | **Windows** | `Omnia_*_x64-setup.exe` | Windows 安装程序（推荐） |
+            | **Windows** | `Omnia_*_x64_en-US.msi` | MSI 安装包 |
+            | **macOS (Intel)** | `Omnia_*_x64.dmg` | Intel Mac 安装包 |
+            | **macOS (Apple Silicon)** | `Omnia_*_aarch64.dmg` | M1/M2/M3 Mac 安装包 |
+            | **Linux (Debian/Ubuntu)** | `omnia_*_amd64.deb` | Debian 系安装包 |
+            | **Linux (通用)** | `omnia_*_amd64.AppImage` | AppImage 通用包 |
+
+            ### 首次使用
+            1. 安装并启动 Omnia
+            2. 首次打开会进入**授权激活页面**
+            3. 输入卡密激活，或点击"免费试用1天"
+            4. 配置 AI 服务商 API Key
+            5. 开始使用！
+
+            ### 定价
+            | 类型 | 价格 | 有效期 |
+            |------|------|--------|
+            | 试用版 | 免费 | 1 天 |
+            | 月卡 | ¥68 | 30 天 |
+            | 季卡 | ¥168 | 90 天 |
+            | 年卡 | ¥388 | 365 天 |
+            | 终身版 | ¥888 | 永久 |
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,5 +1,5 @@
 <template id="scene-multiturn-template">
-  <div data-composition-id="scene-multiturn" data-width="1920" data-height="1080" data-duration="6">
+  <div data-composition-id="scene-multiturn" data-width="1920" data-height="1080" data-duration="8">
     <div class="screenshot-bg"></div>
     
     <div class="overlay-layer">
@@ -65,7 +65,7 @@
         const tl = gsap.timeline({ paused: true });
         tl.fromTo('.screenshot-bg', { opacity: 0, scale: 1.05 }, { opacity: 1, scale: 1, duration: 2.0, ease: 'power3.out' }, 0);
         tl.fromTo('#multiturnCallout', { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 1.5, ease: 'power3.out' }, 1.0);
-        tl.to('.overlay-layer, .screenshot-bg', { opacity: 0, duration: 0.5 }, 5.5);
+        tl.to('.overlay-layer, .screenshot-bg', { opacity: 0, duration: 0.5 }, 7.5);
         window.__timelines = window.__timelines || {};
         window.__timelines["scene-multiturn"] = tl;
       })();

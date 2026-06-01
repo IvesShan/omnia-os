@@ -1,0 +1,96 @@
+<template id="scene-tools-template">
+  <div data-composition-id="scene-tools" data-width="1920" data-height="1080" data-duration="8">
+    <div class="screenshot-bg"></div>
+    
+    <div class="overlay-layer">
+      <div class="text-callout" id="toolsCallout">
+        <div class="callout-title">40+ 工具</div>
+        <div class="callout-desc">一句话，帮你干完一整天的活</div>
+        <div class="tool-list">
+          <span>读文件</span>
+          <span>写代码</span>
+          <span>查数据库</span>
+          <span>发通知</span>
+        </div>
+      </div>
+    </div>
+
+    <style>
+      @font-face { font-family: 'Noto Sans SC'; src: url('../assets/fonts/noto-sans-sc.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'Inter'; src: url('../assets/fonts/inter-latin.woff2') format('woff2'); font-display: swap; }
+      [data-composition-id="scene-tools"] {
+        position: relative;
+        font-family: 'Inter', 'Noto Sans SC', sans-serif;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+      }
+
+      .screenshot-bg {
+        position: absolute;
+        inset: 0;
+        background-image: url('../assets/real-ui-tools.png');
+        background-size: cover;
+        background-position: center;
+        opacity: 0;
+      }
+
+      .overlay-layer {
+        position: absolute;
+        inset: 0;
+        z-index: 10;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .text-callout {
+        text-align: center;
+        opacity: 0;
+      }
+
+      .callout-title {
+        font-size: 96px;
+        font-weight: 900;
+        background: linear-gradient(135deg, #10b981 0%, #3b82f6 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+
+      .callout-desc {
+        font-size: 42px;
+        font-weight: 300;
+        color: rgba(255, 255, 255, 0.8);
+        margin-top: 20px;
+      }
+
+      .tool-list {
+        display: flex;
+        gap: 30px;
+        margin-top: 40px;
+        justify-content: center;
+      }
+
+      .tool-list span {
+        font-size: 24px;
+        color: rgba(16, 185, 129, 0.9);
+        padding: 12px 24px;
+        background: rgba(16, 185, 129, 0.1);
+        border: 1px solid rgba(16, 185, 129, 0.3);
+        border-radius: 12px;
+      }
+    </style>
+
+    <script>
+      (function() {
+        const tl = gsap.timeline({ paused: true });
+        tl.fromTo('.screenshot-bg', { opacity: 0, scale: 1.05 }, { opacity: 1, scale: 1, duration: 2.0, ease: 'power3.out' }, 0);
+        tl.fromTo('#toolsCallout', { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 1.5, ease: 'power3.out' }, 1.5);
+        tl.to('.overlay-layer, .screenshot-bg', { opacity: 0, duration: 0.5 }, 7.5);
+        window.__timelines = window.__timelines || {};
+        window.__timelines["scene-tools"] = tl;
+      })();
+    </script>
+  </div>
+</template>

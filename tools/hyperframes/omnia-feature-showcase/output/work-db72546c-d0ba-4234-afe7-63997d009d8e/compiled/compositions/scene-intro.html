@@ -1,0 +1,229 @@
+<template id="scene-intro-template">
+  <div data-composition-id="scene-intro" data-width="1920" data-height="1080" data-duration="5">
+
+    <!-- Background -->
+    <div class="bg-layer"></div>
+
+    <!-- Grid lines -->
+    <div class="grid-layer">
+      <div class="grid-h grid-h-1"></div>
+      <div class="grid-h grid-h-2"></div>
+      <div class="grid-v grid-v-1"></div>
+      <div class="grid-v grid-v-2"></div>
+    </div>
+
+    <!-- Center content -->
+    <div class="center-content">
+      <!-- Logo -->
+      <div class="logo-container">
+        <div class="glow-ring"></div>
+        <div class="glow-ring ring-2"></div>
+        <div class="logo-icon">
+          <svg width="100" height="100" viewBox="0 0 100 100" fill="none">
+            <circle cx="50" cy="50" r="40" stroke="url(#grad1)" stroke-width="3" fill="none"/>
+            <circle cx="50" cy="50" r="25" stroke="url(#grad1)" stroke-width="2" fill="none" opacity="0.6"/>
+            <circle cx="50" cy="50" r="10" fill="url(#grad1)"/>
+            <line x1="50" y1="10" x2="50" y2="30" stroke="url(#grad1)" stroke-width="2" stroke-linecap="round"/>
+            <line x1="50" y1="70" x2="50" y2="90" stroke="url(#grad1)" stroke-width="2" stroke-linecap="round"/>
+            <line x1="10" y1="50" x2="30" y2="50" stroke="url(#grad1)" stroke-width="2" stroke-linecap="round"/>
+            <line x1="70" y1="50" x2="90" y2="50" stroke="url(#grad1)" stroke-width="2" stroke-linecap="round"/>
+            <defs>
+              <linearGradient id="grad1" x1="0" y1="0" x2="100" y2="100">
+                <stop offset="0%" stop-color="#00d4ff"/>
+                <stop offset="100%" stop-color="#8b5cf6"/>
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+      </div>
+
+      <!-- Title -->
+      <div class="title-block">
+        <div class="brand-name" id="brandTitle">OMNIA</div>
+        <div class="tagline-divider">
+          <span class="div-line"></span>
+          <span class="tagline">有记忆的 AI 助手</span>
+          <span class="div-line"></span>
+        </div>
+        <div class="cn-sub">全能 · 智能 · 记忆</div>
+      </div>
+    </div>
+
+    <style>
+      @font-face { font-family: 'Noto Sans SC'; src: url('../assets/fonts/noto-sans-sc.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'Inter'; src: url('../assets/fonts/inter-latin.woff2') format('woff2'); font-display: swap; }
+
+      [data-composition-id="scene-intro"] {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        font-family: 'Inter', 'Noto Sans SC', sans-serif;
+      }
+
+      .bg-layer {
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(ellipse 80% 60% at 50% 50%, rgba(13, 17, 23, 1) 0%, rgba(5, 5, 15, 1) 100%);
+      }
+
+      .grid-layer {
+        position: absolute;
+        inset: 0;
+        opacity: 0;
+      }
+
+      .grid-h, .grid-v {
+        position: absolute;
+        background: rgba(0, 212, 255, 0.06);
+      }
+
+      .grid-h { width: 100%; height: 1px; }
+      .grid-v { height: 100%; width: 1px; }
+
+      .grid-h-1 { top: 50%; }
+      .grid-v-1 { left: 30%; }
+      .grid-v-2 { left: 70%; }
+
+      .center-content {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 10;
+      }
+
+      .logo-container {
+        position: relative;
+        width: 160px;
+        height: 160px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+      }
+
+      .glow-ring {
+        position: absolute;
+        inset: -20px;
+        border-radius: 50%;
+        border: 1px solid rgba(0, 212, 255, 0.15);
+        opacity: 0;
+      }
+
+      .ring-2 {
+        inset: -40px;
+        border-color: rgba(139, 92, 246, 0.1);
+      }
+
+      .logo-icon {
+        position: relative;
+        z-index: 2;
+      }
+
+      .title-block {
+        margin-top: 48px;
+        text-align: center;
+        opacity: 0;
+      }
+
+      .brand-name {
+        font-size: 120px;
+        font-weight: 900;
+        letter-spacing: 24px;
+        background: linear-gradient(135deg, #ffffff 0%, #00d4ff 50%, #8b5cf6 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        line-height: 1;
+      }
+
+      .tagline-divider {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 24px;
+        margin-top: 24px;
+      }
+
+      .div-line {
+        display: block;
+        width: 80px;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, rgba(0, 212, 255, 0.5), transparent);
+      }
+
+      .tagline {
+        font-size: 32px;
+        font-weight: 300;
+        color: rgba(255, 255, 255, 0.7);
+        letter-spacing: 8px;
+      }
+
+      .cn-sub {
+        margin-top: 16px;
+        font-size: 24px;
+        font-weight: 300;
+        color: rgba(0, 212, 255, 0.6);
+        letter-spacing: 12px;
+      }
+    </style>
+
+    <script>
+      (function() {
+        const tl = gsap.timeline({ paused: true });
+
+        // Grid appears
+        tl.to('.grid-layer', {
+          opacity: 1,
+          duration: 1.5,
+          ease: 'power2.out'
+        }, 0);
+
+        // Logo container
+        tl.fromTo('.logo-container',
+          { opacity: 0, scale: 0.5 },
+          { opacity: 1, scale: 1, duration: 1.0, ease: 'back.out(1.4)' },
+          0.3
+        );
+
+        // Glow rings
+        tl.to('.glow-ring', {
+          opacity: 1,
+          scale: 1.1,
+          duration: 1.2,
+          ease: 'power2.out'
+        }, 0.5);
+
+        // Ring pulse
+        tl.to('.ring-2', {
+          scale: 1.15,
+          duration: 2.0,
+          ease: 'sine.inOut',
+          yoyo: true,
+          repeat: 1
+        }, 0.8);
+
+        // Title block
+        tl.fromTo('.title-block',
+          { opacity: 0, y: 40 },
+          { opacity: 1, y: 0, duration: 1.0, ease: 'power3.out' },
+          0.6
+        );
+
+        // Fade out at end
+        tl.to('.center-content', {
+          opacity: 0,
+          scale: 0.95,
+          duration: 0.5,
+          ease: 'power2.in'
+        }, 4.5);
+
+        window.__timelines = window.__timelines || {};
+        window.__timelines["scene-intro"] = tl;
+      })();
+    </script>
+  </div>
+</template>

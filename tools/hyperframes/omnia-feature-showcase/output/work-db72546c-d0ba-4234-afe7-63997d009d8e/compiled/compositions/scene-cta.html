@@ -1,0 +1,71 @@
+<template id="scene-cta-template">
+  <div data-composition-id="scene-cta" data-width="1920" data-height="1080" data-duration="4">
+    <div class="cta-container">
+      <div class="cta-content" id="ctaContent">
+        <div class="cta-title">Omnia</div>
+        <div class="cta-subtitle">永不遗忘的操作系统</div>
+        <div class="cta-action">立即体验</div>
+      </div>
+    </div>
+
+    <style>
+      @font-face { font-family: 'Noto Sans SC'; src: url('../assets/fonts/noto-sans-sc.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'Inter'; src: url('../assets/fonts/inter-latin.woff2') format('woff2'); font-display: swap; }
+      [data-composition-id="scene-cta"] {
+        background: linear-gradient(135deg, #0a0f19 0%, #1a1a2e 50%, #0a0f19 100%);
+        font-family: 'Inter', 'Noto Sans SC', sans-serif;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .cta-container {
+        text-align: center;
+      }
+
+      .cta-content {
+        opacity: 0;
+      }
+
+      .cta-title {
+        font-size: 144px;
+        font-weight: 900;
+        background: linear-gradient(135deg, #00d4ff 0%, #8b5cf6 50%, #ec4899 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        letter-spacing: 20px;
+      }
+
+      .cta-subtitle {
+        font-size: 48px;
+        font-weight: 300;
+        color: rgba(255, 255, 255, 0.8);
+        margin-top: 20px;
+        letter-spacing: 10px;
+      }
+
+      .cta-action {
+        display: inline-block;
+        margin-top: 50px;
+        padding: 20px 60px;
+        font-size: 32px;
+        font-weight: 600;
+        color: #0a0f19;
+        background: linear-gradient(135deg, #00d4ff 0%, #8b5cf6 100%);
+        border-radius: 50px;
+        cursor: pointer;
+      }
+    </style>
+
+    <script>
+      (function() {
+        const tl = gsap.timeline({ paused: true });
+        tl.fromTo('#ctaContent', { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 1.5, ease: 'power3.out' }, 0.5);
+        tl.to('#ctaContent', { opacity: 0, duration: 0.5 }, 3.5);
+        window.__timelines = window.__timelines || {};
+        window.__timelines["scene-cta"] = tl;
+      })();
+    </script>
+  </div>
+</template>

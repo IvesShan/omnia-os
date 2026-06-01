@@ -11,15 +11,15 @@ FPS = 30
 WIDTH = 1920
 HEIGHT = 1080
 
-# Scene order and durations
+# Scene order and durations (using real UI screenshots)
 SCENES = [
-    ("screenshot-hook.png", 3),
-    ("screenshot-memory-palace.png", 6),
-    ("screenshot-neural-graph.png", 6),
-    ("screenshot-tool-execution.png", 6),
-    ("screenshot-streaming-chat.png", 4),
-    ("screenshot-multi-turn.png", 6),
-    ("screenshot-hook.png", 3),  # CTA repeat
+    ("real-ui-full.png", 3),        # Hook - full UI overview
+    ("real-ui-memory.png", 6),      # Memory Palace
+    ("real-ui-graph.png", 6),       # Neural Graph
+    ("real-ui-tools.png", 6),       # Tools/Skills
+    ("real-ui-streaming.png", 4),   # Streaming Chat
+    ("real-ui-multi-turn.png", 6),  # Multi-turn Chat
+    ("real-ui-full.png", 3),        # CTA repeat
 ]
 
 def create_scene_video(image_path, duration, output_path, fps=30):

@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Omnia - 首次配置向导</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans SC", sans-serif;
+            background: linear-gradient(135deg, #0a0a1a 0%, #1a1a3e 50%, #0a0a2a 100%);
+            color: #e0e0e0;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .wizard-container {
+            background: rgba(20, 20, 50, 0.95);
+            border: 1px solid rgba(100, 100, 255, 0.2);
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 520px;
+            width: 100%;
+            backdrop-filter: blur(20px);
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+        }
+        .logo {
+            text-align: center;
+            font-size: 36px;
+            font-weight: bold;
+            background: linear-gradient(135deg, #64b5f6, #ba68c8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 8px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #888;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        /* 步骤指示器 */
+        .steps {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 30px;
+            gap: 8px;
+        }
+        .step-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.15);
+            transition: all 0.3s;
+        }
+        .step-dot.active {
+            background: #7c4dff;
+            box-shadow: 0 0 10px rgba(124,77,255,0.5);
+        }
+        .step-dot.done {
+            background: #4caf50;
+        }
+
+        /* 步骤内容 */
+        .step-content {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+        .step-content.active {
+            display: block;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .step-title {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #fff;
+        }
+        .step-desc {
+            font-size: 14px;
+            color: #888;
+            margin-bottom: 24px;
+            line-height: 1.6;
+        }
+
+        /* 表单元素 */
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 13px;
+            color: #aaa;
+            font-weight: 500;
+        }
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 14px 16px;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 10px;
+            color: #fff;
+            font-size: 15px;
+            outline: none;
+            transition: all 0.3s;
+        }
+        .form-group input:focus,
+        .form-group select:focus {
+            border-color: rgba(124,77,255,0.6);
+            box-shadow: 0 0 15px rgba(124,77,255,0.1);
+        }
+        .form-group select option {
+            background: #1a1a3e;
+            color: #fff;
+        }
+
+        /* 按钮 */
+        .btn-row {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+        }
+        .btn {
+            flex: 1;
+            padding: 14px 20px;
+            border: none;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #5c6bc0, #7c4dff);
+            color: #fff;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(124,77,255,0.4);
+        }
+        .btn-secondary {
+            background: rgba(255,255,255,0.08);
+            color: #aaa;
+            border: 1px solid rgba(255,255,255,0.15);
+        }
+        .btn-secondary:hover {
+            background: rgba(255,255,255,0.12);
+            color: #fff;
+        }
+        .btn-trial {
+            background: transparent;
+            border: 1px solid rgba(255,255,255,0.2);
+            color: #aaa;
+            margin-top: 10px;
+            width: 100%;
+        }
+        .btn-trial:hover {
+            border-color: rgba(255,255,255,0.4);
+            color: #fff;
+        }
+
+        /* 功能卡片 */
+        .feature-cards {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        .feature-card {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 12px;
+            padding: 16px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .feature-card:hover {
+            border-color: rgba(124,77,255,0.4);
+            background: rgba(124,77,255,0.1);
+        }
+        .feature-card.selected {
+            border-color: #7c4dff;
+            background: rgba(124,77,255,0.15);
+        }
+        .feature-icon {
+            font-size: 24px;
+            margin-bottom: 8px;
+        }
+        .feature-name {
+            font-size: 13px;
+            font-weight: 600;
+            color: #fff;
+        }
+        .feature-desc {
+            font-size: 11px;
+            color: #888;
+            margin-top: 4px;
+        }
+
+        /* 消息 */
+        .message {
+            text-align: center;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            display: none;
+            font-size: 14px;
+        }
+        .message.success { display: block; background: rgba(76,175,80,0.15); color: #81c784; }
+        .message.error { display: block; background: rgba(244,67,54,0.15); color: #e57373; }
+        .message.info { display: block; background: rgba(33,150,243,0.15); color: #64b5f6; }
+
+        /* 进度条 */
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 2px;
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #5c6bc0, #7c4dff);
+            border-radius: 2px;
+            transition: width 0.3s ease;
+        }
+
+        /* 完成页面 */
+        .success-icon {
+            text-align: center;
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+        .success-title {
+            text-align: center;
+            font-size: 24px;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 12px;
+        }
+        .success-desc {
+            text-align: center;
+            color: #888;
+            margin-bottom: 30px;
+            line-height: 1.6;
+        }
+
+        /* 机器码 */
+        .machine-id {
+            font-family: monospace;
+            font-size: 11px;
+            color: #555;
+            text-align: center;
+            margin-top: 16px;
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body>
+    <div class="wizard-container">
+        <div class="logo">✦ Omnia</div>
+        <div class="subtitle">AI Operating System · 首次配置向导</div>
+
+        <!-- 进度条 -->
+        <div class="progress-bar">
+            <div class="progress-fill" id="progressFill" style="width: 20%"></div>
+        </div>
+
+        <!-- 步骤指示器 -->
+        <div class="steps">
+            <div class="step-dot active" id="dot1"></div>
+            <div class="step-dot" id="dot2"></div>
+            <div class="step-dot" id="dot3"></div>
+            <div class="step-dot" id="dot4"></div>
+            <div class="step-dot" id="dot5"></div>
+        </div>
+
+        <div id="msg" class="message"></div>
+
+        <!-- Step 1: 欢迎 -->
+        <div class="step-content active" id="step1">
+            <div class="step-title">欢迎使用 Omnia</div>
+            <div class="step-desc">
+                Omnia 是一个具有持久记忆、自主学习能力的 AI 操作系统。<br><br>
+                让我们花 1 分钟完成初始配置。
+            </div>
+            <div class="feature-cards">
+                <div class="feature-card">
+                    <div class="feature-icon">🧠</div>
+                    <div class="feature-name">持久记忆</div>
+                    <div class="feature-desc">记住所有对话</div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🔬</div>
+                    <div class="feature-name">神经图谱</div>
+                    <div class="feature-desc">知识关联网络</div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">⚡</div>
+                    <div class="feature-name">40+ 工具</div>
+                    <div class="feature-desc">自动化执行</div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🤖</div>
+                    <div class="feature-name">多模型</div>
+                    <div class="feature-desc">支持多家 AI</div>
+                </div>
+            </div>
+            <div class="btn-row">
+                <button class="btn btn-primary" onclick="nextStep(2)">开始配置</button>
+            </div>
+        </div>
+
+        <!-- Step 2: 选择 AI 服务商 -->
+        <div class="step-content" id="step2">
+            <div class="step-title">选择 AI 服务商</div>
+            <div class="step-desc">
+                选择你想使用的 AI 服务商，稍后填入 API Key。
+            </div>
+            <div class="form-group">
+                <label>AI 服务商</label>
+                <select id="providerSelect">
+                    <option value="kimi">Kimi (Moonshot) - 推荐国内用户</option>
+                    <option value="deepseek">DeepSeek - 高性价比</option>
+                    <option value="qwen">通义千问 (阿里)</option>
+                    <option value="zhipu">智谱 AI (GLM)</option>
+                    <option value="openai">OpenAI (GPT-4)</option>
+                    <option value="claude">Claude (Anthropic)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>模型</label>
+                <select id="modelSelect">
+                    <option value="auto">自动选择（推荐）</option>
+                </select>
+            </div>
+            <div class="btn-row">
+                <button class="btn btn-secondary" onclick="prevStep(1)">上一步</button>
+                <button class="btn btn-primary" onclick="nextStep(3)">下一步</button>
+            </div>
+        </div>
+
+        <!-- Step 3: API Key -->
+        <div class="step-content" id="step3">
+            <div class="step-title">配置 API Key</div>
+            <div class="step-desc">
+                填入你的 AI 服务商 API Key。<br>
+                <small>API Key 将加密存储在本地，不会上传到任何服务器。</small>
+            </div>
+            <div class="form-group">
+                <label>API Key</label>
+                <input type="password" id="apiKeyInput" placeholder="sk-..." autocomplete="off" />
+            </div>
+            <div class="form-group">
+                <label>API Base URL（可选，留空使用默认）</label>
+                <input type="text" id="apiBaseInput" placeholder="https://api.example.com/v1" autocomplete="off" />
+            </div>
+            <div class="btn-row">
+                <button class="btn btn-secondary" onclick="prevStep(2)">上一步</button>
+                <button class="btn btn-primary" onclick="nextStep(4)">下一步</button>
+            </div>
+        </div>
+
+        <!-- Step 4: 授权激活 -->
+        <div class="step-content" id="step4">
+            <div class="step-title">授权激活</div>
+            <div class="step-desc">
+                输入授权卡密激活，或选择免费试用 1 天。
+            </div>
+            <div class="form-group">
+                <label>授权卡密（格式：OMNI-XXXX-XXXX-XXXX-XXXX）</label>
+                <input type="text" id="licenseKeyInput" placeholder="OMNI-XXXX-XXXX-XXXX-XXXX" maxlength="24" autocomplete="off" />
+            </div>
+            <div class="btn-row">
+                <button class="btn btn-secondary" onclick="prevStep(3)">上一步</button>
+                <button class="btn btn-primary" onclick="activateLicense()">激活授权</button>
+            </div>
+            <button class="btn btn-trial" onclick="activateTrial()">免费试用 1 天</button>
+            <div class="machine-id" id="machineId"></div>
+        </div>
+
+        <!-- Step 5: 完成 -->
+        <div class="step-content" id="step5">
+            <div class="success-icon">🎉</div>
+            <div class="success-title">配置完成！</div>
+            <div class="success-desc">
+                Omnia 已准备就绪。<br>
+                点击下方按钮开始你的 AI 之旅。
+            </div>
+            <div class="btn-row">
+                <button class="btn btn-primary" onclick="finishSetup()" style="flex: 1;">
+                    进入 Omnia →
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentStep = 1;
+        let selectedProvider = 'kimi';
+        let selectedModel = 'auto';
+
+        // 模型映射
+        const models = {
+            kimi: ['moonshot-v1-8k', 'moonshot-v1-32k', 'moonshot-v1-128k'],
+            deepseek: ['deepseek-chat', 'deepseek-coder', 'deepseek-reasoner'],
+            qwen: ['qwen-turbo', 'qwen-plus', 'qwen-max'],
+            zhipu: ['glm-4', 'glm-4-flash', 'glm-3-turbo'],
+            openai: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo'],
+            claude: ['claude-sonnet-4-20250514', 'claude-3-5-haiku-20241022']
+        };
+
+        // 服务商变更时更新模型列表
+        document.getElementById('providerSelect').addEventListener('change', function(e) {
+            selectedProvider = e.target.value;
+            const modelSelect = document.getElementById('modelSelect');
+            modelSelect.innerHTML = '<option value="auto">自动选择（推荐）</option>';
+            (models[selectedProvider] || []).forEach(m => {
+                modelSelect.innerHTML += `<option value="${m}">${m}</option>`;
+            });
+        });
+
+        // 自动格式化卡密输入
+        document.getElementById('licenseKeyInput').addEventListener('input', function(e) {
+            let v = e.target.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+            let parts = [];
+            if (v.startsWith('OMNI')) {
+                parts.push('OMNI');
+                v = v.substring(4);
+            }
+            for (let i = 0; i < v.length && i < 16; i += 4) {
+                parts.push(v.substring(i, Math.min(i+4, v.length)));
+            }
+            e.target.value = parts.join('-');
+        });
+
+        function nextStep(step) {
+            document.getElementById(`step${currentStep}`).classList.remove('active');
+            document.getElementById(`dot${currentStep}`).classList.remove('active');
+            document.getElementById(`dot${currentStep}`).classList.add('done');
+
+            currentStep = step;
+
+            document.getElementById(`step${currentStep}`).classList.add('active');
+            document.getElementById(`dot${currentStep}`).classList.add('active');
+            document.getElementById('progressFill').style.width = `${(currentStep / 5) * 100}%`;
+            hideMsg();
+        }
+
+        function prevStep(step) {
+            document.getElementById(`step${currentStep}`).classList.remove('active');
+            document.getElementById(`dot${currentStep}`).classList.remove('active');
+
+            currentStep = step;
+
+            document.getElementById(`step${currentStep}`).classList.add('active');
+            document.getElementById(`dot${currentStep}`).classList.add('active');
+            document.getElementById(`dot${currentStep}`).classList.remove('done');
+            document.getElementById('progressFill').style.width = `${(currentStep / 5) * 100}%`;
+            hideMsg();
+        }
+
+        async function activateLicense() {
+            const key = document.getElementById('licenseKeyInput').value.trim();
+            if (!key) {
+                showMsg('请输入卡密', 'error');
+                return;
+            }
+
+            try {
+                const resp = await fetch('/api/license/activate', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({key: key})
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    showMsg(data.message, 'success');
+                    setTimeout(() => nextStep(5), 1500);
+                } else {
+                    showMsg(data.message, 'error');
+                }
+            } catch(e) {
+                showMsg('激活请求失败', 'error');
+            }
+        }
+
+        async function activateTrial() {
+            try {
+                const resp = await fetch('/api/license/trial', {method: 'POST'});
+                const data = await resp.json();
+                if (data.success) {
+                    showMsg(data.message, 'success');
+                    setTimeout(() => nextStep(5), 1500);
+                } else {
+                    showMsg(data.message, 'error');
+                }
+            } catch(e) {
+                showMsg('请求失败', 'error');
+            }
+        }
+
+        async function finishSetup() {
+            // 保存 API Key 和服务商配置
+            const apiKey = document.getElementById('apiKeyInput').value.trim();
+            const apiBase = document.getElementById('apiBaseInput').value.trim();
+            const model = document.getElementById('modelSelect').value;
+
+            if (apiKey) {
+                try {
+                    await fetch('/api/config/api-key', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            provider: selectedProvider,
+                            api_key: apiKey,
+                            api_base: apiBase,
+                            model: model
+                        })
+                    });
+                } catch(e) {
+                    console.error('保存 API Key 失败:', e);
+                }
+            }
+
+            // 标记配置完成
+            try {
+                await fetch('/api/setup/complete', {method: 'POST'});
+            } catch(e) {}
+
+            // 跳转到主界面
+            window.location.href = '/';
+        }
+
+        function showMsg(text, type) {
+            const msg = document.getElementById('msg');
+            msg.textContent = text;
+            msg.className = 'message ' + type;
+        }
+
+        function hideMsg() {
+            document.getElementById('msg').className = 'message';
+        }
+
+        // 初始化：获取机器码
+        fetch('/api/license/machine-id')
+            .then(r => r.json())
+            .then(d => {
+                document.getElementById('machineId').textContent = 'Machine ID: ' + d.machine_id;
+            })
+            .catch(() => {});
+    </script>
+</body>
+</html>
