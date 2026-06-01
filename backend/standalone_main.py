@@ -31,13 +31,33 @@ from typing import Dict, Any, Optional
 # ============ 路径配置 ============
 
 def get_app_root():
-    """获取应用根目录"""
+    """获取应用根目录（兼容开发模式和 Nuitka 打包模式）"""
     if getattr(sys, 'frozen', False):
-        return Path(sys.executable).parent
+        # Nuitka --onefile 模式：sys.executable 指向临时解压目录
+        exe_dir = Path(sys.executable).parent
+        # 同时尝试 Nuitka 内部模块目录（_MEIPASS2 或 _NUITKA_MEIPASS）
+        for attr in ['_MEIPASS2', '_NUITKA_MEIPASS', '_NUITKA_ORIGIN']:
+            if hasattr(sys, attr):
+                return Path(getattr(sys, attr))
+        return exe_dir
     return Path(__file__).parent.parent
 
 APP_ROOT = get_app_root()
 DEFAULT_PORT = 5001
+
+# ========== Nuitka onefile 模式路径修复 ==========
+# Nuitka 解压后，src/core/ 等模块需要能被 import core.xxx 找到
+if getattr(sys, 'frozen', False):
+    # 设置环境变量，让 src/omnia/main.py 中的代码也能读取到正确的根目录
+    os.environ['OMNIA_ROOT'] = str(APP_ROOT)
+    # 把解压目录加入 sys.path（用于 import src.xxx）
+    _app_root_str = str(APP_ROOT)
+    if _app_root_str not in sys.path:
+        sys.path.insert(0, _app_root_str)
+    # 把 src/ 子目录加入 sys.path（用于 import core.xxx）
+    _src_dir = str(APP_ROOT / "src")
+    if os.path.isdir(_src_dir) and _src_dir not in sys.path:
+        sys.path.insert(0, _src_dir)
 
 # 用户数据目录
 USER_DATA_DIR = Path.home() / ".omnia"
@@ -74,9 +94,12 @@ logger.info(f"Seeds dir: {SEEDS_DIR}")
 # ============ 🔐 授权系统（统一使用 src/omnia/license.py）===========
 
 # 添加 src 到 sys.path，确保可以导入统一的授权模块
+# 同时插入项目根目录（import src.xxx）和 src 子目录（import core.xxx）
+_app_root = str(APP_ROOT)
 _src_path = str(APP_ROOT / "src")
-if _src_path not in sys.path:
-    sys.path.insert(0, str(APP_ROOT))
+for p in [_app_root, _src_path]:
+    if p not in sys.path:
+        sys.path.insert(0, p)
 
 from src.omnia.license import (
     get_machine_id,

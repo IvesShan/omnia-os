@@ -62,7 +62,8 @@ jobs:
             --output-filename=omnia-backend \
             --output-dir=dist/backend \
             --include-package=src \
-            --include-package=core \
+            --include-package=src.core \
+            --include-package=src.omnia \
             --include-module=flask \
             --include-module=flask_cors \
             --include-module=uvicorn \

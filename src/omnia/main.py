@@ -10,20 +10,39 @@ from pathlib import Path
 def _setup_core_aliases():
     """
     代码库中大量使用了 `from core.xxx` 导入，但项目结构是 src/core/xxx.py。
-    在开发模式和 GitHub Actions 中，需要把 core.xxx 映射到 src.core.xxx。
-    Nuitka 打包后 standalone_main.py 也会做同样的映射。
+    在开发模式、GitHub Actions 和 Nuitka 打包后，需要把 core.xxx 映射到 src.core.xxx。
     """
     import importlib
 
-    # 如果 src.core 可导入但 core 不可导入，创建别名
+    # 在 Nuitka onefile 模式下，standalone_main.py 已经设置了 OMNIA_ROOT 和 sys.path
+    # 这里只需要确保 src.core 可导入，然后创建 core 的别名
+    # 如果 src 在 sys.path 中，import src.core 应该能工作
+    
+    # 先尝试直接加载 src.core（如果 sys.path 中有项目根目录）
     try:
         src_core = importlib.import_module('src.core')
         if 'core' not in sys.modules:
             sys.modules['core'] = src_core
     except ImportError:
-        pass  # src.core 不存在，不处理
+        # src.core 还找不到，可能是路径没配好
+        # 尝试从当前文件推断项目根目录并加入 sys.path
+        try:
+            current_file = Path(__file__).resolve()
+            # __file__ 可能是 .../src/omnia/main.py
+            project_root = current_file.parent.parent.parent
+            src_path = str(project_root / "src")
+            if src_path not in sys.path:
+                sys.path.insert(0, src_path)
+            if str(project_root) not in sys.path:
+                sys.path.insert(0, str(project_root))
+            # 再试一次
+            src_core = importlib.import_module('src.core')
+            if 'core' not in sys.modules:
+                sys.modules['core'] = src_core
+        except ImportError:
+            pass  # 真的找不到，让后续导入报错
 
-    # 设置导入钩子
+    # 设置导入钩子（拦截所有 core.xxx 导入）
     original_import = __builtins__['__import__']
 
     _THIRD_PARTY_CORE = ('certifi', 'httpcore', 'httpx', 'anyio', 'h11', 'h2', 'hpack', 'hyperframe', 'sniffio', 'idna')
