@@ -16,13 +16,10 @@
             --success: #3fb950;
             --warning: #d29922;
             --danger: #f85149;
+            --purple: #bc8cff;
         }
 
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
@@ -34,11 +31,7 @@
             justify-content: center;
         }
 
-        .container {
-            width: 100%;
-            max-width: 480px;
-            padding: 20px;
-        }
+        .container { width: 100%; max-width: 520px; padding: 20px; }
 
         .card {
             background: var(--bg-secondary);
@@ -48,69 +41,66 @@
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
         }
 
-        .logo {
-            text-align: center;
-            margin-bottom: 32px;
-        }
+        .logo { text-align: center; margin-bottom: 32px; }
+        .logo h1 { font-size: 28px; color: var(--accent); margin-bottom: 8px; }
+        .logo p { color: var(--text-secondary); font-size: 14px; }
 
-        .logo h1 {
-            font-size: 28px;
-            color: var(--accent);
-            margin-bottom: 8px;
-        }
-
-        .logo p {
-            color: var(--text-secondary);
-            font-size: 14px;
-        }
-
+        /* 状态卡片 */
         .status-card {
             background: var(--bg-tertiary);
             border-radius: 8px;
             padding: 16px;
             margin-bottom: 24px;
             text-align: center;
+            border: 1px solid transparent;
         }
+        .status-card.active { border-color: var(--success); }
+        .status-card.expired { border-color: var(--danger); }
+        .status-card.inactive { border-color: var(--warning); }
+        .status-card.trial { border-color: var(--purple); }
 
-        .status-card.active {
-            border: 1px solid var(--success);
-        }
+        .status-icon { font-size: 32px; margin-bottom: 8px; }
+        .status-text { font-size: 16px; font-weight: 500; }
+        .status-detail { font-size: 13px; color: var(--text-secondary); margin-top: 8px; }
 
-        .status-card.expired {
-            border: 1px solid var(--danger);
-        }
-
-        .status-card.inactive {
-            border: 1px solid var(--warning);
-        }
-
-        .status-icon {
-            font-size: 32px;
-            margin-bottom: 8px;
-        }
-
-        .status-text {
-            font-size: 16px;
-            font-weight: 500;
-        }
-
-        .status-detail {
-            font-size: 13px;
+        .status-meta {
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+            margin-top: 12px;
+            font-size: 12px;
             color: var(--text-secondary);
-            margin-top: 8px;
         }
-
-        .form-group {
-            margin-bottom: 20px;
+        .status-meta .tag {
+            padding: 2px 8px;
+            border-radius: 4px;
+            background: rgba(88, 166, 255, 0.1);
+            color: var(--accent);
         }
+        .status-meta .tag.online { background: rgba(63, 185, 80, 0.1); color: var(--success); }
+        .status-meta .tag.offline { background: rgba(210, 153, 34, 0.1); color: var(--warning); }
 
+        /* 更新通知 */
+        .update-banner {
+            background: rgba(188, 140, 255, 0.1);
+            border: 1px solid var(--purple);
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 16px;
+            display: none;
+            text-align: center;
+        }
+        .update-banner .version { color: var(--purple); font-weight: 600; }
+        .update-banner a { color: var(--accent); text-decoration: none; }
+
+        /* 表单 */
+        .form-group { margin-bottom: 16px; }
         .form-group label {
             display: block;
             font-size: 14px;
             color: var(--text-secondary);
             margin-bottom: 8px;
         }
-
         .form-group input {
             width: 100%;
             padding: 12px 16px;
@@ -124,17 +114,52 @@
             text-transform: uppercase;
             transition: border-color 0.2s;
         }
+        .form-group input:focus { outline: none; border-color: var(--accent); }
+        .form-group input::placeholder { color: var(--text-secondary); letter-spacing: 1px; }
 
-        .form-group input:focus {
-            outline: none;
-            border-color: var(--accent);
+        /* API Key 配置 */
+        .api-key-section {
+            background: var(--bg-tertiary);
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 20px;
         }
-
-        .form-group input::placeholder {
+        .api-key-section h4 { font-size: 14px; margin-bottom: 12px; color: var(--accent); }
+        .api-key-display {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+        .api-key-display .masked {
+            font-family: monospace;
             color: var(--text-secondary);
-            letter-spacing: 1px;
+            flex: 1;
         }
+        .api-key-display .change-btn {
+            font-size: 12px;
+            color: var(--accent);
+            background: none;
+            border: 1px solid var(--bg-tertiary);
+            padding: 4px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .api-key-edit { display: none; }
+        .api-key-edit.show { display: block; }
+        .api-key-edit input {
+            width: 100%;
+            padding: 10px 12px;
+            background: var(--bg-primary);
+            border: 1px solid var(--bg-tertiary);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+        .api-key-edit .api-actions { display: flex; gap: 8px; }
 
+        /* 按钮 */
         .btn {
             width: 100%;
             padding: 14px;
@@ -145,86 +170,74 @@
             cursor: pointer;
             transition: all 0.2s;
         }
-
-        .btn-primary {
-            background: var(--accent);
-            color: var(--bg-primary);
+        .btn-primary { background: var(--accent); color: var(--bg-primary); }
+        .btn-primary:hover { background: var(--accent-hover); }
+        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-trial {
+            background: transparent;
+            border: 1px solid var(--purple);
+            color: var(--purple);
+            margin-top: 8px;
         }
-
-        .btn-primary:hover {
-            background: var(--accent-hover);
-        }
-
-        .btn-primary:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
+        .btn-trial:hover { background: rgba(188, 140, 255, 0.1); }
+        .btn-sm {
+            width: auto;
+            padding: 6px 16px;
+            font-size: 13px;
+            border-radius: 6px;
         }
 
         .message {
-            margin-top: 16px;
+            margin-top: 12px;
             padding: 12px;
             border-radius: 8px;
             font-size: 14px;
             text-align: center;
             display: none;
         }
+        .message.success { background: rgba(63, 185, 80, 0.1); border: 1px solid var(--success); color: var(--success); display: block; }
+        .message.error { background: rgba(248, 81, 73, 0.1); border: 1px solid var(--danger); color: var(--danger); display: block; }
+        .message.info { background: rgba(88, 166, 255, 0.1); border: 1px solid var(--accent); color: var(--accent); display: block; }
+        .message.warning { background: rgba(210, 153, 34, 0.1); border: 1px solid var(--warning); color: var(--warning); display: block; }
 
-        .message.success {
-            background: rgba(63, 185, 80, 0.1);
-            border: 1px solid var(--success);
-            color: var(--success);
-            display: block;
-        }
-
-        .message.error {
-            background: rgba(248, 81, 73, 0.1);
-            border: 1px solid var(--danger);
-            color: var(--danger);
-            display: block;
-        }
-
+        /* 定价 */
         .pricing {
             margin-top: 24px;
             padding-top: 24px;
             border-top: 1px solid var(--bg-tertiary);
         }
-
-        .pricing h3 {
-            font-size: 14px;
-            color: var(--text-secondary);
-            text-align: center;
-            margin-bottom: 16px;
-        }
-
+        .pricing h3 { font-size: 14px; color: var(--text-secondary); text-align: center; margin-bottom: 16px; }
         .pricing-grid {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 12px;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
         }
-
         .pricing-item {
             text-align: center;
-            padding: 12px 8px;
+            padding: 12px 6px;
             background: var(--bg-tertiary);
             border-radius: 8px;
         }
+        .pricing-item .period { font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; }
+        .pricing-item .price { font-size: 18px; font-weight: 600; color: var(--accent); }
+        .pricing-item .unit { font-size: 11px; color: var(--text-secondary); }
 
-        .pricing-item .period {
+        /* 停用按钮 */
+        .danger-zone {
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid var(--bg-tertiary);
+            text-align: center;
+        }
+        .btn-danger {
+            background: transparent;
+            border: 1px solid var(--danger);
+            color: var(--danger);
             font-size: 13px;
-            color: var(--text-secondary);
-            margin-bottom: 4px;
+            padding: 8px 16px;
+            width: auto;
         }
-
-        .pricing-item .price {
-            font-size: 20px;
-            font-weight: 600;
-            color: var(--accent);
-        }
-
-        .pricing-item .unit {
-            font-size: 12px;
-            color: var(--text-secondary);
-        }
+        .btn-danger:hover { background: rgba(248, 81, 73, 0.1); }
 
         .footer {
             text-align: center;
@@ -235,8 +248,7 @@
 
         .loading {
             display: inline-block;
-            width: 16px;
-            height: 16px;
+            width: 16px; height: 16px;
             border: 2px solid var(--bg-primary);
             border-top-color: transparent;
             border-radius: 50%;
@@ -244,10 +256,11 @@
             margin-right: 8px;
             vertical-align: middle;
         }
+        @keyframes spin { to { transform: rotate(360deg); } }
 
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
+        /* 折叠面板 */
+        .collapsible { display: none; }
+        .collapsible.show { display: block; }
     </style>
 </head>
 <body>
@@ -258,68 +271,114 @@
                 <p>AI 认知操作系统 - 商业版</p>
             </div>
 
+            <!-- 更新通知 -->
+            <div class="update-banner" id="updateBanner">
+                <span class="version" id="updateVersion"></span>
+                <span> 新版本可用</span>
+                <a id="updateLink" href="#" target="_blank">立即更新 →</a>
+            </div>
+
+            <!-- 状态卡片 -->
             <div class="status-card" id="statusCard">
                 <div class="status-icon" id="statusIcon">⏳</div>
                 <div class="status-text" id="statusText">正在检查授权状态...</div>
                 <div class="status-detail" id="statusDetail"></div>
+                <div class="status-meta" id="statusMeta" style="display:none">
+                    <span class="tag" id="statusType"></span>
+                    <span class="tag" id="onlineStatus"></span>
+                </div>
             </div>
 
+            <!-- API Key 配置 -->
+            <div class="api-key-section" id="apiKeySection">
+                <h4>🔑 API Key 配置</h4>
+                <div class="api-key-display" id="apiKeyDisplay">
+                    <span class="masked" id="apiKeyMasked">未配置</span>
+                    <button class="change-btn" onclick="toggleApiKeyEdit()">配置</button>
+                </div>
+                <div class="api-key-edit" id="apiKeyEdit">
+                    <input type="password" id="apiKeyInput" placeholder="输入你的 API Key" autocomplete="off">
+                    <div class="api-actions">
+                        <button class="btn btn-primary btn-sm" onclick="saveApiKey()">保存</button>
+                        <button class="btn btn-sm" style="background:var(--bg-tertiary);color:var(--text-secondary)" onclick="toggleApiKeyEdit()">取消</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 激活表单 -->
             <div id="activateForm">
                 <div class="form-group">
                     <label>请输入授权卡密</label>
-                    <input 
-                        type="text" 
-                        id="licenseKey" 
-                        placeholder="XXXX-XXXX-XXXX-XXXX"
-                        maxlength="19"
-                        autocomplete="off"
-                    >
+                    <input type="text" id="licenseKey" placeholder="OMNI-XXXX-XXXX-XXXX-XXXX" maxlength="24" autocomplete="off">
                 </div>
                 <button class="btn btn-primary" id="activateBtn" onclick="activateLicense()">
                     激活授权
                 </button>
+                <button class="btn btn-trial" id="trialBtn" onclick="activateTrial()">
+                    🆓 免费试用 1 天
+                </button>
                 <div class="message" id="message"></div>
             </div>
 
+            <!-- 定价 -->
             <div class="pricing">
                 <h3>授权价格</h3>
                 <div class="pricing-grid">
                     <div class="pricing-item">
+                        <div class="period">试用</div>
+                        <div class="price">免费</div>
+                        <div class="unit">/1天</div>
+                    </div>
+                    <div class="pricing-item">
                         <div class="period">月卡</div>
-                        <div class="price">¥88</div>
+                        <div class="price">¥68</div>
                         <div class="unit">/月</div>
                     </div>
                     <div class="pricing-item">
                         <div class="period">季卡</div>
-                        <div class="price">¥198</div>
+                        <div class="price">¥168</div>
                         <div class="unit">/3月</div>
                     </div>
                     <div class="pricing-item">
                         <div class="period">年卡</div>
-                        <div class="price">¥398</div>
+                        <div class="price">¥388</div>
                         <div class="unit">/年</div>
                     </div>
                 </div>
+            </div>
+
+            <!-- 停用授权（仅已激活时显示） -->
+            <div class="danger-zone" id="dangerZone" style="display:none">
+                <button class="btn btn-danger" onclick="deactivateLicense()">停用本设备授权（用于迁移）</button>
+                <div class="message" id="deactivateMsg"></div>
             </div>
         </div>
 
         <div class="footer">
             <p>购买卡密请联系管理员</p>
-            <p style="margin-top: 8px;">© 2025 Omnia. All rights reserved.</p>
+            <p style="margin-top: 4px;">机器ID: <code id="machineId" style="color:var(--accent)">-</code></p>
+            <p style="margin-top: 8px;">© 2026 Omnia. All rights reserved.</p>
         </div>
     </div>
 
     <script>
-        // 页面加载时检查授权状态
+        let currentStatus = null;
+
         window.onload = function() {
             checkLicenseStatus();
+            checkUpdate();
         };
 
-        // 自动格式化卡密输入
+        // 自动格式化卡密输入 (OMNI-XXXX-XXXX-XXXX-XXXX)
         document.getElementById('licenseKey').addEventListener('input', function(e) {
             let value = e.target.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+            // 保留 OMNI 前缀
+            if (value.length > 0 && !value.startsWith('OMNI')) {
+                // 如果用户直接输入后面的部分
+                value = 'OMNI' + value;
+            }
             let formatted = '';
-            for (let i = 0; i < value.length && i < 16; i++) {
+            for (let i = 0; i < value.length && i < 20; i++) {
                 if (i > 0 && i % 4 === 0) formatted += '-';
                 formatted += value[i];
             }
@@ -329,33 +388,125 @@
         async function checkLicenseStatus() {
             try {
                 const response = await fetch('/api/license/status');
-                const data = await response.json();
-                
+                currentStatus = await response.json();
+
                 const statusCard = document.getElementById('statusCard');
                 const statusIcon = document.getElementById('statusIcon');
                 const statusText = document.getElementById('statusText');
                 const statusDetail = document.getElementById('statusDetail');
+                const statusMeta = document.getElementById('statusMeta');
                 const activateForm = document.getElementById('activateForm');
+                const dangerZone = document.getElementById('dangerZone');
+                const machineId = document.getElementById('machineId');
 
-                if (data.is_valid) {
-                    statusCard.className = 'status-card active';
-                    statusIcon.textContent = '✅';
-                    statusText.textContent = '授权有效';
-                    statusDetail.textContent = `${data.type_label} | 过期: ${data.expire_time} | 剩余 ${data.remaining_days} 天`;
+                // 机器ID
+                if (currentStatus.machine_id) {
+                    machineId.textContent = currentStatus.machine_id.substring(0, 16) + '...';
+                }
+
+                // API Key 状态
+                updateApiKeyDisplay(currentStatus);
+
+                if (currentStatus.is_valid) {
+                    const isTrial = currentStatus.type === 'trial';
+
+                    statusCard.className = 'status-card' + (isTrial ? ' trial' : ' active');
+                    statusIcon.textContent = isTrial ? '🎁' : '✅';
+                    statusText.textContent = isTrial ? '试用中' : '授权有效';
+
+                    let detail = currentStatus.type_label;
+                    if (currentStatus.expire_time) detail += ` | 过期: ${currentStatus.expire_time}`;
+                    if (currentStatus.remaining_days !== undefined) detail += ` | 剩余 ${currentStatus.remaining_days} 天`;
+                    statusDetail.textContent = detail;
+
+                    // 元标签
+                    statusMeta.style.display = 'flex';
+                    document.getElementById('statusType').textContent = currentStatus.type_label || '授权';
+
+                    const onlineStatus = document.getElementById('onlineStatus');
+                    if (currentStatus.online_verified) {
+                        onlineStatus.textContent = '🟢 在线验证通过';
+                        onlineStatus.className = 'tag online';
+                    } else {
+                        onlineStatus.textContent = '🟡 离线模式';
+                        onlineStatus.className = 'tag offline';
+                    }
+
+                    // 已激活时隐藏试用按钮，显示停用按钮
                     activateForm.style.display = 'none';
-                } else if (data.status === 'expired') {
+                    dangerZone.style.display = 'block';
+
+                } else if (currentStatus.status === '已过期') {
                     statusCard.className = 'status-card expired';
                     statusIcon.textContent = '⚠️';
                     statusText.textContent = '授权已过期';
-                    statusDetail.textContent = `过期时间: ${data.expire_time}`;
+                    statusDetail.textContent = `过期时间: ${currentStatus.expire_time || '未知'}`;
+                    statusMeta.style.display = 'none';
+
+                    // 过期时可以重新激活
+                    activateForm.style.display = 'block';
+                    dangerZone.style.display = 'none';
+                    document.getElementById('trialBtn').style.display = currentStatus.trial_used ? 'none' : 'block';
+
                 } else {
                     statusCard.className = 'status-card inactive';
                     statusIcon.textContent = '🔒';
                     statusText.textContent = '未激活';
-                    statusDetail.textContent = '请输入卡密激活软件';
+                    statusDetail.textContent = '请输入卡密激活软件，或免费试用 1 天';
+                    statusMeta.style.display = 'none';
+
+                    activateForm.style.display = 'block';
+                    dangerZone.style.display = 'none';
+                    // 检查试用是否已使用
+                    document.getElementById('trialBtn').style.display = currentStatus.trial_used ? 'none' : 'block';
                 }
             } catch (error) {
                 console.error('检查授权状态失败:', error);
+                document.getElementById('statusText').textContent = '检查状态失败';
+            }
+        }
+
+        function updateApiKeyDisplay(status) {
+            const maskedEl = document.getElementById('apiKeyMasked');
+            if (status.has_api_key && status.api_key_masked) {
+                maskedEl.textContent = status.api_key_masked;
+                maskedEl.style.color = 'var(--success)';
+            } else {
+                maskedEl.textContent = '⚠️ 未配置（请先配置 API Key 才能使用）';
+                maskedEl.style.color = 'var(--warning)';
+            }
+        }
+
+        function toggleApiKeyEdit() {
+            const edit = document.getElementById('apiKeyEdit');
+            edit.classList.toggle('show');
+            if (edit.classList.contains('show')) {
+                document.getElementById('apiKeyInput').focus();
+            }
+        }
+
+        async function saveApiKey() {
+            const input = document.getElementById('apiKeyInput');
+            const key = input.value.trim();
+            if (!key) return;
+
+            try {
+                const resp = await fetch('/api/license/api-key', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ api_key: key }),
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    input.value = '';
+                    toggleApiKeyEdit();
+                    // 刷新状态
+                    checkLicenseStatus();
+                } else {
+                    alert(data.message || '保存失败');
+                }
+            } catch (e) {
+                alert('保存失败: ' + e.message);
             }
         }
 
@@ -363,12 +514,11 @@
             const keyInput = document.getElementById('licenseKey');
             const btn = document.getElementById('activateBtn');
             const message = document.getElementById('message');
-            
             const key = keyInput.value.trim();
-            
-            if (!key || key.length < 16) {
+
+            if (!key || key.length < 19) {
                 message.className = 'message error';
-                message.textContent = '请输入完整的卡密';
+                message.textContent = '请输入完整的卡密（OMNI-XXXX-XXXX-XXXX-XXXX）';
                 return;
             }
 
@@ -380,22 +530,26 @@
             try {
                 const response = await fetch('/api/license/activate', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ key: key }),
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ key: key, online: true }),
                 });
-
                 const data = await response.json();
 
                 if (data.success) {
-                    message.className = 'message success';
-                    message.textContent = data.message;
-                    
-                    // 2秒后刷新状态
-                    setTimeout(() => {
-                        checkLicenseStatus();
-                    }, 1500);
+                    let cls = 'message success';
+                    let msg = data.message;
+                    if (data.warning) {
+                        cls = 'message warning';
+                        msg += '\n⚠️ ' + data.warning;
+                    }
+                    if (data.online) {
+                        msg += ' (🟢 在线验证)';
+                    } else {
+                        msg += ' (🟡 离线模式)';
+                    }
+                    message.className = cls;
+                    message.textContent = msg;
+                    setTimeout(() => checkLicenseStatus(), 2000);
                 } else {
                     message.className = 'message error';
                     message.textContent = data.message || '激活失败';
@@ -409,11 +563,77 @@
             }
         }
 
+        async function activateTrial() {
+            const btn = document.getElementById('trialBtn');
+            const message = document.getElementById('message');
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading"></span>正在激活试用...';
+
+            try {
+                const resp = await fetch('/api/license/trial', { method: 'POST' });
+                const data = await resp.json();
+
+                if (data.success) {
+                    message.className = 'message success';
+                    message.textContent = data.message;
+                    setTimeout(() => checkLicenseStatus(), 1500);
+                } else {
+                    message.className = 'message error';
+                    message.textContent = data.message || '试用激活失败';
+                }
+            } catch (e) {
+                message.className = 'message error';
+                message.textContent = '网络错误';
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '🆓 免费试用 1 天';
+            }
+        }
+
+        async function deactivateLicense() {
+            if (!confirm('确定要停用本设备的授权吗？\n停用后可在其他设备使用同一卡密。')) return;
+
+            const msg = document.getElementById('deactivateMsg');
+
+            try {
+                const resp = await fetch('/api/license/deactivate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ online: true }),
+                });
+                const data = await resp.json();
+
+                if (data.success) {
+                    msg.className = 'message success';
+                    msg.textContent = data.message;
+                    setTimeout(() => checkLicenseStatus(), 1500);
+                } else {
+                    msg.className = 'message error';
+                    msg.textContent = data.message || '停用失败';
+                }
+            } catch (e) {
+                msg.className = 'message error';
+                msg.textContent = '网络错误';
+            }
+        }
+
+        async function checkUpdate() {
+            try {
+                const resp = await fetch('/api/license/update');
+                const data = await resp.json();
+                if (data.has_update && data.update) {
+                    const banner = document.getElementById('updateBanner');
+                    document.getElementById('updateVersion').textContent = data.update.version;
+                    document.getElementById('updateLink').href = data.update.url || '#';
+                    banner.style.display = 'block';
+                }
+            } catch (e) { /* 忽略 */ }
+        }
+
         // 回车键激活
         document.getElementById('licenseKey').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                activateLicense();
-            }
+            if (e.key === 'Enter') activateLicense();
         });
     </script>
 </body>

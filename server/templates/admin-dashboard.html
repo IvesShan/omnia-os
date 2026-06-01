@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Omnia 管理后台</title>
+    <style>
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-tertiary: #21262d;
+            --text-primary: #e6edf3;
+            --text-secondary: #8b949e;
+            --accent: #58a6ff;
+            --success: #3fb950;
+            --warning: #d29922;
+            --danger: #f85149;
+            --purple: #bc8cff;
+            --orange: #f0883e;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+
+        .header {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--bg-tertiary);
+            padding: 16px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .header h1 { font-size: 20px; }
+        .header h1 span { color: var(--accent); }
+        .header .admin-actions { display: flex; gap: 12px; align-items: center; }
+        .header .token-input {
+            padding: 6px 12px;
+            background: var(--bg-primary);
+            border: 1px solid var(--bg-tertiary);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: 13px;
+            width: 200px;
+        }
+        .header .login-btn {
+            padding: 6px 16px;
+            background: var(--accent);
+            color: var(--bg-primary);
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+        }
+
+        .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
+
+        /* 统计卡片 */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .stat-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--bg-tertiary);
+            border-radius: 8px;
+            padding: 20px;
+        }
+        .stat-card .label { font-size: 13px; color: var(--text-secondary); margin-bottom: 8px; }
+        .stat-card .value { font-size: 28px; font-weight: 600; }
+        .stat-card .value.accent { color: var(--accent); }
+        .stat-card .value.success { color: var(--success); }
+        .stat-card .value.warning { color: var(--warning); }
+        .stat-card .value.purple { color: var(--purple); }
+
+        /* 图表区 */
+        .charts-row {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .chart-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--bg-tertiary);
+            border-radius: 8px;
+            padding: 20px;
+        }
+        .chart-card h3 { font-size: 15px; margin-bottom: 16px; color: var(--text-secondary); }
+
+        /* 趋势图（CSS实现） */
+        .bar-chart {
+            display: flex;
+            align-items: flex-end;
+            gap: 8px;
+            height: 150px;
+            padding-top: 10px;
+        }
+        .bar-col {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
+            height: 100%;
+        }
+        .bar {
+            width: 100%;
+            background: var(--accent);
+            border-radius: 4px 4px 0 0;
+            min-height: 2px;
+            transition: height 0.3s;
+        }
+        .bar-label { font-size: 11px; color: var(--text-secondary); margin-top: 6px; }
+        .bar-value { font-size: 11px; color: var(--accent); margin-bottom: 4px; }
+
+        /* 简易饼图用数据表格代替 */
+        .type-table { width: 100%; }
+        .type-table tr { border-bottom: 1px solid var(--bg-tertiary); }
+        .type-table td { padding: 8px 4px; font-size: 13px; }
+        .type-table td:last-child { text-align: right; font-weight: 600; }
+        .type-dot {
+            display: inline-block;
+            width: 10px; height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+
+        /* 表格 */
+        .data-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--bg-tertiary);
+            border-radius: 8px;
+            margin-bottom: 24px;
+            overflow: hidden;
+        }
+        .data-card-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--bg-tertiary);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .data-card-header h3 { font-size: 15px; }
+        .data-card-header .actions { display: flex; gap: 8px; }
+
+        table.data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        table.data-table th {
+            padding: 10px 16px;
+            text-align: left;
+            font-size: 12px;
+            color: var(--text-secondary);
+            background: var(--bg-tertiary);
+            font-weight: 500;
+        }
+        table.data-table td {
+            padding: 10px 16px;
+            font-size: 13px;
+            border-bottom: 1px solid var(--bg-tertiary);
+        }
+        table.data-table tr:hover { background: rgba(88, 166, 255, 0.04); }
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+        .badge-active { background: rgba(63, 185, 80, 0.15); color: var(--success); }
+        .badge-revoked { background: rgba(248, 81, 73, 0.15); color: var(--danger); }
+        .mono { font-family: 'SF Mono', Monaco, monospace; font-size: 12px; }
+
+        /* 生成卡密弹窗 */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.6);
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-overlay.show { display: flex; }
+        .modal {
+            background: var(--bg-secondary);
+            border: 1px solid var(--bg-tertiary);
+            border-radius: 12px;
+            padding: 24px;
+            width: 480px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        .modal h3 { margin-bottom: 16px; }
+        .modal label { display: block; font-size: 13px; color: var(--text-secondary); margin-bottom: 6px; margin-top: 12px; }
+        .modal select, .modal input[type="number"], .modal textarea {
+            width: 100%;
+            padding: 8px 12px;
+            background: var(--bg-primary);
+            border: 1px solid var(--bg-tertiary);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: 14px;
+        }
+        .modal .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+        .modal .btn {
+            padding: 8px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        .modal .btn-primary { background: var(--accent); color: var(--bg-primary); }
+        .modal .btn-cancel { background: var(--bg-tertiary); color: var(--text-secondary); }
+
+        .generated-keys {
+            margin-top: 12px;
+            padding: 12px;
+            background: var(--bg-primary);
+            border-radius: 6px;
+            max-height: 200px;
+            overflow-y: auto;
+            display: none;
+        }
+        .generated-keys.show { display: block; }
+        .generated-keys code {
+            display: block;
+            font-size: 13px;
+            padding: 2px 0;
+            color: var(--success);
+        }
+
+        /* 登录遮罩 */
+        #loginOverlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: var(--bg-primary);
+            z-index: 200;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        #loginOverlay.hidden { display: none; }
+        .login-box {
+            background: var(--bg-secondary);
+            border: 1px solid var(--bg-tertiary);
+            border-radius: 12px;
+            padding: 32px;
+            width: 380px;
+            text-align: center;
+        }
+        .login-box h2 { margin-bottom: 8px; }
+        .login-box p { font-size: 13px; color: var(--text-secondary); margin-bottom: 20px; }
+        .login-box input {
+            width: 100%;
+            padding: 12px;
+            background: var(--bg-primary);
+            border: 1px solid var(--bg-tertiary);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 14px;
+            margin-bottom: 12px;
+        }
+        .login-box button {
+            width: 100%;
+            padding: 12px;
+            background: var(--accent);
+            color: var(--bg-primary);
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            cursor: pointer;
+        }
+        .login-error { color: var(--danger); font-size: 13px; margin-top: 8px; display: none; }
+
+        .refresh-btn {
+            padding: 4px 12px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--bg-tertiary);
+            border-radius: 4px;
+            color: var(--text-secondary);
+            font-size: 12px;
+            cursor: pointer;
+        }
+        .refresh-btn:hover { border-color: var(--accent); color: var(--accent); }
+    </style>
+</head>
+<body>
+    <!-- 登录 -->
+    <div id="loginOverlay">
+        <div class="login-box">
+            <h2>🔐 管理后台</h2>
+            <p>请输入管理员 Token 登录</p>
+            <input type="password" id="loginToken" placeholder="Admin Token" autofocus>
+            <button onclick="doLogin()">登 录</button>
+            <div class="login-error" id="loginError">Token 无效</div>
+        </div>
+    </div>
+
+    <!-- 主界面 -->
+    <div class="header">
+        <h1>🧠 <span>Omnia</span> 管理后台</h1>
+        <div class="admin-actions">
+            <button class="refresh-btn" onclick="loadAll()">🔄 刷新</button>
+            <span id="lastUpdate" style="font-size:12px;color:var(--text-secondary)">-</span>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- 统计卡片 -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="label">总卡密数</div>
+                <div class="value accent" id="statTotalKeys">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">已激活卡密</div>
+                <div class="value success" id="statActiveKeys">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">活跃设备数</div>
+                <div class="value purple" id="statActiveDevices">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">今日激活</div>
+                <div class="value warning" id="statTodayActivations">-</div>
+            </div>
+        </div>
+
+        <!-- 图表行 -->
+        <div class="charts-row">
+            <div class="chart-card">
+                <h3>📈 7天激活趋势</h3>
+                <div class="bar-chart" id="trendChart"></div>
+            </div>
+            <div class="chart-card">
+                <h3>📊 授权类型分布</h3>
+                <table class="type-table" id="typeTable"></table>
+            </div>
+        </div>
+
+        <!-- 卡密管理 -->
+        <div class="data-card">
+            <div class="data-card-header">
+                <h3>🔑 卡密列表</h3>
+                <div class="actions">
+                    <button class="refresh-btn" onclick="loadKeys()">刷新</button>
+                    <button class="refresh-btn" style="background:var(--accent);color:var(--bg-primary);border-color:var(--accent)" onclick="showGenerateModal()">+ 生成卡密</button>
+                </div>
+            </div>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>卡密</th>
+                        <th>类型</th>
+                        <th>有效期</th>
+                        <th>设备数</th>
+                        <th>状态</th>
+                        <th>创建时间</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="keysTableBody">
+                    <tr><td colspan="7" style="text-align:center;color:var(--text-secondary)">加载中...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 激活记录 -->
+        <div class="data-card">
+            <div class="data-card-header">
+                <h3>💻 激活记录</h3>
+                <button class="refresh-btn" onclick="loadActivations()">刷新</button>
+            </div>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>卡密</th>
+                        <th>机器ID</th>
+                        <th>机器名</th>
+                        <th>系统</th>
+                        <th>IP</th>
+                        <th>激活时间</th>
+                        <th>最后验证</th>
+                    </tr>
+                </thead>
+                <tbody id="activationsTableBody">
+                    <tr><td colspan="7" style="text-align:center;color:var(--text-secondary)">加载中...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 事件日志 -->
+        <div class="data-card">
+            <div class="data-card-header">
+                <h3>📋 事件日志</h3>
+                <div class="actions">
+                    <select id="eventFilter" onchange="loadEvents()" style="padding:4px 8px;background:var(--bg-primary);border:1px solid var(--bg-tertiary);border-radius:4px;color:var(--text-primary);font-size:12px">
+                        <option value="">全部</option>
+                        <option value="activate_success">激活成功</option>
+                        <option value="activate_fail">激活失败</option>
+                        <option value="verify">验证</option>
+                        <option value="deactivate">停用</option>
+                        <option value="admin_generate">生成卡密</option>
+                        <option value="admin_revoke">撤销</option>
+                    </select>
+                    <button class="refresh-btn" onclick="loadEvents()">刷新</button>
+                </div>
+            </div>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>类型</th>
+                        <th>卡密</th>
+                        <th>机器ID</th>
+                        <th>IP</th>
+                        <th>附加信息</th>
+                        <th>时间</th>
+                    </tr>
+                </thead>
+                <tbody id="eventsTableBody">
+                    <tr><td colspan="6" style="text-align:center;color:var(--text-secondary)">加载中...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 生成卡密弹窗 -->
+    <div class="modal-overlay" id="generateModal">
+        <div class="modal">
+            <h3>🔑 批量生成卡密</h3>
+            <label>授权类型</label>
+            <select id="genType">
+                <option value="T">试用版 (1天)</option>
+                <option value="M">月卡 (30天) - ¥68</option>
+                <option value="Q">季卡 (90天) - ¥168</option>
+                <option value="Y">年卡 (365天) - ¥388</option>
+                <option value="P">终身版 - ¥888</option>
+            </select>
+            <label>生成数量</label>
+            <input type="number" id="genCount" value="10" min="1" max="1000">
+            <label>备注（可选）</label>
+            <input type="text" id="genNote" placeholder="批次备注">
+            <div class="generated-keys" id="generatedKeys"></div>
+            <div class="modal-actions">
+                <button class="btn btn-cancel" onclick="closeGenerateModal()">关闭</button>
+                <button class="btn btn-primary" id="genBtn" onclick="generateKeys()">生成</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let ADMIN_TOKEN = '';
+
+        function doLogin() {
+            const input = document.getElementById('loginToken');
+            ADMIN_TOKEN = input.value.trim();
+            if (!ADMIN_TOKEN) return;
+
+            // 尝试请求验证
+            fetch('/api/v1/admin/stats', {
+                headers: { 'Authorization': 'Bearer ' + ADMIN_TOKEN }
+            }).then(r => {
+                if (r.ok) {
+                    document.getElementById('loginOverlay').classList.add('hidden');
+                    loadAll();
+                } else {
+                    document.getElementById('loginError').style.display = 'block';
+                }
+            }).catch(() => {
+                document.getElementById('loginError').style.display = 'block';
+            });
+        }
+
+        document.getElementById('loginToken').addEventListener('keypress', e => {
+            if (e.key === 'Enter') doLogin();
+        });
+
+        function headers() {
+            return { 'Authorization': 'Bearer ' + ADMIN_TOKEN, 'Content-Type': 'application/json' };
+        }
+
+        async function loadAll() {
+            await Promise.all([loadStats(), loadKeys(), loadActivations(), loadEvents()]);
+            document.getElementById('lastUpdate').textContent = '更新: ' + new Date().toLocaleTimeString();
+        }
+
+        async function loadStats() {
+            try {
+                const resp = await fetch('/api/v1/admin/stats', { headers: headers() });
+                const data = await resp.json();
+
+                document.getElementById('statTotalKeys').textContent = data.total_keys || 0;
+                document.getElementById('statActiveKeys').textContent = data.active_keys || 0;
+                document.getElementById('statActiveDevices').textContent = data.active_devices || 0;
+                document.getElementById('statTodayActivations').textContent = data.today_activations || 0;
+
+                // 趋势图
+                const chart = document.getElementById('trendChart');
+                chart.innerHTML = '';
+                const trend = data.trend_7d || [];
+                const maxCount = Math.max(...trend.map(t => t.count), 1);
+
+                trend.forEach(item => {
+                    const height = Math.max((item.count / maxCount) * 120, 2);
+                    const date = item.date.substring(5); // MM-DD
+                    chart.innerHTML += `
+                        <div class="bar-col">
+                            <div class="bar-value">${item.count}</div>
+                            <div class="bar" style="height:${height}px"></div>
+                            <div class="bar-label">${date}</div>
+                        </div>
+                    `;
+                });
+
+                // 类型分布
+                const typeTable = document.getElementById('typeTable');
+                typeTable.innerHTML = '';
+                const colors = { T: 'var(--text-secondary)', M: 'var(--accent)', Q: 'var(--success)', Y: 'var(--warning)', P: 'var(--purple)' };
+                const typeStats = data.type_stats || {};
+                for (const [k, v] of Object.entries(typeStats)) {
+                    typeTable.innerHTML += `
+                        <tr>
+                            <td><span class="type-dot" style="background:${colors[k] || 'var(--text-secondary)'}"></span>${v.label}</td>
+                            <td>${v.keys} 个 / ${v.devices} 台</td>
+                        </tr>
+                    `;
+                }
+                if (Object.keys(typeStats).length === 0) {
+                    typeTable.innerHTML = '<tr><td colspan="2" style="text-align:center;color:var(--text-secondary)">暂无数据</td></tr>';
+                }
+
+            } catch (e) {
+                console.error('加载统计失败:', e);
+            }
+        }
+
+        async function loadKeys() {
+            try {
+                const resp = await fetch('/api/v1/admin/keys', { headers: headers() });
+                const data = await resp.json();
+                const tbody = document.getElementById('keysTableBody');
+                tbody.innerHTML = '';
+
+                if (!data.keys || data.keys.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-secondary)">暂无卡密</td></tr>';
+                    return;
+                }
+
+                data.keys.forEach(k => {
+                    const status = k.is_revoked
+                        ? '<span class="badge badge-revoked">已撤销</span>'
+                        : '<span class="badge badge-active">正常</span>';
+                    const keyShort = k.license_key.substring(0, 14) + '***';
+                    tbody.innerHTML += `
+                        <tr>
+                            <td class="mono">${keyShort}</td>
+                            <td>${k.label}</td>
+                            <td>${k.days}天</td>
+                            <td>${k.active_devices}/${k.max_devices}</td>
+                            <td>${status}</td>
+                            <td style="font-size:12px">${k.created_at ? k.created_at.substring(0, 16) : '-'}</td>
+                            <td>
+                                ${!k.is_revoked ? `<button class="refresh-btn" style="color:var(--danger);border-color:var(--danger)" onclick="revokeKey('${k.license_key}')">撤销</button>` : '-'}
+                            </td>
+                        </tr>
+                    `;
+                });
+            } catch (e) {
+                console.error('加载卡密失败:', e);
+            }
+        }
+
+        async function loadActivations() {
+            try {
+                const resp = await fetch('/api/v1/admin/activations', { headers: headers() });
+                const data = await resp.json();
+                const tbody = document.getElementById('activationsTableBody');
+                tbody.innerHTML = '';
+
+                if (!data.activations || data.activations.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-secondary)">暂无激活记录</td></tr>';
+                    return;
+                }
+
+                data.activations.slice(0, 50).forEach(a => {
+                    const keyShort = a.license_key ? a.license_key.substring(0, 14) + '***' : '-';
+                    const machineShort = a.machine_id ? a.machine_id.substring(0, 12) + '...' : '-';
+                    tbody.innerHTML += `
+                        <tr>
+                            <td class="mono">${keyShort}</td>
+                            <td class="mono">${machineShort}</td>
+                            <td>${a.machine_name || '-'}</td>
+                            <td>${a.os_type || '-'}</td>
+                            <td>${a.ip_address || '-'}</td>
+                            <td style="font-size:12px">${a.activated_at ? a.activated_at.substring(0, 16) : '-'}</td>
+                            <td style="font-size:12px">${a.last_verify_at ? a.last_verify_at.substring(0, 16) : '-'}</td>
+                        </tr>
+                    `;
+                });
+            } catch (e) {
+                console.error('加载激活记录失败:', e);
+            }
+        }
+
+        async function loadEvents() {
+            try {
+                const filter = document.getElementById('eventFilter').value;
+                const url = '/api/v1/admin/events' + (filter ? `?event_type=${filter}` : '');
+                const resp = await fetch(url, { headers: headers() });
+                const data = await resp.json();
+                const tbody = document.getElementById('eventsTableBody');
+                tbody.innerHTML = '';
+
+                if (!data.events || data.events.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-secondary)">暂无事件</td></tr>';
+                    return;
+                }
+
+                const typeLabels = {
+                    activate_success: '✅ 激活成功',
+                    activate_fail: '❌ 激活失败',
+                    activate_reuse: '🔄 重新验证',
+                    verify: '🔍 验证',
+                    verify_fail: '⚠️ 验证失败',
+                    deactivate: '🔌 停用',
+                    admin_generate: '🔑 生成卡密',
+                    admin_revoke: '🚫 撤销',
+                };
+
+                data.events.slice(0, 100).forEach(e => {
+                    const extra = e.extra && e.extra !== '{}' ? JSON.parse(e.extra) : {};
+                    const extraStr = Object.entries(extra).map(([k,v]) => `${k}=${v}`).join(', ');
+                    const keyShort = e.license_key ? e.license_key.substring(0, 14) + '***' : '-';
+                    const machineShort = e.machine_id ? e.machine_id.substring(0, 12) + '...' : '-';
+
+                    tbody.innerHTML += `
+                        <tr>
+                            <td>${typeLabels[e.event_type] || e.event_type}</td>
+                            <td class="mono">${keyShort}</td>
+                            <td class="mono">${machineShort}</td>
+                            <td>${e.ip_address || '-'}</td>
+                            <td style="font-size:12px;color:var(--text-secondary)">${extraStr || '-'}</td>
+                            <td style="font-size:12px">${e.created_at ? e.created_at.substring(0, 16) : '-'}</td>
+                        </tr>
+                    `;
+                });
+            } catch (e) {
+                console.error('加载事件失败:', e);
+            }
+        }
+
+        function showGenerateModal() {
+            document.getElementById('generateModal').classList.add('show');
+            document.getElementById('generatedKeys').classList.remove('show');
+            document.getElementById('generatedKeys').innerHTML = '';
+        }
+        function closeGenerateModal() {
+            document.getElementById('generateModal').classList.remove('show');
+            loadKeys();
+        }
+
+        async function generateKeys() {
+            const type = document.getElementById('genType').value;
+            const count = parseInt(document.getElementById('genCount').value) || 10;
+            const note = document.getElementById('genNote').value;
+            const btn = document.getElementById('genBtn');
+
+            btn.disabled = true;
+            btn.textContent = '生成中...';
+
+            try {
+                const resp = await fetch('/api/v1/admin/generate', {
+                    method: 'POST',
+                    headers: headers(),
+                    body: JSON.stringify({ license_type: type, count: count, note: note }),
+                });
+                const data = await resp.json();
+
+                if (data.success && data.keys) {
+                    const container = document.getElementById('generatedKeys');
+                    container.innerHTML = `<div style="margin-bottom:8px;color:var(--success)">✅ 成功生成 ${data.generated} 个 ${data.type} 卡密</div>`;
+                    data.keys.forEach(k => {
+                        container.innerHTML += `<code>${k}</code>`;
+                    });
+                    container.classList.add('show');
+                } else {
+                    alert(data.detail || '生成失败');
+                }
+            } catch (e) {
+                alert('生成失败: ' + e.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '生成';
+            }
+        }
+
+        async function revokeKey(key) {
+            if (!confirm(`确定要撤销卡密？\n${key}\n\n撤销后所有使用此卡密的设备将立即失效。`)) return;
+
+            try {
+                const resp = await fetch('/api/v1/admin/revoke', {
+                    method: 'POST',
+                    headers: headers(),
+                    body: JSON.stringify({ license_key: key }),
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    loadAll();
+                } else {
+                    alert(data.detail || '撤销失败');
+                }
+            } catch (e) {
+                alert('撤销失败: ' + e.message);
+            }
+        }
+    </script>
+</body>
+</html>

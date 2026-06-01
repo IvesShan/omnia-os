@@ -19,6 +19,7 @@ from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
 # ============================================================
@@ -427,6 +428,15 @@ async def server_status():
     }
 
 
+@app.get("/admin", response_class=HTMLResponse)
+async def admin_dashboard():
+    """管理后台页面"""
+    template_path = Path(__file__).parent / "templates" / "admin-dashboard.html"
+    if template_path.exists():
+        return HTMLResponse(template_path.read_text(encoding="utf-8"))
+    return HTMLResponse("<h1>管理后台模板不存在</h1>", status_code=404)
+
+
 # ============================================================
 # 管理 API（需要 Admin Token）
 # ============================================================
@@ -454,7 +464,7 @@ async def admin_stats(request: Request):
         # 总激活设备数
         active_devices = conn.execute(
             "SELECT COUNT(*) as cnt FROM activations WHERE is_active = 1"
-        ).fetchone()["today"]
+        ).fetchone()["cnt"]
         today_str = datetime.now().strftime("%Y-%m-%d")
 
         # 今日激活数
