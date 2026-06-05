@@ -190,7 +190,9 @@ const GraphViz = {
   
   async loadGraph() {
     try {
-      const response = await fetch('/api/graph?limit=500', { cache: 'no-store' });
+      // 限制节点数量，避免卡顿
+      const maxNodes = 200;
+      const response = await fetch(`/api/graph?limit=${maxNodes}`, { cache: 'no-store' });
       const text = await response.text();
       try {
         const data = JSON.parse(text);
