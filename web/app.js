@@ -1425,15 +1425,18 @@ function handlePanelClick(action) {
       // 触发神经图谱加载
       const initGraphViz = () => {
         if (typeof GraphViz !== 'undefined') {
-          // 检查是否已初始化 Three.js 场景
-          if (!GraphViz.scene) {
+          // 检查是否已初始化（使用 isInitialized 属性）
+          if (!GraphViz.isInitialized) {
             console.log('[App] GraphViz 未初始化，调用 init()');
             GraphViz.init();
             appendOmnia('[系统] 神经图谱已激活，正在加载实体关系网络...');
           } else {
             console.log('[App] GraphViz 已初始化，刷新数据');
-            GraphViz.loadGraph();
+            // 已初始化，只刷新数据
             GraphViz.loadStats();
+            GraphViz.loadGraph().then(() => {
+              GraphViz.resetConvergence(); // 重置收敛状态，让节点重新排列
+            });
             // 刷新数据时不重复显示激活消息
           }
         } else {

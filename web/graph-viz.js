@@ -79,7 +79,23 @@ const GraphViz = {
   particles: [],
   particleTimer: 0,
   
+  // 动画循环 ID（用于停止动画）
+  animationFrameId: null,
+  
+  // 初始化状态
+  isInitialized: false,
+  
   async init() {
+    // 防止重复初始化
+    if (this.isInitialized) {
+      console.log("[GraphViz] 已经初始化，跳过重复初始化");
+      // 只刷新数据，不重新初始化
+      await this.loadStats();
+      await this.loadGraph();
+      this.resetConvergence(); // 重置收敛状态，让节点重新排列
+      return;
+    }
+    
     console.log("[GraphViz] 初始化 Canvas 2D Obsidian 风格");
     
     const container = document.getElementById('graph-canvas');
@@ -105,6 +121,7 @@ const GraphViz = {
       await this.loadGraph();
       this.initPhysics();
       this.startAnimation();
+      this.isInitialized = true;
       
       console.log("[GraphViz] 初始化完成，节点数:", this.nodes.length);
     } catch (error) {
@@ -245,6 +262,12 @@ const GraphViz = {
   },
   
   startAnimation() {
+    // 先停止之前的动画循环（如果有）
+    if (this.animationFrameId) {
+      cancelAnimationFrame(this.animationFrameId);
+      this.animationFrameId = null;
+    }
+    
     const animate = () => {
       // 检查是否真正收敛（所有节点速度 < 阈值）
       const isConverged = this.checkConvergence();
@@ -257,7 +280,7 @@ const GraphViz = {
         this.render();
       }
       
-      requestAnimationFrame(animate);
+      this.animationFrameId = requestAnimationFrame(animate);
     };
     animate();
   },
@@ -747,10 +770,21 @@ const GraphViz = {
   },
   
   destroy() {
+    // 停止动画循环
+    if (this.animationFrameId) {
+      cancelAnimationFrame(this.animationFrameId);
+      this.animationFrameId = null;
+    }
+    
+    // 重置初始化状态
+    this.isInitialized = false;
+    
     // 清理资源
     this.nodes = [];
     this.links = [];
     this.particles = [];
+    
+    console.log('[GraphViz] 资源已清理');
   }
 };
 
