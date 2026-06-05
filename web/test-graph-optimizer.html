@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Graph Viz 优化测试</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: #0f1117;
+      color: #e2e8f0;
+      font-family: 'Inter', sans-serif;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .header {
+      background: rgba(15, 17, 23, 0.95);
+      border-bottom: 1px solid rgba(100, 116, 139, 0.3);
+      padding: 16px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .header h1 {
+      font-size: 18px;
+      font-weight: 600;
+      color: #e2e8f0;
+    }
+
+    .controls {
+      display: flex;
+      gap: 12px;
+    }
+
+    .btn {
+      background: rgba(100, 116, 139, 0.2);
+      border: 1px solid rgba(100, 116, 139, 0.3);
+      border-radius: 8px;
+      padding: 8px 16px;
+      color: #e2e8f0;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn:hover {
+      background: rgba(100, 116, 139, 0.3);
+      border-color: rgba(100, 116, 139, 0.5);
+    }
+
+    .btn.active {
+      background: rgba(124, 58, 237, 0.3);
+      border-color: rgba(124, 58, 237, 0.5);
+      color: #a78bfa;
+    }
+
+    .main {
+      flex: 1;
+      display: flex;
+      position: relative;
+    }
+
+    #graph-canvas {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .stats-panel {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      background: rgba(15, 17, 23, 0.95);
+      border: 1px solid rgba(100, 116, 139, 0.3);
+      border-radius: 12px;
+      padding: 16px;
+      min-width: 200px;
+      z-index: 100;
+    }
+
+    .stat-item {
+      margin-bottom: 12px;
+    }
+
+    .stat-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .stat-label {
+      font-size: 12px;
+      color: #64748b;
+      margin-bottom: 4px;
+    }
+
+    .stat-value {
+      font-size: 16px;
+      font-weight: 600;
+      color: #e2e8f0;
+    }
+
+    .stat-value.converged {
+      color: #22c55e;
+    }
+
+    .stat-value.converging {
+      color: #f59e0b;
+    }
+
+    .stat-value.active {
+      color: #3b82f6;
+    }
+
+    .style-panel {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: rgba(15, 17, 23, 0.95);
+      border: 1px solid rgba(100, 116, 139, 0.3);
+      border-radius: 12px;
+      padding: 16px;
+      min-width: 200px;
+      z-index: 100;
+    }
+
+    .style-title {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      color: #e2e8f0;
+    }
+
+    .style-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .style-item {
+      background: rgba(100, 116, 139, 0.1);
+      border: 1px solid rgba(100, 116, 139, 0.2);
+      border-radius: 8px;
+      padding: 10px 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .style-item:hover {
+      background: rgba(100, 116, 139, 0.2);
+      border-color: rgba(100, 116, 139, 0.4);
+    }
+
+    .style-item.active {
+      background: rgba(124, 58, 237, 0.2);
+      border-color: rgba(124, 58, 237, 0.4);
+    }
+
+    .style-item-name {
+      font-size: 13px;
+      font-weight: 500;
+      color: #e2e8f0;
+      margin-bottom: 2px;
+    }
+
+    .style-item-desc {
+      font-size: 11px;
+      color: #64748b;
+    }
+
+    .log-panel {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      right: 20px;
+      background: rgba(15, 17, 23, 0.95);
+      border: 1px solid rgba(100, 116, 139, 0.3);
+      border-radius: 12px;
+      padding: 16px;
+      max-height: 150px;
+      overflow-y: auto;
+      z-index: 100;
+    }
+
+    .log-title {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      color: #e2e8f0;
+    }
+
+    .log-content {
+      font-family: 'Monaco', 'Menlo', monospace;
+      font-size: 12px;
+      color: #94a3b8;
+      line-height: 1.6;
+    }
+
+    .log-entry {
+      margin-bottom: 4px;
+    }
+
+    .log-entry.info {
+      color: #3b82f6;
+    }
+
+    .log-entry.success {
+      color: #22c55e;
+    }
+
+    .log-entry.warning {
+      color: #f59e0b;
+    }
+
+    .log-entry.error {
+      color: #ef4444;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Graph Viz 优化测试</h1>
+    <div class="controls">
+      <button class="btn" onclick="resetSimulation()">重置模拟</button>
+      <button class="btn" onclick="togglePhysics()">切换物理</button>
+      <button class="btn" onclick="addNodes()">添加节点</button>
+    </div>
+  </div>
+
+  <div class="main">
+    <div id="graph-canvas"></div>
+
+    <div class="stats-panel">
+      <div class="stat-item">
+        <div class="stat-label">节点数量</div>
+        <div class="stat-value" id="stat-nodes">0</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-label">边数量</div>
+        <div class="stat-value" id="stat-edges">0</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-label">平均速度</div>
+        <div class="stat-value" id="stat-velocity">0.00 px/帧</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-label">收敛状态</div>
+        <div class="stat-value" id="stat-convergence">活跃</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-label">当前风格</div>
+        <div class="stat-value" id="stat-style">Data Drift</div>
+      </div>
+    </div>
+
+    <div class="style-panel">
+      <div class="style-title">视觉风格</div>
+      <div class="style-list" id="style-list"></div>
+    </div>
+
+    <div class="log-panel">
+      <div class="log-title">日志</div>
+      <div class="log-content" id="log-content"></div>
+    </div>
+  </div>
+
+  <script src="graph-viz.js"></script>
+  <script src="convergence-detector.js"></script>
+  <script src="style-switcher.js"></script>
+  <script src="optimize-physics.js"></script>
+  <script>
+    // 初始化图谱
+    async function initGraph() {
+      try {
+        addLog('info', '正在初始化图谱...');
+        
+        await GraphViz.init();
+        
+        // 初始化风格切换器
+        window.styleSwitcher = new StyleSwitcher(GraphViz);
+        
+        // 初始化优化器
+        window.optimizer = new PhysicsOptimizer();
+        
+        // 更新统计信息
+        updateStats();
+        
+        // 渲染风格列表
+        renderStyleList();
+        
+        addLog('success', `图谱初始化完成: ${GraphViz.nodes.length} 节点, ${GraphViz.links.length} 边`);
+        
+        // 启动统计更新
+        setInterval(updateStats, 100);
+        
+      } catch (error) {
+        addLog('error', `初始化失败: ${error.message}`);
+      }
+    }
+
+    // 更新统计信息
+    function updateStats() {
+      // 节点和边数量
+      document.getElementById('stat-nodes').textContent = GraphViz.nodes.length;
+      document.getElementById('stat-edges').textContent = GraphViz.links.length;
+      
+      // 收敛状态
+      const convergence = GraphViz.getConvergenceStatus();
+      const velocityEl = document.getElementById('stat-velocity');
+      const convergenceEl = document.getElementById('stat-convergence');
+      
+      velocityEl.textContent = convergence.currentVelocity.toFixed(3) + ' px/帧';
+      
+      if (convergence.isConverged) {
+        convergenceEl.textContent = '已收敛';
+        convergenceEl.className = 'stat-value converged';
+      } else if (convergence.currentVelocity > 1.0) {
+        convergenceEl.textContent = '活跃';
+        convergenceEl.className = 'stat-value active';
+      } else {
+        convergenceEl.textContent = '收敛中';
+        convergenceEl.className = 'stat-value converging';
+      }
+      
+      // 当前风格
+      if (window.styleSwitcher) {
+        const current = window.styleSwitcher.getCurrentStyle();
+        document.getElementById('stat-style').textContent = current.name;
+      }
+    }
+
+    // 渲染风格列表
+    function renderStyleList() {
+      const list = document.getElementById('style-list');
+      const styles = window.styleSwitcher.getAvailableStyles();
+      
+      list.innerHTML = styles.map(style => `
+        <div class="style-item ${style.id === window.styleSwitcher.currentStyle ? 'active' : ''}" 
+             onclick="switchStyle('${style.id}')">
+          <div class="style-item-name">${style.name}</div>
+          <div class="style-item-desc">${style.description}</div>
+        </div>
+      `).join('');
+    }
+
+    // 切换风格
+    function switchStyle(styleName) {
+      const success = window.styleSwitcher.switchTo(styleName);
+      if (success) {
+        renderStyleList();
+        addLog('success', `切换到风格: ${styleName}`);
+      }
+    }
+
+    // 重置模拟
+    function resetSimulation() {
+      GraphViz.alpha = 1.0;
+      GraphViz.resetConvergence();
+      addLog('info', '模拟已重置');
+    }
+
+    // 切换物理
+    function togglePhysics() {
+      if (GraphViz.convergence.isConverged) {
+        GraphViz.resetConvergence();
+        addLog('info', '物理模拟已激活');
+      } else {
+        GraphViz.convergence.isConverged = true;
+        addLog('info', '物理模拟已停止');
+      }
+    }
+
+    // 添加节点
+    function addNodes() {
+      const centerX = GraphViz.canvas.width / (2 * window.devicePixelRatio);
+      const centerY = GraphViz.canvas.height / (2 * window.devicePixelRatio);
+      
+      // 添加 10 个随机节点
+      for (let i = 0; i < 10; i++) {
+        const node = {
+          id: `node-${Date.now()}-${i}`,
+          label: `Node ${GraphViz.nodes.length + 1}`,
+          type: ['PERSON', 'PROJECT', 'FILE', 'CONCEPT'][Math.floor(Math.random() * 4)],
+          x: centerX + (Math.random() - 0.5) * 200,
+          y: centerY + (Math.random() - 0.5) * 200,
+          vx: 0,
+          vy: 0,
+          size: 3 + Math.random() * 5,
+          color: GraphViz.getNodeColor(node.type)
+        };
+        
+        GraphViz.nodes.push(node);
+        GraphViz.nodeMap[node.id] = node;
+        
+        // 添加随机边
+        if (GraphViz.nodes.length > 1) {
+          const randomNode = GraphViz.nodes[Math.floor(Math.random() * (GraphViz.nodes.length - 1))];
+          GraphViz.links.push({
+            source: node.id,
+            target: randomNode.id,
+            type: 'RELATED'
+          });
+        }
+      }
+      
+      // 重置收敛状态
+      GraphViz.resetConvergence();
+      
+      addLog('info', `添加了 10 个节点，当前总数: ${GraphViz.nodes.length}`);
+    }
+
+    // 添加日志
+    function addLog(type, message) {
+      const logContent = document.getElementById('log-content');
+      const entry = document.createElement('div');
+      entry.className = `log-entry ${type}`;
+      entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+      logContent.appendChild(entry);
+      logContent.scrollTop = logContent.scrollHeight;
+    }
+
+    // 页面加载完成后初始化
+    window.addEventListener('load', initGraph);
+  </script>
+</body>
+</html>
