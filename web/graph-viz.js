@@ -4,7 +4,7 @@
  * 设计参考：Obsidian Graph View
  * - 零外部依赖
  * - Canvas 2D 批量渲染
- * - 力导向物理模拟
+ * - 力导向物理模拟（优化版：使用网格空间分区）
  * - 悬停高亮 + 拖拽交互
  */
 
@@ -25,20 +25,20 @@ const GraphViz = {
   isDragging: false,
   lastMouse: { x: 0, y: 0 },
   
-  // 力导向参数（Data Drift 风格 - 优化抖动问题）
+  // 力导向参数（优化版）
   physics: {
-    repulsion: -120,           // 斥力强度（降低，减少碰撞）
-    springStrength: 0.03,      // 弹簧强度（降低，减少振荡）
-    idealLinkLength: 100,      // 理想链接长度（增加，减少密度）
-    damping: 0.92,             // 阻尼（适中）
-    centerForce: 0.01,         // 向心力（降低）
-    maxVelocity: 8,            // 最大速度
-    coolingFactor: 0.995,      // 冷却因子（缓慢冷却）
-    minAlpha: 0.01,            // 最小活跃度（低阈值）
+    repulsion: -200,           // 斥力强度
+    springStrength: 0.05,      // 弹簧强度
+    idealLinkLength: 150,      // 理想链接长度
+    damping: 0.85,             // 阻尼（降低，让节点更快稳定）
+    centerForce: 0.02,         // 向心力
+    maxVelocity: 15,           // 最大速度
+    coolingFactor: 0.99,       // 冷却因子
+    minAlpha: 0.01,            // 最小活跃度
     
     // 收敛检测参数
-    convergenceThreshold: 0.5, // 速度阈值（像素/帧）
-    convergenceFrames: 60      // 连续帧数
+    convergenceThreshold: 1.0, // 速度阈值（像素/帧）
+    convergenceFrames: 30      // 连续帧数（降低，更快收敛）
   },
   
   // 当前活跃度（用于控制模拟）
@@ -49,6 +49,12 @@ const GraphViz = {
     frameCount: 0,
     isConverged: false,
     history: []
+  },
+  
+  // 空间分区网格（用于优化斥力计算）
+  grid: {
+    cellSize: 100,    // 网格单元大小
+    cells: {}         // 网格单元字典
   },
   
   // 颜色方案
@@ -85,6 +91,13 @@ const GraphViz = {
   // 初始化状态
   isInitialized: false,
   
+  // 性能监控
+  performance: {
+    lastFrameTime: 0,
+    frameCount: 0,
+    fps: 0
+  },
+  
   async init() {
     // 防止重复初始化
     if (this.isInitialized) {
@@ -92,7 +105,7 @@ const GraphViz = {
       // 只刷新数据，不重新初始化
       await this.loadStats();
       await this.loadGraph();
-      this.resetConvergence(); // 重置收敛状态，让节点重新排列
+      this.resetConvergence();
       return;
     }
     
@@ -104,7 +117,7 @@ const GraphViz = {
       return;
     }
     
-    // 创建 canvas 元素（容器是 div，需要创建 canvas 子元素）
+    // 创建 canvas 元素
     this.canvas = document.createElement('canvas');
     this.canvas.style.cssText = 'width: 100%; height: 100%;';
     container.innerHTML = '';
@@ -262,14 +275,22 @@ const GraphViz = {
   },
   
   startAnimation() {
-    // 先停止之前的动画循环（如果有）
+    // 先停止之前的动画循环
     if (this.animationFrameId) {
       cancelAnimationFrame(this.animationFrameId);
       this.animationFrameId = null;
     }
     
-    const animate = () => {
-      // 检查是否真正收敛（所有节点速度 < 阈值）
+    const animate = (timestamp) => {
+      // 计算 FPS
+      if (timestamp - this.performance.lastFrameTime >= 1000) {
+        this.performance.fps = this.performance.frameCount;
+        this.performance.frameCount = 0;
+        this.performance.lastFrameTime = timestamp;
+      }
+      this.performance.frameCount++;
+      
+      // 检查是否真正收敛
       const isConverged = this.checkConvergence();
       
       if (!isConverged) {
@@ -282,12 +303,11 @@ const GraphViz = {
       
       this.animationFrameId = requestAnimationFrame(animate);
     };
-    animate();
+    animate(0);
   },
   
   /**
    * 检查是否真正收敛
-   * 收敛条件：连续 N 帧所有节点平均速度 < 阈值
    */
   checkConvergence() {
     if (this.nodes.length === 0) return true;
@@ -312,7 +332,7 @@ const GraphViz = {
       if (this.convergence.frameCount >= this.physics.convergenceFrames) {
         if (!this.convergence.isConverged) {
           this.convergence.isConverged = true;
-          console.log('[GraphViz] 物理模拟已真正收敛，平均速度:', avgVelocity.toFixed(3), 'px/帧');
+          console.log('[GraphViz] 物理模拟已收敛，平均速度:', avgVelocity.toFixed(3), 'px/帧');
         }
         return true;
       }
@@ -337,8 +357,50 @@ const GraphViz = {
       frameCount: this.convergence.frameCount,
       requiredFrames: this.physics.convergenceFrames,
       currentVelocity: avgVelocity,
-      threshold: this.physics.convergenceThreshold
+      threshold: this.physics.convergenceThreshold,
+      fps: this.performance.fps
     };
+  },
+  
+  /**
+   * 构建空间分区网格（优化斥力计算）
+   */
+  buildGrid() {
+    const cellSize = this.grid.cellSize;
+    this.grid.cells = {};
+    
+    this.nodes.forEach(node => {
+      const cellX = Math.floor(node.x / cellSize);
+      const cellY = Math.floor(node.y / cellSize);
+      const key = `${cellX},${cellY}`;
+      
+      if (!this.grid.cells[key]) {
+        this.grid.cells[key] = [];
+      }
+      this.grid.cells[key].push(node);
+    });
+  },
+  
+  /**
+   * 获取相邻网格单元的节点
+   */
+  getNeighborNodes(node) {
+    const cellSize = this.grid.cellSize;
+    const cellX = Math.floor(node.x / cellSize);
+    const cellY = Math.floor(node.y / cellSize);
+    const neighbors = [];
+    
+    // 检查 3x3 的相邻网格
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        const key = `${cellX + dx},${cellY + dy}`;
+        if (this.grid.cells[key]) {
+          neighbors.push(...this.grid.cells[key]);
+        }
+      }
+    }
+    
+    return neighbors;
   },
   
   update() {
@@ -347,15 +409,22 @@ const GraphViz = {
     const centerX = this.canvas.width / (2 * window.devicePixelRatio);
     const centerY = this.canvas.height / (2 * window.devicePixelRatio);
     
-    // 1. 斥力（所有节点对）
-    for (let i = 0; i < this.nodes.length; i++) {
-      for (let j = i + 1; j < this.nodes.length; j++) {
-        const nodeA = this.nodes[i];
-        const nodeB = this.nodes[j];
+    // 构建空间分区网格
+    this.buildGrid();
+    
+    // 1. 斥力（使用空间分区优化）
+    this.nodes.forEach(nodeA => {
+      const neighbors = this.getNeighborNodes(nodeA);
+      
+      neighbors.forEach(nodeB => {
+        if (nodeA === nodeB) return;
         
         const dx = nodeB.x - nodeA.x;
         const dy = nodeB.y - nodeA.y;
         const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+        
+        // 只计算近距离的斥力（优化性能）
+        if (dist > this.grid.cellSize * 2) return;
         
         const force = this.physics.repulsion / (dist * dist);
         const fx = (dx / dist) * force;
@@ -363,10 +432,8 @@ const GraphViz = {
         
         nodeA.vx -= fx;
         nodeA.vy -= fy;
-        nodeB.vx += fx;
-        nodeB.vy += fy;
-      }
-    }
+      });
+    });
     
     // 2. 弹簧力（连接的节点）
     this.links.forEach(link => {
@@ -414,7 +481,7 @@ const GraphViz = {
       node.y += node.vy;
     });
     
-    // 5. 冷却（保留，但不作为停止条件）
+    // 5. 冷却
     this.alpha *= this.physics.coolingFactor;
   },
   
@@ -445,6 +512,9 @@ const GraphViz = {
     this.drawNodes(ctx);
     
     ctx.restore();
+    
+    // 绘制性能信息（调试用）
+    this.drawPerformanceInfo(ctx, width, height);
   },
   
   drawGrid(ctx, width, height) {
@@ -578,6 +648,30 @@ const GraphViz = {
     });
   },
   
+  /**
+   * 绘制性能信息（调试用）
+   */
+  drawPerformanceInfo(ctx, width, height) {
+    const status = this.getConvergenceStatus();
+    
+    ctx.fillStyle = 'rgba(100, 116, 139, 0.7)';
+    ctx.font = '10px monospace';
+    ctx.textAlign = 'right';
+    
+    const lines = [
+      `FPS: ${status.fps}`,
+      `Nodes: ${this.nodes.length}`,
+      `Links: ${this.links.length}`,
+      `Velocity: ${status.currentVelocity.toFixed(2)} px/f`,
+      `Converged: ${status.isConverged ? '✓' : '✗'}`,
+      `Frames: ${status.frameCount}/${status.requiredFrames}`
+    ];
+    
+    lines.forEach((line, i) => {
+      ctx.fillText(line, width - 10, height - 10 - (lines.length - 1 - i) * 14);
+    });
+  },
+  
   // 鼠标事件处理
   onMouseDown(e) {
     const rect = this.canvas.getBoundingClientRect();
@@ -621,7 +715,7 @@ const GraphViz = {
         this.draggedNode.y = y;
         this.draggedNode.vx = 0;
         this.draggedNode.vy = 0;
-        this.resetConvergence(); // 重置收敛状态，重新激活物理
+        this.resetConvergence();
       } else {
         // 拖拽视图
         this.transform.x += e.clientX - this.lastMouse.x;
@@ -660,7 +754,7 @@ const GraphViz = {
     this.transform.x = 0;
     this.transform.y = 0;
     this.transform.scale = 1;
-    this.resetConvergence(); // 重置收敛状态，重新激活物理
+    this.resetConvergence();
   },
   
   onTouchStart(e) {
@@ -704,7 +798,7 @@ const GraphViz = {
   },
   
   /**
-   * 重置收敛状态（用于拖拽节点后重新激活物理模拟）
+   * 重置收敛状态
    */
   resetConvergence() {
     this.convergence.frameCount = 0;
