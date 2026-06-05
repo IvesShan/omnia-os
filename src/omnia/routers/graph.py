@@ -169,7 +169,7 @@ async def neural_graph_search(request: dict):
 
 
 @router.get("/neural-graph/export")
-async def neural_graph_export(limit: int = Query(100, ge=1, le=1000)):
+async def neural_graph_export(limit: int = Query(2000, ge=1, le=5000)):
     """导出图谱数据供前端可视化"""
     try:
         graph = await get_neural_graph()
@@ -234,7 +234,7 @@ async def memory_neural_graph():
 @router.get("/graph")
 async def graph_export(
     min_weight: float = Query(0.0, ge=0.0),
-    limit: int = Query(500, ge=1, le=2000)
+    limit: int = Query(2000, ge=1, le=5000)
 ):
     """导出图谱数据用于可视化"""
     try:
