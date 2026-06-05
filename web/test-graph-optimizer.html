@@ -3,430 +3,463 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Graph Viz 优化测试</title>
+  <title>神经图谱物理引擎优化测试</title>
   <style>
     * {
       margin: 0;
       padding: 0;
       box-sizing: border-box;
     }
-
+    
     body {
       background: #0f1117;
       color: #e2e8f0;
       font-family: 'Inter', sans-serif;
       height: 100vh;
-      display: flex;
-      flex-direction: column;
+      overflow: hidden;
     }
-
-    .header {
+    
+    .container {
+      display: flex;
+      height: 100vh;
+    }
+    
+    .graph-area {
+      flex: 1;
+      position: relative;
+    }
+    
+    #graph-canvas {
+      width: 100%;
+      height: 100%;
+    }
+    
+    .sidebar {
+      width: 350px;
       background: rgba(15, 17, 23, 0.95);
-      border-bottom: 1px solid rgba(100, 116, 139, 0.3);
-      padding: 16px 24px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
+      border-left: 1px solid rgba(100, 116, 139, 0.2);
+      padding: 20px;
+      overflow-y: auto;
     }
-
-    .header h1 {
+    
+    h1 {
+      font-size: 20px;
+      margin-bottom: 20px;
+      color: #22d3ee;
+    }
+    
+    h2 {
+      font-size: 16px;
+      margin: 20px 0 10px;
+      color: #94a3b8;
+    }
+    
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    
+    .stat-card {
+      background: rgba(100, 116, 139, 0.1);
+      border: 1px solid rgba(100, 116, 139, 0.2);
+      border-radius: 8px;
+      padding: 12px;
+    }
+    
+    .stat-label {
+      font-size: 11px;
+      color: #64748b;
+      margin-bottom: 4px;
+    }
+    
+    .stat-value {
       font-size: 18px;
       font-weight: 600;
       color: #e2e8f0;
     }
-
-    .controls {
-      display: flex;
-      gap: 12px;
-    }
-
-    .btn {
-      background: rgba(100, 116, 139, 0.2);
-      border: 1px solid rgba(100, 116, 139, 0.3);
-      border-radius: 8px;
-      padding: 8px 16px;
-      color: #e2e8f0;
-      font-size: 14px;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-
-    .btn:hover {
-      background: rgba(100, 116, 139, 0.3);
-      border-color: rgba(100, 116, 139, 0.5);
-    }
-
-    .btn.active {
-      background: rgba(124, 58, 237, 0.3);
-      border-color: rgba(124, 58, 237, 0.5);
-      color: #a78bfa;
-    }
-
-    .main {
-      flex: 1;
-      display: flex;
-      position: relative;
-    }
-
-    #graph-canvas {
-      flex: 1;
-      position: relative;
-      overflow: hidden;
-    }
-
-    .stats-panel {
-      position: absolute;
-      top: 20px;
-      left: 20px;
-      background: rgba(15, 17, 23, 0.95);
-      border: 1px solid rgba(100, 116, 139, 0.3);
-      border-radius: 12px;
-      padding: 16px;
-      min-width: 200px;
-      z-index: 100;
-    }
-
-    .stat-item {
-      margin-bottom: 12px;
-    }
-
-    .stat-item:last-child {
-      margin-bottom: 0;
-    }
-
-    .stat-label {
-      font-size: 12px;
-      color: #64748b;
-      margin-bottom: 4px;
-    }
-
-    .stat-value {
-      font-size: 16px;
-      font-weight: 600;
-      color: #e2e8f0;
-    }
-
-    .stat-value.converged {
+    
+    .stat-value.success {
       color: #22c55e;
     }
-
-    .stat-value.converging {
+    
+    .stat-value.warning {
       color: #f59e0b;
     }
-
-    .stat-value.active {
-      color: #3b82f6;
+    
+    .stat-value.error {
+      color: #ef4444;
     }
-
-    .style-panel {
-      position: absolute;
-      top: 20px;
-      right: 20px;
-      background: rgba(15, 17, 23, 0.95);
-      border: 1px solid rgba(100, 116, 139, 0.3);
-      border-radius: 12px;
-      padding: 16px;
-      min-width: 200px;
-      z-index: 100;
+    
+    .control-group {
+      margin-bottom: 15px;
     }
-
-    .style-title {
-      font-size: 14px;
-      font-weight: 600;
-      margin-bottom: 12px;
-      color: #e2e8f0;
-    }
-
-    .style-list {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .style-item {
-      background: rgba(100, 116, 139, 0.1);
-      border: 1px solid rgba(100, 116, 139, 0.2);
-      border-radius: 8px;
-      padding: 10px 12px;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-
-    .style-item:hover {
-      background: rgba(100, 116, 139, 0.2);
-      border-color: rgba(100, 116, 139, 0.4);
-    }
-
-    .style-item.active {
-      background: rgba(124, 58, 237, 0.2);
-      border-color: rgba(124, 58, 237, 0.4);
-    }
-
-    .style-item-name {
-      font-size: 13px;
-      font-weight: 500;
-      color: #e2e8f0;
-      margin-bottom: 2px;
-    }
-
-    .style-item-desc {
-      font-size: 11px;
-      color: #64748b;
-    }
-
-    .log-panel {
-      position: absolute;
-      bottom: 20px;
-      left: 20px;
-      right: 20px;
-      background: rgba(15, 17, 23, 0.95);
-      border: 1px solid rgba(100, 116, 139, 0.3);
-      border-radius: 12px;
-      padding: 16px;
-      max-height: 150px;
-      overflow-y: auto;
-      z-index: 100;
-    }
-
-    .log-title {
-      font-size: 14px;
-      font-weight: 600;
-      margin-bottom: 12px;
-      color: #e2e8f0;
-    }
-
-    .log-content {
-      font-family: 'Monaco', 'Menlo', monospace;
+    
+    .control-label {
       font-size: 12px;
       color: #94a3b8;
+      margin-bottom: 5px;
+      display: flex;
+      justify-content: space-between;
+    }
+    
+    .control-value {
+      color: #64748b;
+      font-family: monospace;
+    }
+    
+    input[type="range"] {
+      width: 100%;
+      height: 6px;
+      background: rgba(100, 116, 139, 0.2);
+      border-radius: 3px;
+      outline: none;
+    }
+    
+    input[type="range"]::-webkit-slider-thumb {
+      width: 16px;
+      height: 16px;
+      background: #22d3ee;
+      border-radius: 50%;
+      cursor: pointer;
+    }
+    
+    button {
+      background: rgba(34, 211, 238, 0.2);
+      border: 1px solid rgba(34, 211, 238, 0.4);
+      color: #22d3ee;
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      transition: all 0.2s;
+      margin-right: 8px;
+      margin-bottom: 8px;
+    }
+    
+    button:hover {
+      background: rgba(34, 211, 238, 0.3);
+    }
+    
+    button.active {
+      background: rgba(34, 211, 238, 0.4);
+      border-color: #22d3ee;
+    }
+    
+    .log-panel {
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(100, 116, 139, 0.2);
+      border-radius: 8px;
+      padding: 10px;
+      margin-top: 20px;
+      max-height: 200px;
+      overflow-y: auto;
+      font-family: monospace;
+      font-size: 11px;
       line-height: 1.6;
     }
-
+    
     .log-entry {
-      margin-bottom: 4px;
+      color: #94a3b8;
     }
-
-    .log-entry.info {
-      color: #3b82f6;
-    }
-
+    
     .log-entry.success {
       color: #22c55e;
     }
-
+    
     .log-entry.warning {
       color: #f59e0b;
     }
-
+    
     .log-entry.error {
       color: #ef4444;
+    }
+    
+    .bug-info {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      border-radius: 8px;
+      padding: 15px;
+      margin: 20px 0;
+    }
+    
+    .bug-title {
+      color: #ef4444;
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+    
+    .bug-list {
+      list-style: none;
+      padding: 0;
+    }
+    
+    .bug-list li {
+      color: #94a3b8;
+      font-size: 13px;
+      margin-bottom: 8px;
+      padding-left: 20px;
+      position: relative;
+    }
+    
+    .bug-list li::before {
+      content: '🐛';
+      position: absolute;
+      left: 0;
+    }
+    
+    .fix-info {
+      background: rgba(34, 197, 94, 0.1);
+      border: 1px solid rgba(34, 197, 94, 0.3);
+      border-radius: 8px;
+      padding: 15px;
+      margin: 20px 0;
+    }
+    
+    .fix-title {
+      color: #22c55e;
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+    
+    .fix-list {
+      list-style: none;
+      padding: 0;
+    }
+    
+    .fix-list li {
+      color: #94a3b8;
+      font-size: 13px;
+      margin-bottom: 8px;
+      padding-left: 20px;
+      position: relative;
+    }
+    
+    .fix-list li::before {
+      content: '✅';
+      position: absolute;
+      left: 0;
     }
   </style>
 </head>
 <body>
-  <div class="header">
-    <h1>Graph Viz 优化测试</h1>
-    <div class="controls">
-      <button class="btn" onclick="resetSimulation()">重置模拟</button>
-      <button class="btn" onclick="togglePhysics()">切换物理</button>
-      <button class="btn" onclick="addNodes()">添加节点</button>
+  <div class="container">
+    <div class="graph-area">
+      <div id="graph-canvas"></div>
     </div>
-  </div>
-
-  <div class="main">
-    <div id="graph-canvas"></div>
-
-    <div class="stats-panel">
-      <div class="stat-item">
-        <div class="stat-label">节点数量</div>
-        <div class="stat-value" id="stat-nodes">0</div>
-      </div>
-      <div class="stat-item">
-        <div class="stat-label">边数量</div>
-        <div class="stat-value" id="stat-edges">0</div>
-      </div>
-      <div class="stat-item">
-        <div class="stat-label">平均速度</div>
-        <div class="stat-value" id="stat-velocity">0.00 px/帧</div>
-      </div>
-      <div class="stat-item">
-        <div class="stat-label">收敛状态</div>
-        <div class="stat-value" id="stat-convergence">活跃</div>
-      </div>
-      <div class="stat-item">
-        <div class="stat-label">当前风格</div>
-        <div class="stat-value" id="stat-style">Data Drift</div>
-      </div>
-    </div>
-
-    <div class="style-panel">
-      <div class="style-title">视觉风格</div>
-      <div class="style-list" id="style-list"></div>
-    </div>
-
-    <div class="log-panel">
-      <div class="log-title">日志</div>
-      <div class="log-content" id="log-content"></div>
-    </div>
-  </div>
-
-  <script src="graph-viz.js"></script>
-  <script src="convergence-detector.js"></script>
-  <script src="style-switcher.js"></script>
-  <script src="optimize-physics.js"></script>
-  <script>
-    // 初始化图谱
-    async function initGraph() {
-      try {
-        addLog('info', '正在初始化图谱...');
-        
-        await GraphViz.init();
-        
-        // 初始化风格切换器
-        window.styleSwitcher = new StyleSwitcher(GraphViz);
-        
-        // 初始化优化器
-        window.optimizer = new PhysicsOptimizer();
-        
-        // 更新统计信息
-        updateStats();
-        
-        // 渲染风格列表
-        renderStyleList();
-        
-        addLog('success', `图谱初始化完成: ${GraphViz.nodes.length} 节点, ${GraphViz.links.length} 边`);
-        
-        // 启动统计更新
-        setInterval(updateStats, 100);
-        
-      } catch (error) {
-        addLog('error', `初始化失败: ${error.message}`);
-      }
-    }
-
-    // 更新统计信息
-    function updateStats() {
-      // 节点和边数量
-      document.getElementById('stat-nodes').textContent = GraphViz.nodes.length;
-      document.getElementById('stat-edges').textContent = GraphViz.links.length;
+    
+    <div class="sidebar">
+      <h1>🧠 神经图谱优化测试</h1>
       
-      // 收敛状态
-      const convergence = GraphViz.getConvergenceStatus();
-      const velocityEl = document.getElementById('stat-velocity');
-      const convergenceEl = document.getElementById('stat-convergence');
+      <div class="bug-info">
+        <div class="bug-title">🐛 发现的 Bug</div>
+        <ul class="bug-list">
+          <li>点击节点时错误地移动节点位置</li>
+          <li>节点堆在一起（向心力太强）</li>
+          <li>距离太小导致力爆炸（除以0）</li>
+          <li>节点飞出画布无边界约束</li>
+        </ul>
+      </div>
       
-      velocityEl.textContent = convergence.currentVelocity.toFixed(3) + ' px/帧';
+      <div class="fix-info">
+        <div class="fix-title">✅ 修复方案</div>
+        <ul class="fix-list">
+          <li>添加拖拽距离检测（>5px才算拖拽）</li>
+          <li>添加最小距离限制（5px）</li>
+          <li>只对远离中心的节点施加向心力</li>
+          <li>添加边界约束和反弹</li>
+          <li>网格布局初始位置（防重叠）</li>
+        </ul>
+      </div>
       
-      if (convergence.isConverged) {
-        convergenceEl.textContent = '已收敛';
-        convergenceEl.className = 'stat-value converged';
-      } else if (convergence.currentVelocity > 1.0) {
-        convergenceEl.textContent = '活跃';
-        convergenceEl.className = 'stat-value active';
-      } else {
-        convergenceEl.textContent = '收敛中';
-        convergenceEl.className = 'stat-value converging';
-      }
-      
-      // 当前风格
-      if (window.styleSwitcher) {
-        const current = window.styleSwitcher.getCurrentStyle();
-        document.getElementById('stat-style').textContent = current.name;
-      }
-    }
-
-    // 渲染风格列表
-    function renderStyleList() {
-      const list = document.getElementById('style-list');
-      const styles = window.styleSwitcher.getAvailableStyles();
-      
-      list.innerHTML = styles.map(style => `
-        <div class="style-item ${style.id === window.styleSwitcher.currentStyle ? 'active' : ''}" 
-             onclick="switchStyle('${style.id}')">
-          <div class="style-item-name">${style.name}</div>
-          <div class="style-item-desc">${style.description}</div>
+      <h2>📊 实时统计</h2>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">FPS</div>
+          <div class="stat-value" id="fps">0</div>
         </div>
-      `).join('');
-    }
-
-    // 切换风格
-    function switchStyle(styleName) {
-      const success = window.styleSwitcher.switchTo(styleName);
-      if (success) {
-        renderStyleList();
-        addLog('success', `切换到风格: ${styleName}`);
-      }
-    }
-
-    // 重置模拟
-    function resetSimulation() {
-      GraphViz.alpha = 1.0;
-      GraphViz.resetConvergence();
-      addLog('info', '模拟已重置');
-    }
-
-    // 切换物理
-    function togglePhysics() {
-      if (GraphViz.convergence.isConverged) {
-        GraphViz.resetConvergence();
-        addLog('info', '物理模拟已激活');
-      } else {
-        GraphViz.convergence.isConverged = true;
-        addLog('info', '物理模拟已停止');
-      }
-    }
-
-    // 添加节点
-    function addNodes() {
-      const centerX = GraphViz.canvas.width / (2 * window.devicePixelRatio);
-      const centerY = GraphViz.canvas.height / (2 * window.devicePixelRatio);
+        <div class="stat-card">
+          <div class="stat-label">节点数</div>
+          <div class="stat-value" id="node-count">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">边数</div>
+          <div class="stat-value" id="link-count">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">状态</div>
+          <div class="stat-value" id="convergence-status">运行中</div>
+        </div>
+      </div>
       
-      // 添加 10 个随机节点
-      for (let i = 0; i < 10; i++) {
-        const node = {
-          id: `node-${Date.now()}-${i}`,
-          label: `Node ${GraphViz.nodes.length + 1}`,
-          type: ['PERSON', 'PROJECT', 'FILE', 'CONCEPT'][Math.floor(Math.random() * 4)],
-          x: centerX + (Math.random() - 0.5) * 200,
-          y: centerY + (Math.random() - 0.5) * 200,
-          vx: 0,
-          vy: 0,
-          size: 3 + Math.random() * 5,
-          color: GraphViz.getNodeColor(node.type)
-        };
-        
-        GraphViz.nodes.push(node);
-        GraphViz.nodeMap[node.id] = node;
-        
-        // 添加随机边
-        if (GraphViz.nodes.length > 1) {
-          const randomNode = GraphViz.nodes[Math.floor(Math.random() * (GraphViz.nodes.length - 1))];
-          GraphViz.links.push({
-            source: node.id,
-            target: randomNode.id,
-            type: 'RELATED'
-          });
-        }
-      }
+      <h2>⚙️ 物理参数</h2>
+      <div class="control-group">
+        <div class="control-label">
+          <span>斥力强度</span>
+          <span class="control-value" id="repulsion-value">-300</span>
+        </div>
+        <input type="range" id="repulsion" min="-1000" max="-50" value="-300" step="10">
+      </div>
       
-      // 重置收敛状态
-      GraphViz.resetConvergence();
+      <div class="control-group">
+        <div class="control-label">
+          <span>向心力</span>
+          <span class="control-value" id="center-force-value">0.002</span>
+        </div>
+        <input type="range" id="center-force" min="0" max="0.02" value="0.002" step="0.001">
+      </div>
       
-      addLog('info', `添加了 10 个节点，当前总数: ${GraphViz.nodes.length}`);
-    }
-
-    // 添加日志
-    function addLog(type, message) {
-      const logContent = document.getElementById('log-content');
+      <div class="control-group">
+        <div class="control-label">
+          <span>阻尼系数</span>
+          <span class="control-value" id="damping-value">0.90</span>
+        </div>
+        <input type="range" id="damping" min="0.8" max="0.99" value="0.90" step="0.01">
+      </div>
+      
+      <div class="control-group">
+        <div class="control-label">
+          <span>最大速度</span>
+          <span class="control-value" id="max-velocity-value">8</span>
+        </div>
+        <input type="range" id="max-velocity" min="1" max="20" value="8" step="1">
+      </div>
+      
+      <h2>🎮 操作</h2>
+      <button id="btn-reset">🔄 重置图谱</button>
+      <button id="btn-shake">💥 扰动测试</button>
+      <button id="btn-center">🎯 居中视图</button>
+      
+      <h2>📝 日志</h2>
+      <div class="log-panel" id="log-panel">
+        <div class="log-entry">等待初始化...</div>
+      </div>
+    </div>
+  </div>
+  
+  <script src="/graph-viz.js"></script>
+  <script>
+    // 日志函数
+    function log(message, type = '') {
+      const logPanel = document.getElementById('log-panel');
       const entry = document.createElement('div');
       entry.className = `log-entry ${type}`;
       entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
-      logContent.appendChild(entry);
-      logContent.scrollTop = logContent.scrollHeight;
+      logPanel.appendChild(entry);
+      logPanel.scrollTop = logPanel.scrollHeight;
+      
+      // 限制日志数量
+      while (logPanel.children.length > 50) {
+        logPanel.removeChild(logPanel.firstChild);
+      }
     }
-
-    // 页面加载完成后初始化
-    window.addEventListener('load', initGraph);
+    
+    // 更新统计信息
+    function updateStats() {
+      if (window.GraphViz) {
+        const status = window.GraphViz.getConvergenceStatus();
+        
+        document.getElementById('fps').textContent = status.fps;
+        document.getElementById('node-count').textContent = window.GraphViz.nodes.length;
+        document.getElementById('link-count').textContent = window.GraphViz.links.length;
+        
+        const statusEl = document.getElementById('convergence-status');
+        if (status.isConverged) {
+          statusEl.textContent = '✓ 已收敛';
+          statusEl.className = 'stat-value success';
+        } else {
+          statusEl.textContent = `${status.frameCount}/${status.requiredFrames}`;
+          statusEl.className = 'stat-value warning';
+        }
+      }
+      requestAnimationFrame(updateStats);
+    }
+    
+    // 参数滑块事件
+    document.getElementById('repulsion').addEventListener('input', (e) => {
+      const value = parseFloat(e.target.value);
+      document.getElementById('repulsion-value').textContent = value;
+      if (window.GraphViz) {
+        window.GraphViz.physics.repulsion = value;
+        window.GraphViz.resetConvergence();
+        log(`斥力强度: ${value}`, 'warning');
+      }
+    });
+    
+    document.getElementById('center-force').addEventListener('input', (e) => {
+      const value = parseFloat(e.target.value);
+      document.getElementById('center-force-value').textContent = value.toFixed(3);
+      if (window.GraphViz) {
+        window.GraphViz.physics.centerForce = value;
+        window.GraphViz.resetConvergence();
+        log(`向心力: ${value.toFixed(3)}`, 'warning');
+      }
+    });
+    
+    document.getElementById('damping').addEventListener('input', (e) => {
+      const value = parseFloat(e.target.value);
+      document.getElementById('damping-value').textContent = value.toFixed(2);
+      if (window.GraphViz) {
+        window.GraphViz.physics.damping = value;
+        window.GraphViz.resetConvergence();
+        log(`阻尼系数: ${value.toFixed(2)}`, 'warning');
+      }
+    });
+    
+    document.getElementById('max-velocity').addEventListener('input', (e) => {
+      const value = parseFloat(e.target.value);
+      document.getElementById('max-velocity-value').textContent = value;
+      if (window.GraphViz) {
+        window.GraphViz.physics.maxVelocity = value;
+        window.GraphViz.resetConvergence();
+        log(`最大速度: ${value}`, 'warning');
+      }
+    });
+    
+    // 按钮事件
+    document.getElementById('btn-reset').addEventListener('click', () => {
+      if (window.GraphViz) {
+        window.GraphViz.destroy();
+        window.GraphViz.isInitialized = false;
+        window.GraphViz.init();
+        log('🔄 图谱已重置', 'success');
+      }
+    });
+    
+    document.getElementById('btn-shake').addEventListener('click', () => {
+      if (window.GraphViz) {
+        window.GraphViz.nodes.forEach(node => {
+          node.vx += (Math.random() - 0.5) * 10;
+          node.vy += (Math.random() - 0.5) * 10;
+        });
+        window.GraphViz.resetConvergence();
+        log('💥 扰动测试', 'warning');
+      }
+    });
+    
+    document.getElementById('btn-center').addEventListener('click', () => {
+      if (window.GraphViz) {
+        window.GraphViz.transform.x = 0;
+        window.GraphViz.transform.y = 0;
+        window.GraphViz.transform.scale = 1;
+        log('🎯 视图已居中', 'success');
+      }
+    });
+    
+    // 初始化
+    window.addEventListener('load', async () => {
+      log('🚀 开始初始化图谱...', 'success');
+      
+      try {
+        await window.GraphViz.init();
+        log(`✅ 图谱加载完成：${window.GraphViz.nodes.length} 节点，${window.GraphViz.links.length} 边`, 'success');
+      } catch (error) {
+        log(`❌ 初始化失败: ${error.message}`, 'error');
+      }
+      
+      updateStats();
+    });
   </script>
 </body>
 </html>
