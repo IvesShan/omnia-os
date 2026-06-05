@@ -25,20 +25,20 @@ const GraphViz = {
   isDragging: false,
   lastMouse: { x: 0, y: 0 },
   
-  // 力导向参数（优化版）
+  // 力导向参数（优化版 - 针对 4235 节点的大图优化）
   physics: {
-    repulsion: -200,           // 斥力强度
-    springStrength: 0.05,      // 弹簧强度
-    idealLinkLength: 150,      // 理想链接长度
-    damping: 0.85,             // 阻尼（降低，让节点更快稳定）
-    centerForce: 0.02,         // 向心力
-    maxVelocity: 15,           // 最大速度
-    coolingFactor: 0.99,       // 冷却因子
-    minAlpha: 0.01,            // 最小活跃度
+    repulsion: -50,            // 斥力强度（大幅降低，减少碰撞）
+    springStrength: 0.05,      // 弹簧强度（降低，减少振荡）
+    idealLinkLength: 150,      // 理想链接长度（增加，节点更分散）
+    damping: 0.95,             // 阻尼（大幅提高，更快停止）
+    centerForce: 0.03,         // 向心力（降低，减少拉扯）
+    maxVelocity: 8,            // 最大速度（降低，更平滑）
+    coolingFactor: 0.95,       // 冷却因子（大幅加快冷却）
+    minAlpha: 0.005,           // 最小活跃度（降低，更容易停止）
     
-    // 收敛检测参数
-    convergenceThreshold: 1.0, // 速度阈值（像素/帧）
-    convergenceFrames: 30      // 连续帧数（降低，更快收敛）
+    // 收敛检测参数（更宽松的收敛条件）
+    convergenceThreshold: 1.0, // 速度阈值（提高，更容易收敛）
+    convergenceFrames: 30      // 连续帧数（增加，确保真正收敛）
   },
   
   // 当前活跃度（用于控制模拟）
@@ -53,7 +53,7 @@ const GraphViz = {
   
   // 空间分区网格（用于优化斥力计算）
   grid: {
-    cellSize: 100,    // 网格单元大小
+    cellSize: 200,    // 网格单元大小（增大，减少每格节点数）
     cells: {}         // 网格单元字典
   },
   
@@ -341,6 +341,17 @@ const GraphViz = {
       this.convergence.isConverged = false;
     }
     
+    // 强制收敛：如果超过 500 帧，强制停止
+    if (!this.convergence.totalFrames) this.convergence.totalFrames = 0;
+    this.convergence.totalFrames++;
+    if (this.convergence.totalFrames > 500) {
+      if (!this.convergence.isConverged) {
+        this.convergence.isConverged = true;
+        console.log('[GraphViz] 物理模拟强制收敛（超过 500 帧）');
+      }
+      return true;
+    }
+    
     return false;
   },
   
@@ -400,6 +411,10 @@ const GraphViz = {
       }
     }
     
+    // 限制返回数量，避免计算量过大
+    if (neighbors.length > 50) {
+      return neighbors.slice(0, 50);
+    }
     return neighbors;
   },
   
@@ -804,6 +819,7 @@ const GraphViz = {
     this.convergence.frameCount = 0;
     this.convergence.isConverged = false;
     this.convergence.history = [];
+    this.convergence.totalFrames = 0;
     this.alpha = Math.max(this.alpha, 0.1);
   },
   
