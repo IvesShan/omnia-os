@@ -25,20 +25,24 @@ const GraphViz = {
   isDragging: false,
   lastMouse: { x: 0, y: 0 },
   
-  // 力导向参数（优化版 - 针对 4235 节点的大图优化）
+  // 力导向参数（参考 D3-force）
   physics: {
-    repulsion: -50,            // 斥力强度（大幅降低，减少碰撞）
-    springStrength: 0.05,      // 弹簧强度（降低，减少振荡）
-    idealLinkLength: 150,      // 理想链接长度（增加，节点更分散）
-    damping: 0.95,             // 阻尼（大幅提高，更快停止）
-    centerForce: 0.03,         // 向心力（降低，减少拉扯）
-    maxVelocity: 8,            // 最大速度（降低，更平滑）
-    coolingFactor: 0.95,       // 冷却因子（大幅加快冷却）
-    minAlpha: 0.005,           // 最小活跃度（降低，更容易停止）
+    repulsion: -300,           // 斥力强度（减小，防止爆发）
+    springStrength: 0.02,      // 弹簧强度
+    idealLinkLength: 150,      // 理想链接长度（增大，给节点更多空间）
+    damping: 0.9,              // 阻尼（适中）
+    centerForce: 0.002,        // 向心力（很小，只防飘散）
+    maxVelocity: 8,            // 最大速度（减小，更平滑）
+    coolingFactor: 0.998,      // 冷却因子
+    minAlpha: 0.001,           // 最小活跃度
     
-    // 收敛检测参数（更宽松的收敛条件）
-    convergenceThreshold: 1.0, // 速度阈值（提高，更容易收敛）
-    convergenceFrames: 30      // 连续帧数（增加，确保真正收敛）
+    // 收敛检测参数
+    convergenceThreshold: 0.1, // 速度阈值（更严格）
+    convergenceFrames: 100,    // 连续帧数（更长）
+    
+    // 碰撞检测参数
+    minDistance: 5,            // 最小距离（防止除以0）
+    collisionForce: 0.5,      // 碰撞力强度
   },
   
   // 当前活跃度（用于控制模拟）
@@ -190,9 +194,8 @@ const GraphViz = {
   
   async loadGraph() {
     try {
-      // 限制节点数量，避免卡顿
-      const maxNodes = 200;
-      const response = await fetch(`/api/graph?limit=${maxNodes}`, { cache: 'no-store' });
+      // 不限制节点数量，使用空间分区优化性能
+      const response = await fetch('/api/graph', { cache: 'no-store' });
       const text = await response.text();
       try {
         const data = JSON.parse(text);
@@ -257,15 +260,26 @@ const GraphViz = {
   },
   
   initPhysics() {
-    // 初始位置：圆形分布
-    const centerX = this.canvas.width / (2 * window.devicePixelRatio);
-    const centerY = this.canvas.height / (2 * window.devicePixelRatio);
-    const radius = Math.min(centerX, centerY) * 0.6;
+    // 初始位置：在画布内随机分散（避免所有节点堆在同一个圆上）
+    const width = this.canvas.width / window.devicePixelRatio;
+    const height = this.canvas.height / window.devicePixelRatio;
+    const padding = 100;
+    
+    // 计算节点分布的网格（确保不重叠）
+    const nodeCount = this.nodes.length;
+    const gridSize = Math.ceil(Math.sqrt(nodeCount));
+    const cellWidth = (width - padding * 2) / gridSize;
+    const cellHeight = (height - padding * 2) / gridSize;
     
     this.nodes.forEach((node, i) => {
-      const angle = (i / this.nodes.length) * Math.PI * 2;
-      node.x = centerX + Math.cos(angle) * radius * (0.5 + Math.random() * 0.5);
-      node.y = centerY + Math.sin(angle) * radius * (0.5 + Math.random() * 0.5);
+      // 网格布局 + 随机偏移（防止完全重叠）
+      const gridX = i % gridSize;
+      const gridY = Math.floor(i / gridSize);
+      const offsetX = (Math.random() - 0.5) * cellWidth * 0.8;
+      const offsetY = (Math.random() - 0.5) * cellHeight * 0.8;
+      
+      node.x = padding + gridX * cellWidth + cellWidth / 2 + offsetX;
+      node.y = padding + gridY * cellHeight + cellHeight / 2 + offsetY;
       node.vx = 0;
       node.vy = 0;
     });
@@ -343,17 +357,6 @@ const GraphViz = {
       this.convergence.isConverged = false;
     }
     
-    // 强制收敛：如果超过 500 帧，强制停止
-    if (!this.convergence.totalFrames) this.convergence.totalFrames = 0;
-    this.convergence.totalFrames++;
-    if (this.convergence.totalFrames > 500) {
-      if (!this.convergence.isConverged) {
-        this.convergence.isConverged = true;
-        console.log('[GraphViz] 物理模拟强制收敛（超过 500 帧）');
-      }
-      return true;
-    }
-    
     return false;
   },
   
@@ -413,10 +416,7 @@ const GraphViz = {
       }
     }
     
-    // 限制返回数量，避免计算量过大
-    if (neighbors.length > 50) {
-      return neighbors.slice(0, 50);
-    }
+    // 不限制邻居数量，让空间分区自然优化
     return neighbors;
   },
   
@@ -429,7 +429,7 @@ const GraphViz = {
     // 构建空间分区网格
     this.buildGrid();
     
-    // 1. 斥力（使用空间分区优化）
+    // 1. 斥力（使用空间分区优化，添加最小距离限制）
     this.nodes.forEach(nodeA => {
       const neighbors = this.getNeighborNodes(nodeA);
       
@@ -438,12 +438,23 @@ const GraphViz = {
         
         const dx = nodeB.x - nodeA.x;
         const dy = nodeB.y - nodeA.y;
-        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+        const distSq = dx * dx + dy * dy;
+        const dist = Math.sqrt(distSq);
+        
+        // 防止距离太小导致力爆炸
+        if (dist < this.physics.minDistance) {
+          // 碰撞检测：强制分开
+          const force = this.physics.collisionForce;
+          nodeA.vx -= (dx / dist || 0) * force;
+          nodeA.vy -= (dy / dist || 0) * force;
+          return;
+        }
         
         // 只计算近距离的斥力（优化性能）
         if (dist > this.grid.cellSize * 2) return;
         
-        const force = this.physics.repulsion / (dist * dist);
+        // 斥力计算（带最小距离保护）
+        const force = this.physics.repulsion / Math.max(distSq, 100);
         const fx = (dx / dist) * force;
         const fy = (dy / dist) * force;
         
@@ -452,7 +463,7 @@ const GraphViz = {
       });
     });
     
-    // 2. 弹簧力（连接的节点）
+    // 2. 弹簧力（连接的节点，添加最小距离限制）
     this.links.forEach(link => {
       const source = this.nodeMap[link.source];
       const target = this.nodeMap[link.target];
@@ -460,7 +471,18 @@ const GraphViz = {
       
       const dx = target.x - source.x;
       const dy = target.y - source.y;
-      const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      
+      // 防止距离太小
+      if (dist < this.physics.minDistance) {
+        // 碰撞检测
+        const force = this.physics.collisionForce;
+        source.vx -= (dx / dist || 0) * force;
+        source.vy -= (dy / dist || 0) * force;
+        target.vx += (dx / dist || 0) * force;
+        target.vy += (dy / dist || 0) * force;
+        return;
+      }
       
       const displacement = dist - this.physics.idealLinkLength;
       const force = displacement * this.physics.springStrength;
@@ -474,13 +496,26 @@ const GraphViz = {
       target.vy -= fy;
     });
     
-    // 3. 向心力（防止节点飘散）
+    // 3. 向心力（只对远离中心的节点施加，防止飘散）
+    const safeRadius = Math.min(centerX, centerY) * 0.8;
     this.nodes.forEach(node => {
-      node.vx += (centerX - node.x) * this.physics.centerForce;
-      node.vy += (centerY - node.y) * this.physics.centerForce;
+      const dx = centerX - node.x;
+      const dy = centerY - node.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      
+      // 只对远离中心的节点施加向心力
+      if (dist > safeRadius) {
+        const factor = this.physics.centerForce * (dist - safeRadius) / safeRadius;
+        node.vx += dx * factor;
+        node.vy += dy * factor;
+      }
     });
     
     // 4. 更新位置
+    const width = this.canvas.width / window.devicePixelRatio;
+    const height = this.canvas.height / window.devicePixelRatio;
+    const padding = 20;
+    
     this.nodes.forEach(node => {
       // 限制速度
       const speed = Math.sqrt(node.vx * node.vx + node.vy * node.vy);
@@ -496,6 +531,24 @@ const GraphViz = {
       // 更新位置
       node.x += node.vx;
       node.y += node.vy;
+      
+      // 边界约束（防止节点飞出画布）
+      if (node.x < padding) {
+        node.x = padding;
+        node.vx *= -0.5; // 反弹
+      }
+      if (node.x > width - padding) {
+        node.x = width - padding;
+        node.vx *= -0.5;
+      }
+      if (node.y < padding) {
+        node.y = padding;
+        node.vy *= -0.5;
+      }
+      if (node.y > height - padding) {
+        node.y = height - padding;
+        node.vy *= -0.5;
+      }
     });
     
     // 5. 冷却
@@ -710,6 +763,7 @@ const GraphViz = {
     
     this.lastMouse.x = e.clientX;
     this.lastMouse.y = e.clientY;
+    this.dragStartPos = { x: e.clientX, y: e.clientY };
   },
   
   onMouseMove(e) {
@@ -726,14 +780,19 @@ const GraphViz = {
     
     // 拖拽
     if (this.isDragging) {
-      if (this.draggedNode) {
-        // 拖拽节点
+      // 计算鼠标移动距离（判断是否真的在拖拽）
+      const dx = e.clientX - this.dragStartPos.x;
+      const dy = e.clientY - this.dragStartPos.y;
+      const dragDist = Math.sqrt(dx * dx + dy * dy);
+      
+      // 只有移动超过 5px 才算拖拽（防止点击时移动节点）
+      if (this.draggedNode && dragDist > 5) {
         this.draggedNode.x = x;
         this.draggedNode.y = y;
         this.draggedNode.vx = 0;
         this.draggedNode.vy = 0;
         this.resetConvergence();
-      } else {
+      } else if (!this.draggedNode) {
         // 拖拽视图
         this.transform.x += e.clientX - this.lastMouse.x;
         this.transform.y += e.clientY - this.lastMouse.y;
