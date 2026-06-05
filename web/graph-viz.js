@@ -106,8 +106,8 @@ const GraphViz = {
 
     container.innerHTML = '';
 
-    // 创建 3d-force-graph 实例
-    this.graph = new ThreeForceGraph({ controlType: 'orbit' })
+    // 创建 3d-force-graph 实例（全局变量名为 ForceGraph3D）
+    this.graph = new ForceGraph3D({ controlType: 'orbit' })
       .container(container)
       .graphData(this.graphData)
       .width(container.clientWidth)
