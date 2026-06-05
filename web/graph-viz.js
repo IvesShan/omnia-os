@@ -230,7 +230,7 @@ const GraphViz = {
   
   async loadGraph() {
     try {
-      const response = await fetch('/api/graph', { cache: 'no-store' });
+      const response = await fetch('/api/graph?limit=500', { cache: 'no-store' });
       const text = await response.text();
       try {
         const data = JSON.parse(text);

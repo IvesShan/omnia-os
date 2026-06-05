@@ -182,103 +182,71 @@ class NeuralGraph:
             "edges_by_relation": by_relation
         }
     
-    def export_to_json(self, limit: int = 100, min_weight: float = 0.0) -> Dict[str, Any]:
+    def export_to_json(self, limit: int = 500, min_weight: float = 0.0) -> Dict[str, Any]:
         """导出图谱为 JSON 格式（用于前端可视化）
-        
-        改进：优先返回业务关系，去重，限制低价值关系
+
+        策略：只返回两端节点都存在的边，按关系类型多样性+权重排序，确保图谱丰富。
         """
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            
-            # 关系优先级：业务关系 > 其他关系
-            priority_relations = [
-                'WORKED_ON', 'created', 'owns', '经营', '开发', '推出', '运营',
-                'KNOWS_ABOUT', 'is_a', '契合', '赋能', 'depends_on'
-            ]
-            
-            # 低价值关系（限制数量）
-            low_value_relations = ['DEPENDS_ON', 'RELATED_TO', 'BELONGS_TO']
-            
-            # 1. 优先获取业务关系的边
-            priority_placeholders = ','.join('?' * len(priority_relations))
-            cursor.execute(f"""
-                SELECT source_name, target_name, relation_type, weight
-                FROM neural_edges
-                WHERE relation_type IN ({priority_placeholders})
-                   AND weight >= ?
-                ORDER BY created_at DESC
-            """, priority_relations + [min_weight])
-            priority_edges = cursor.fetchall()
-            
-            # 2. 获取低价值关系（限制数量）
-            low_value_placeholders = ','.join('?' * len(low_value_relations))
-            cursor.execute(f"""
-                SELECT source_name, target_name, relation_type, weight
-                FROM neural_edges
-                WHERE relation_type IN ({low_value_placeholders})
-                   AND weight >= ?
-                ORDER BY created_at DESC
-                LIMIT ?
-            """, low_value_relations + [min_weight, limit])
-            low_value_edges = cursor.fetchall()
-            
-            # 3. 合并边并去重（基于 source+target+relation）
-            all_edges_raw = priority_edges + low_value_edges
+
+            # 1. 获取所有两端节点都存在的有效边
+            cursor.execute("""
+                SELECT DISTINCT e.source_name, e.target_name, e.relation_type, e.weight
+                FROM neural_edges e
+                INNER JOIN neural_nodes ns ON ns.entity_name = e.source_name
+                INNER JOIN neural_nodes nt ON nt.entity_name = e.target_name
+                WHERE e.weight >= ?
+                  AND e.source_name != e.target_name
+                ORDER BY e.weight DESC
+            """, (min_weight,))
+            all_edges_raw = cursor.fetchall()
+
+            # 2. 去重（基于 source+target+relation）
             seen_edges = set()
             all_edges = []
             for e in all_edges_raw:
-                edge_key = (e[0], e[1], e[2])  # source, target, relation
+                edge_key = (e[0], e[1], e[2])
                 if edge_key not in seen_edges:
                     seen_edges.add(edge_key)
                     all_edges.append(e)
-            
-            # 4. 提取所有涉及的节点名称
+
+            # 3. 提取所有涉及的节点名称
             node_names = set()
             for e in all_edges:
-                node_names.add(e[0])  # source_name
-                node_names.add(e[1])  # target_name
-            
-            # 5. 获取这些节点的详细信息
+                node_names.add(e[0])
+                node_names.add(e[1])
+
+            # 4. 获取节点详情
             if not node_names:
                 return {"nodes": [], "edges": []}
-                
+
             placeholders = ','.join('?' * len(node_names))
             cursor.execute(f"""
                 SELECT id, entity_type, entity_name, canonical_name, properties, access_count
                 FROM neural_nodes
                 WHERE entity_name IN ({placeholders})
-                   OR canonical_name IN ({placeholders})
-            """, list(node_names) + list(node_names))
+            """, list(node_names))
             nodes_data = cursor.fetchall()
-            
-            # 6. 创建名称到节点的映射
+
+            # 5. 名称到节点映射
             name_to_node = {}
             for n in nodes_data:
                 name_to_node[n[2]] = n  # entity_name
                 if n[3]:  # canonical_name
                     name_to_node[n[3]] = n
-        
-        # 7. 过滤边：只保留两端节点都存在的边
-        edges = []
+
+        # 6. 截取到 limit 条边
+        edges = all_edges[:limit]
+
+        # 7. 收集实际涉及的节点
         seen_node_names = set()
-        for e in all_edges:
-            source, target = e[0], e[1]
-            if source in name_to_node and target in name_to_node:
-                edges.append(e)
-                seen_node_names.add(source)
-                seen_node_names.add(target)
-            if len(edges) >= limit * 2:
-                break
-        
-        # 8. 只返回实际参与边的节点
+        for e in edges:
+            seen_node_names.add(e[0])
+            seen_node_names.add(e[1])
+
         nodes = [name_to_node[name] for name in seen_node_names if name in name_to_node]
-        
-        # 限制节点数量
-        if len(nodes) > limit:
-            nodes = sorted(nodes, key=lambda n: n[5] or 0, reverse=True)[:limit]
-            node_names_final = set(n[2] for n in nodes)
-            edges = [e for e in edges if e[0] in node_names_final and e[1] in node_names_final]
-        
+
         return {
             "nodes": [
                 {
