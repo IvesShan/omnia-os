@@ -295,12 +295,71 @@ const GraphViz = {
       this.performance.frameCount++;
       
       const isConverged = this.checkConvergence();
-      if (!isConverged) this.update();
+      if (!isConverged) {
+        // 未收敛：正常物理模拟
+        this.update();
+      } else {
+        // 收敛后：添加持续流动效果（始终执行）
+        this.ambientFlow();
+      }
       this.render();
       
+      // 动画始终持续运行
       this.animationFrameId = requestAnimationFrame(animate);
     };
     animate(0);
+  },
+  
+  // 持续流动动画状态
+  ambient: {
+    time: 0,
+    breathingPhase: 0,
+    driftPhase: 0,
+    particleSpawnTimer: 0,
+  },
+  
+  ambientFlow() {
+    if (this.nodes.length === 0) return;
+    
+    // 1. 呼吸效果：节点大小缓慢变化（更明显）
+    this.ambient.breathingPhase += 0.025;
+    
+    // 2. 漂移：不受缩放影响，直接用物理坐标偏移
+    this.ambient.driftPhase += 0.008; // 更快的漂移速度
+    const driftAmplitude = 8.0; // 大幅增加漂移幅度（3→8）
+    
+    this.nodes.forEach((node, i) => {
+      // 每个节点有不同的相位偏移（用索引生成伪随机相位）
+      const phaseX = i * 1.7 + Math.sin(i * 0.3) * 2;
+      const phaseY = i * 2.3 + Math.cos(i * 0.5) * 2;
+      
+      // 正弦波漂移 - 每帧移动明显距离
+      node.x += Math.sin(this.ambient.driftPhase * 1.2 + phaseX) * driftAmplitude;
+      node.y += Math.cos(this.ambient.driftPhase * 0.9 + phaseY) * driftAmplitude;
+      
+      // 3. 节点呼吸效果：修改节点大小（更明显）
+      node._breathScale = 1.0 + Math.sin(this.ambient.breathingPhase + i * 0.25) * 0.35;
+    });
+    
+    // 4. 边上的粒子流动（增加频率和数量）
+    this.ambient.particleSpawnTimer++;
+    if (this.ambient.particleSpawnTimer % 5 === 0) { // 更频繁（8→5）
+      const numParticles = Math.min(12, Math.max(5, Math.floor(this.links.length / 15)));
+      for (let i = 0; i < numParticles; i++) {
+        const randomLink = this.links[Math.floor(Math.random() * this.links.length)];
+        if (randomLink) {
+          this.particles.push({
+            source: randomLink.source,
+            target: randomLink.target,
+            progress: 0,
+            speed: 0.015 + Math.random() * 0.02
+          });
+        }
+      }
+    }
+    
+    // 5. 更新时间
+    this.ambient.time += 0.016;
   },
   
   checkConvergence() {
@@ -499,7 +558,13 @@ const GraphViz = {
       const isHighlighted = this.hoveredNode && 
         (source.id === this.hoveredNode.id || target.id === this.hoveredNode.id);
       
-      ctx.strokeStyle = isHighlighted ? this.colors.linkHighlight : this.colors.linkDefault;
+      // 边的流动效果：透明度随时间变化
+      const flowAlpha = 0.15 + Math.sin(this.ambient.time * 2 + link.source.length * 0.5) * 0.1;
+      const flowColor = isHighlighted 
+        ? this.colors.linkHighlight 
+        : `rgba(100, 116, 139, ${flowAlpha})`;
+      
+      ctx.strokeStyle = flowColor;
       ctx.lineWidth = isHighlighted ? 1.5 : 0.5;
       
       ctx.beginPath();
@@ -513,7 +578,9 @@ const GraphViz = {
     this.nodes.forEach(node => {
       const isHovered = this.hoveredNode && node.id === this.hoveredNode.id;
       const isSelected = this.selectedNode && node.id === this.selectedNode.id;
-      const size = isHovered ? node.size * 1.3 : node.size;
+      // 应用呼吸效果
+      const breathScale = node._breathScale || 1.0;
+      const size = isHovered ? node.size * 1.3 * breathScale : node.size * breathScale;
       
       if (isHovered || isSelected) {
         const gradient = ctx.createRadialGradient(node.x, node.y, 0, node.x, node.y, size * 3);
@@ -547,12 +614,12 @@ const GraphViz = {
   
   drawParticles(ctx) {
     this.particleTimer++;
-    if (this.particleTimer % 30 === 0 && this.hoveredNode) {
+    if (this.particleTimer % 15 === 0 && this.hoveredNode) { // 从30改为15
       this.addParticlesForNode(this.hoveredNode);
     }
     
     this.particles = this.particles.filter(p => {
-      p.progress += 0.02;
+      p.progress += (p.speed || 0.02);
       if (p.progress >= 1) return false;
       
       const source = this.nodeMap[p.source];
@@ -562,12 +629,27 @@ const GraphViz = {
       const x = source.x + (target.x - source.x) * p.progress;
       const y = source.y + (target.y - source.y) * p.progress;
       
-      ctx.fillStyle = this.colors.particle;
-      ctx.globalAlpha = 1 - p.progress;
+      // 呼吸效果：粒子大小和透明度变化（更明显）
+      const breathEffect = 1.0 + Math.sin(this.ambient.breathingPhase + p.progress * Math.PI * 4) * 0.5;
+      const alpha = (1 - p.progress) * breathEffect;
+      
+      // 粒子发光效果
+      const glowRadius = 4 * breathEffect;
+      const gradient = ctx.createRadialGradient(x, y, 0, x, y, glowRadius);
+      gradient.addColorStop(0, `rgba(34, 211, 238, ${alpha})`); // 青色核心
+      gradient.addColorStop(0.5, `rgba(34, 211, 238, ${alpha * 0.5})`); // 半透明中间
+      gradient.addColorStop(1, 'rgba(34, 211, 238, 0)'); // 透明边缘
+      
+      ctx.fillStyle = gradient;
       ctx.beginPath();
-      ctx.arc(x, y, 2, 0, Math.PI * 2);
+      ctx.arc(x, y, glowRadius, 0, Math.PI * 2);
       ctx.fill();
-      ctx.globalAlpha = 1;
+      
+      // 核心亮点
+      ctx.fillStyle = `rgba(255, 255, 255, ${alpha * 0.8})`;
+      ctx.beginPath();
+      ctx.arc(x, y, 1.5 * breathEffect, 0, Math.PI * 2);
+      ctx.fill();
       
       return true;
     });

@@ -116,6 +116,8 @@ class NeuralGraphContextEnhancer:
             "Neural Graph", "neural_graph",
             "UltraPlan", "ultraplan",
             "MCP", "API", "飞书",
+            "记忆宫殿", "神经图谱", "记忆系统",
+            "context_enhancer", "graph_enhancer",
         ]
         
         # 检查已知实体

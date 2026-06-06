@@ -111,12 +111,26 @@ class NeuralGraph:
     
     def add_node(self, entity_type: str, entity_name: str, 
                  canonical_name: str = None, properties: Dict = None) -> str:
-        """添加节点，返回节点ID"""
+        """添加节点，返回节点ID（自动去重：先检查是否已存在同名节点）"""
         import uuid
-        node_id = f"entity_{uuid.uuid4().hex[:8]}"
         
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
+            
+            # 先检查是否已存在同名节点（按 canonical_name 去重）
+            cursor.execute("""
+                SELECT id FROM neural_nodes 
+                WHERE canonical_name = ? OR entity_name = ?
+                LIMIT 1
+            """, (canonical_name or entity_name, entity_name))
+            existing = cursor.fetchone()
+            
+            if existing:
+                # 已存在，返回已有 ID
+                return existing[0]
+            
+            # 不存在，创建新节点
+            node_id = f"entity_{uuid.uuid4().hex[:8]}"
             
             cursor.execute("""
                 INSERT OR REPLACE INTO neural_nodes 

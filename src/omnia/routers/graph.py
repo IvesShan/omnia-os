@@ -169,7 +169,7 @@ async def neural_graph_search(request: dict):
 
 
 @router.get("/neural-graph/export")
-async def neural_graph_export(limit: int = Query(2000, ge=1, le=5000)):
+async def neural_graph_export(limit: int = Query(5000, ge=1, le=10000)):
     """导出图谱数据供前端可视化"""
     try:
         graph = await get_neural_graph()
@@ -192,7 +192,7 @@ async def memory_neural_graph():
     """
     try:
         graph = await get_neural_graph()
-        data = graph.export_to_json(limit=500)
+        data = graph.export_to_json(limit=5000)
         
         # 转换为 ForceGraph 需要的格式
         # nodes: {id, label, type}
@@ -234,7 +234,7 @@ async def memory_neural_graph():
 @router.get("/graph")
 async def graph_export(
     min_weight: float = Query(0.0, ge=0.0),
-    limit: int = Query(2000, ge=1, le=5000)
+    limit: int = Query(5000, ge=1, le=10000)
 ):
     """导出图谱数据用于可视化"""
     try:
