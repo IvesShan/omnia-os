@@ -1431,13 +1431,10 @@ function handlePanelClick(action) {
             GraphViz.init();
             appendOmnia('[系统] 神经图谱已激活，正在加载实体关系网络...');
           } else {
-            console.log('[App] GraphViz 已初始化，刷新数据');
-            // 已初始化，只刷新数据
+            console.log('[App] GraphViz 已初始化，不重复展开');
+            // 已初始化 → 不再重新加载数据或重新展开
+            // 只静默刷新统计数字，不触发任何重排
             GraphViz.loadStats();
-            GraphViz.loadGraph().then(() => {
-              GraphViz.resetConvergence(); // 重置收敛状态，让节点重新排列
-            });
-            // 刷新数据时不重复显示激活消息
           }
         } else {
           console.log('[App] GraphViz 尚未加载，等待 three-loaded 事件...');

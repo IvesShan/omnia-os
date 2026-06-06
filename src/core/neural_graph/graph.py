@@ -182,27 +182,36 @@ class NeuralGraph:
             "edges_by_relation": by_relation
         }
     
-    def export_to_json(self, limit: int = 500, min_weight: float = 0.0) -> Dict[str, Any]:
+    def export_to_json(self, limit: int = 10000, min_weight: float = 0.0) -> Dict[str, Any]:
         """导出图谱为 JSON 格式（用于前端可视化）
 
-        策略：只返回两端节点都存在的边，按关系类型多样性+权重排序，确保图谱丰富。
+        策略：返回所有节点（按 canonical_name 去重），以及 limit 条高质量边，确保图谱完整。
         """
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
 
-            # 1. 获取所有两端节点都存在的有效边
+            # 1. 获取所有节点（按 canonical_name 去重，保留每组第一条）
+            cursor.execute("""
+                SELECT id, entity_type, entity_name, canonical_name, properties, access_count
+                FROM neural_nodes
+                WHERE id IN (
+                    SELECT MIN(id) FROM neural_nodes
+                    GROUP BY COALESCE(canonical_name, entity_name)
+                )
+            """)
+            all_nodes = cursor.fetchall()
+
+            # 2. 获取所有有效边
             cursor.execute("""
                 SELECT DISTINCT e.source_name, e.target_name, e.relation_type, e.weight
                 FROM neural_edges e
-                INNER JOIN neural_nodes ns ON ns.entity_name = e.source_name
-                INNER JOIN neural_nodes nt ON nt.entity_name = e.target_name
                 WHERE e.weight >= ?
                   AND e.source_name != e.target_name
                 ORDER BY e.weight DESC
             """, (min_weight,))
             all_edges_raw = cursor.fetchall()
 
-            # 2. 去重（基于 source+target+relation）
+            # 3. 去重（基于 source+target+relation）
             seen_edges = set()
             all_edges = []
             for e in all_edges_raw:
@@ -211,64 +220,65 @@ class NeuralGraph:
                     seen_edges.add(edge_key)
                     all_edges.append(e)
 
-            # 3. 提取所有涉及的节点名称
-            node_names = set()
-            for e in all_edges:
-                node_names.add(e[0])
-                node_names.add(e[1])
+            # 4. 截取边到 limit
+            edges = all_edges[:limit]
 
-            # 4. 获取节点详情
-            if not node_names:
-                return {"nodes": [], "edges": []}
-
-            placeholders = ','.join('?' * len(node_names))
-            cursor.execute(f"""
-                SELECT id, entity_type, entity_name, canonical_name, properties, access_count
-                FROM neural_nodes
-                WHERE entity_name IN ({placeholders})
-            """, list(node_names))
-            nodes_data = cursor.fetchall()
-
-            # 5. 名称到节点映射
+            # 5. 构建节点映射
             name_to_node = {}
-            for n in nodes_data:
+            for n in all_nodes:
                 name_to_node[n[2]] = n  # entity_name
                 if n[3]:  # canonical_name
                     name_to_node[n[3]] = n
 
-        # 6. 截取到 limit 条边
-        edges = all_edges[:limit]
+            # 6. 收集边涉及的节点名称
+            edge_node_names = set()
+            for e in edges:
+                edge_node_names.add(e[0])
+                edge_node_names.add(e[1])
 
-        # 7. 收集实际涉及的节点
-        seen_node_names = set()
-        for e in edges:
-            seen_node_names.add(e[0])
-            seen_node_names.add(e[1])
+            # 7. 优先返回边涉及的节点，然后补充其他节点（直到全部）
+            # 这样确保有连接关系的节点优先展示
+            result_nodes = []
+            seen_node_names = set()
 
-        nodes = [name_to_node[name] for name in seen_node_names if name in name_to_node]
+            # 先添加边涉及的节点
+            for name in edge_node_names:
+                if name in name_to_node and name not in seen_node_names:
+                    seen_node_names.add(name)
+                    result_nodes.append(name_to_node[name])
 
-        return {
-            "nodes": [
-                {
-                    "id": n[0],
-                    "type": n[1],
-                    "name": n[2],
-                    "canonical_name": n[3],
-                    "properties": json.loads(n[4]) if n[4] else {},
-                    "access_count": n[5] or 0
-                }
-                for n in nodes
-            ],
-            "edges": [
-                {
-                    "source": e[0],
-                    "target": e[1],
-                    "relation": e[2],
-                    "weight": e[3]
-                }
-                for e in edges
-            ]
-        }
+            # 再添加其他节点（有访问记录的优先）
+            other_nodes = []
+            for n in all_nodes:
+                if n[2] not in seen_node_names:
+                    other_nodes.append(n)
+            
+            # 按访问次数排序
+            other_nodes.sort(key=lambda x: x[5] or 0, reverse=True)
+            result_nodes.extend(other_nodes)
+
+            return {
+                "nodes": [
+                    {
+                        "id": n[0],
+                        "type": n[1],
+                        "name": n[2],
+                        "canonical_name": n[3],
+                        "properties": json.loads(n[4]) if n[4] else {},
+                        "access_count": n[5] or 0
+                    }
+                    for n in result_nodes
+                ],
+                "edges": [
+                    {
+                        "source": e[0],
+                        "target": e[1],
+                        "relation": e[2],
+                        "weight": e[3]
+                    }
+                    for e in edges
+                ]
+            }
 
     def search_nodes(self, query: str, limit: int = 10) -> List[Dict]:
         """搜索节点"""

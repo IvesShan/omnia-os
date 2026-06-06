@@ -24,43 +24,47 @@ const GraphViz = {
   
   // 交互状态
   isDragging: false,
-  isDraggedNode: false,  // 是否真的拖拽了节点（移动超过5px）
+  isDraggedNode: false,
   dragStartPos: { x: 0, y: 0 },
   lastMouse: { x: 0, y: 0 },
   
-  // 力导向参数（参考 D3-force）
+  // 力导向参数
   physics: {
-    repulsion: -500,           // 斥力强度（负值，越大斥力越强）
-    springStrength: 0.005,     // 弹簧强度（连接节点间的力）
+    repulsion: 500,            // 斥力强度（正值）
+    springStrength: 0.005,     // 弹簧强度
     idealLinkLength: 120,      // 理想链接长度
-    damping: 0.85,             // 阻尼（速度衰减）
-    centerForce: 0,            // 向心力（设为0，不拉向中心）
+    damping: 0.85,             // 阻尼
+    centerForce: 0,            // 向心力（设为0）
     maxVelocity: 20,           // 最大速度
-    coolingFactor: 0.995,      // 冷却因子（慢慢降温）
+    coolingFactor: 0.995,      // 冷却因子
     minAlpha: 0.001,           // 最小活跃度
-    
-    // 收敛检测参数
-    convergenceThreshold: 0.05, // 速度阈值
-    convergenceFrames: 60,     // 连续帧数
+    convergenceThreshold: 0.05,
+    convergenceFrames: 60,
   },
   
-  // 当前活跃度（用于控制模拟）
+  // 边类型权重（用于计算理想长度）
+  edgeTypeWeights: {
+    'BELONGS_TO': 0.6,      // 属于：短边
+    'DEPENDS_ON': 0.8,      // 依赖：中等边
+    'RELATED_TO': 1.2,      // 相关：长边
+    'WORKED_ON': 0.7,       // 工作：中短边
+    'KNOWS_ABOUT': 1.5,     // 知道：最长边
+    'default': 1.0
+  },
+  
   alpha: 1.0,
   
-  // 收敛检测状态
   convergence: {
     frameCount: 0,
     isConverged: false,
     history: []
   },
   
-  // 空间分区网格（用于优化斥力计算）
   grid: {
     cellSize: 150,
     cells: {}
   },
   
-  // 颜色方案
   colors: {
     bg: '#0f1117',
     grid: 'rgba(100, 116, 139, 0.08)',
@@ -72,7 +76,6 @@ const GraphViz = {
     text: '#e2e8f0'
   },
   
-  // 类型颜色（HSL 色轮均匀分布）
   typeColors: {
     'PERSON':   { h: 190, s: 70, l: 60 },
     'PROJECT':  { h: 270, s: 70, l: 60 },
@@ -84,17 +87,11 @@ const GraphViz = {
     'DEFAULT':  { h: 210, s: 10, l: 50 }
   },
   
-  // 粒子系统
   particles: [],
   particleTimer: 0,
-  
-  // 动画循环 ID
   animationFrameId: null,
-  
-  // 初始化状态
   isInitialized: false,
   
-  // 性能监控
   performance: {
     lastFrameTime: 0,
     frameCount: 0,
@@ -103,20 +100,13 @@ const GraphViz = {
   
   async init() {
     if (this.isInitialized) {
-      console.log("[GraphViz] 已经初始化，跳过重复初始化");
+      // 已初始化 → 只刷新统计数字，不重新加载图谱、不触发展开
       await this.loadStats();
-      await this.loadGraph();
-      this.resetConvergence();
       return;
     }
-    
-    console.log("[GraphViz] 初始化 Canvas 2D Obsidian 风格");
     
     const container = document.getElementById('graph-canvas');
-    if (!container) {
-      console.error('[GraphViz] 找不到 graph-canvas');
-      return;
-    }
+    if (!container) return;
     
     this.canvas = document.createElement('canvas');
     this.canvas.style.cssText = 'width: 100%; height: 100%;';
@@ -125,7 +115,6 @@ const GraphViz = {
     
     this.ctx = this.canvas.getContext('2d');
     this.resizeCanvas();
-    
     this.bindEvents();
     
     try {
@@ -134,8 +123,6 @@ const GraphViz = {
       this.initPhysics();
       this.startAnimation();
       this.isInitialized = true;
-      
-      console.log("[GraphViz] 初始化完成，节点数:", this.nodes.length);
     } catch (error) {
       console.error("[GraphViz] 初始化错误:", error);
     }
@@ -156,73 +143,75 @@ const GraphViz = {
     this.canvas.addEventListener('mouseup', this.onMouseUp.bind(this));
     this.canvas.addEventListener('wheel', this.onWheel.bind(this));
     this.canvas.addEventListener('dblclick', this.onDblClick.bind(this));
-    
     this.canvas.addEventListener('touchstart', this.onTouchStart.bind(this));
     this.canvas.addEventListener('touchmove', this.onTouchMove.bind(this));
     this.canvas.addEventListener('touchend', this.onTouchEnd.bind(this));
-    
     window.addEventListener('resize', () => this.resizeCanvas());
   },
   
   async loadStats() {
     try {
       const response = await fetch('/api/graph/stats', { cache: 'no-store' });
-      const text = await response.text();
-      try {
-        const data = JSON.parse(text);
-        const nodesEl = document.getElementById('gs-nodes');
-        const edgesEl = document.getElementById('gs-edges');
-        if (nodesEl) nodesEl.textContent = data.nodes || '—';
-        if (edgesEl) edgesEl.textContent = data.edges || '—';
-      } catch (parseErr) {
-        console.warn('[GraphViz] stats 非 JSON 响应，跳过');
-      }
-    } catch (error) {
-      if (error.name !== 'AbortError') {
-        console.warn('[GraphViz] 加载统计失败:', error.message);
-      }
-    }
+      const data = JSON.parse(await response.text());
+      const nodesEl = document.getElementById('gs-nodes');
+      const edgesEl = document.getElementById('gs-edges');
+      if (nodesEl) nodesEl.textContent = data.nodes || '—';
+      if (edgesEl) edgesEl.textContent = data.edges || '—';
+    } catch (error) {}
   },
   
   async loadGraph() {
     try {
       const response = await fetch('/api/graph', { cache: 'no-store' });
-      const text = await response.text();
-      try {
-        const data = JSON.parse(text);
-        
-        this.nodes = (data.nodes || []).map((n, i) => ({
-          id: n.name || n.id,
-          label: n.label || n.name,
-          type: n.type || 'ENTITY',
-          evidence: n.evidence || '',
-          x: 0, y: 0,
-          vx: 0, vy: 0,
-          size: 3,
-          color: this.getNodeColor(n.type)
-        }));
-        
-        this.links = (data.edges || []).map(e => ({
-          source: e.source,
-          target: e.target,
-          type: e.type || 'RELATED'
-        }));
-        
-        this.nodeMap = {};
-        this.nodes.forEach(n => this.nodeMap[n.id] = n);
-        
-        this.calculateNodeSizes();
-        
-        console.log('[GraphViz] 加载图谱:', this.nodes.length, '节点,', this.links.length, '边');
-      } catch (parseErr) {
-        console.warn('[GraphViz] graph 非 JSON 响应，跳过');
-        this.nodes = [];
-        this.links = [];
-      }
+      const data = JSON.parse(await response.text());
+      
+      // 用 name 作为 id，按 name 去重（后端已去重，这里做双重保障）
+      const nodeByName = {};
+      (data.nodes || []).forEach(n => {
+        const name = n.canonical_name || n.name || n.id;
+        if (!nodeByName[name]) {
+          nodeByName[name] = n;
+        } else {
+          // 保留访问次数更高的
+          if ((n.access_count || 0) > (nodeByName[name].access_count || 0)) {
+            nodeByName[name] = n;
+          }
+        }
+      });
+      
+      this.nodes = Object.values(nodeByName).map((n, i) => ({
+        id: n.canonical_name || n.name || n.id,
+        label: n.name || n.canonical_name || n.id,
+        type: n.type || 'ENTITY',
+        evidence: n.evidence || '',
+        x: 0, y: 0,
+        vx: 0, vy: 0,
+        size: 3,
+        color: this.getNodeColor(n.type)
+      }));
+      
+      // 去重边：同一对节点只保留一条边
+      const edgeSet = new Set();
+      this.links = [];
+      (data.edges || []).forEach(e => {
+        const key = [e.source, e.target].sort().join('→');
+        if (!edgeSet.has(key)) {
+          edgeSet.add(key);
+          this.links.push({
+            source: e.source,
+            target: e.target,
+            type: e.type || 'RELATED',
+            weight: e.weight || 1.0
+          });
+        }
+      });
+      
+      this.nodeMap = {};
+      this.nodes.forEach(n => this.nodeMap[n.id] = n);
+      this.calculateNodeSizes();
+      
+      console.log('[GraphViz] 加载图谱:', this.nodes.length, '节点,', this.links.length, '边（去重后）');
     } catch (error) {
-      if (error.name !== 'AbortError') {
-        console.warn('[GraphViz] 加载图谱失败:', error.message);
-      }
       this.nodes = [];
       this.links = [];
     }
@@ -239,73 +228,63 @@ const GraphViz = {
       degree[l.source] = (degree[l.source] || 0) + 1;
       degree[l.target] = (degree[l.target] || 0) + 1;
     });
-    
     this.nodes.forEach(n => {
       n.size = Math.max(3, Math.min(12, 3 + (degree[n.id] || 0) * 0.8));
     });
   },
   
   initPhysics() {
-    // 关键：初始位置使用大面积随机分布
-    // 根据节点数量动态计算散布范围
     const nodeCount = this.nodes.length;
-    const spreadRadius = Math.sqrt(nodeCount) * 30; // 每个节点约 30px 间距
-    
-    console.log('[GraphViz] 初始散布半径:', spreadRadius, 'px');
+    const spreadRadius = Math.sqrt(nodeCount) * 50;
     
     this.nodes.forEach((node, i) => {
-      // 使用螺旋布局 + 随机偏移（避免所有节点从同一点出发）
-      const angle = i * 2.399963; // 黄金角（弧度）
+      const angle = i * 2.399963;
       const r = Math.sqrt(i / nodeCount) * spreadRadius;
-      const offsetX = (Math.random() - 0.5) * 40;
-      const offsetY = (Math.random() - 0.5) * 40;
-      
-      node.x = r * Math.cos(angle) + offsetX;
-      node.y = r * Math.sin(angle) + offsetY;
+      node.x = r * Math.cos(angle) + (Math.random() - 0.5) * 60;
+      node.y = r * Math.sin(angle) + (Math.random() - 0.5) * 60;
       node.vx = 0;
       node.vy = 0;
     });
     
-    // 居中视图：将 transform 设为画布中心
     const width = this.canvas.width / window.devicePixelRatio;
     const height = this.canvas.height / window.devicePixelRatio;
     this.transform.x = width / 2;
     this.transform.y = height / 2;
-    this.transform.scale = 0.5; // 缩小一点，让节点都在视野内
+    this.transform.scale = 0.3;
     
-    // 根据节点数量调整初始 alpha（活跃度）
     this.alpha = 1.0;
     
-    // 根据节点数量调整物理参数
     if (nodeCount > 1000) {
-      // 大图：需要更强的斥力，更大的间距
-      this.physics.repulsion = -800;
-      this.physics.idealLinkLength = 200;
-      this.physics.damping = 0.88;
-      this.physics.coolingFactor = 0.998;
-      this.grid.cellSize = 200;
+      this.physics.repulsion = 1200;
+      this.physics.idealLinkLength = 250;
+      this.physics.springStrength = 0.002;
+      this.physics.damping = 0.82;
+      this.physics.centerForce = 0;
+      this.physics.coolingFactor = 0.999;
+      this.grid.cellSize = 250;
     } else if (nodeCount > 300) {
-      // 中图
-      this.physics.repulsion = -600;
+      this.physics.repulsion = 1000;
+      this.physics.idealLinkLength = 200;
+      this.physics.springStrength = 0.003;
+      this.physics.damping = 0.84;
+      this.physics.centerForce = 0;
+      this.physics.coolingFactor = 0.998;
+      this.grid.cellSize = 220;
+    } else {
+      this.physics.repulsion = 800;
       this.physics.idealLinkLength = 150;
-      this.physics.damping = 0.86;
+      this.physics.springStrength = 0.004;
+      this.physics.damping = 0.85;
+      this.physics.centerForce = 0;
       this.physics.coolingFactor = 0.997;
       this.grid.cellSize = 180;
-    } else {
-      // 小图
-      this.physics.repulsion = -400;
-      this.physics.idealLinkLength = 120;
-      this.physics.damping = 0.85;
-      this.physics.coolingFactor = 0.995;
-      this.grid.cellSize = 150;
     }
+    
+    this.physics.convergenceFrames = Math.min(120, Math.floor(nodeCount / 10));
   },
   
   startAnimation() {
-    if (this.animationFrameId) {
-      cancelAnimationFrame(this.animationFrameId);
-      this.animationFrameId = null;
-    }
+    if (this.animationFrameId) cancelAnimationFrame(this.animationFrameId);
     
     const animate = (timestamp) => {
       if (timestamp - this.performance.lastFrameTime >= 1000) {
@@ -315,14 +294,8 @@ const GraphViz = {
       }
       this.performance.frameCount++;
       
-      // 检查收敛
       const isConverged = this.checkConvergence();
-      
-      if (!isConverged) {
-        this.update();
-      }
-      
-      // 总是渲染
+      if (!isConverged) this.update();
       this.render();
       
       this.animationFrameId = requestAnimationFrame(animate);
@@ -349,9 +322,7 @@ const GraphViz = {
       if (this.convergence.frameCount >= this.physics.convergenceFrames) {
         if (!this.convergence.isConverged) {
           this.convergence.isConverged = true;
-          // 强制停止所有节点
           this.nodes.forEach(n => { n.vx = 0; n.vy = 0; });
-          console.log('[GraphViz] 物理模拟已收敛，平均速度:', avgVelocity.toFixed(4));
         }
         return true;
       }
@@ -366,15 +337,11 @@ const GraphViz = {
   buildGrid() {
     const cellSize = this.grid.cellSize;
     this.grid.cells = {};
-    
     this.nodes.forEach(node => {
       const cellX = Math.floor(node.x / cellSize);
       const cellY = Math.floor(node.y / cellSize);
       const key = `${cellX},${cellY}`;
-      
-      if (!this.grid.cells[key]) {
-        this.grid.cells[key] = [];
-      }
+      if (!this.grid.cells[key]) this.grid.cells[key] = [];
       this.grid.cells[key].push(node);
     });
   },
@@ -384,34 +351,24 @@ const GraphViz = {
     const cellX = Math.floor(node.x / cellSize);
     const cellY = Math.floor(node.y / cellSize);
     const neighbors = [];
-    
     for (let dx = -1; dx <= 1; dx++) {
       for (let dy = -1; dy <= 1; dy++) {
         const key = `${cellX + dx},${cellY + dy}`;
-        if (this.grid.cells[key]) {
-          neighbors.push(...this.grid.cells[key]);
-        }
+        if (this.grid.cells[key]) neighbors.push(...this.grid.cells[key]);
       }
     }
-    
     return neighbors;
   },
   
   update() {
     if (this.nodes.length === 0) return;
+    if (this.draggedNode && this.isDraggedNode) return;
     
-    // 检查是否在拖拽节点（拖拽时不更新物理）
-    if (this.draggedNode && this.isDraggedNode) {
-      return;
-    }
-    
-    // 构建空间分区网格
     this.buildGrid();
     
-    // 1. 斥力（使用空间分区优化）
+    // 1. 斥力
     this.nodes.forEach(nodeA => {
       const neighbors = this.getNeighborNodes(nodeA);
-      
       neighbors.forEach(nodeB => {
         if (nodeA === nodeB) return;
         
@@ -419,18 +376,14 @@ const GraphViz = {
         const dy = nodeA.y - nodeB.y;
         const distSq = dx * dx + dy * dy;
         
-        // 防止距离太小导致力爆炸
         const minDist = 10;
         if (distSq < minDist * minDist) {
-          // 碰撞：强制推开
           const angle = Math.atan2(dy, dx) || (Math.random() * Math.PI * 2);
-          nodeA.vx += Math.cos(angle) * 2;
-          nodeA.vy += Math.sin(angle) * 2;
+          nodeA.vx += Math.cos(angle) * 3;
+          nodeA.vy += Math.sin(angle) * 3;
           return;
         }
         
-        // 斥力 = repulsion / distSq
-        // 方向：从 nodeB 指向 nodeA（推开）
         const force = this.physics.repulsion / distSq;
         const fx = (dx / Math.sqrt(distSq)) * force;
         const fy = (dy / Math.sqrt(distSq)) * force;
@@ -440,7 +393,7 @@ const GraphViz = {
       });
     });
     
-    // 2. 弹簧力（连接的节点）
+    // 2. 弹簧力（根据边类型调整理想长度）
     this.links.forEach(link => {
       const source = this.nodeMap[link.source];
       const target = this.nodeMap[link.target];
@@ -450,10 +403,14 @@ const GraphViz = {
       const dy = target.y - source.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
       
-      if (dist < 1) return; // 防止除以0
+      if (dist < 1) return;
       
-      // 弹簧力：当距离大于理想长度时吸引，小于时排斥
-      const displacement = dist - this.physics.idealLinkLength;
+      // 根据边类型计算理想长度
+      const typeWeight = this.edgeTypeWeights[link.type] || this.edgeTypeWeights.default;
+      const idealLength = this.physics.idealLinkLength * typeWeight;
+      
+      // 弹簧力
+      const displacement = dist - idealLength;
       const force = displacement * this.physics.springStrength;
       
       const fx = (dx / dist) * force;
@@ -465,37 +422,26 @@ const GraphViz = {
       target.vy -= fy;
     });
     
-    // 3. 向心力（如果设置了的话）
-    if (this.physics.centerForce > 0) {
-      this.nodes.forEach(node => {
-        node.vx -= node.x * this.physics.centerForce;
-        node.vy -= node.y * this.physics.centerForce;
-      });
-    }
+    // 3. 向心力（设为0，不拉向中心）
     
-    // 4. 更新位置（无限画布，不加边界约束）
+    // 4. 更新位置
     this.nodes.forEach(node => {
-      // 限制速度
       const speed = Math.sqrt(node.vx * node.vx + node.vy * node.vy);
       if (speed > this.physics.maxVelocity) {
         node.vx = (node.vx / speed) * this.physics.maxVelocity;
         node.vy = (node.vy / speed) * this.physics.maxVelocity;
       }
       
-      // 应用阻尼
       node.vx *= this.physics.damping;
       node.vy *= this.physics.damping;
       
-      // 更新位置（无限画布，没有边界限制）
       node.x += node.vx * this.alpha;
       node.y += node.vy * this.alpha;
     });
     
     // 5. 冷却
     this.alpha *= this.physics.coolingFactor;
-    if (this.alpha < this.physics.minAlpha) {
-      this.alpha = this.physics.minAlpha;
-    }
+    if (this.alpha < this.physics.minAlpha) this.alpha = this.physics.minAlpha;
   },
   
   render() {
@@ -503,30 +449,21 @@ const GraphViz = {
     const width = this.canvas.width / window.devicePixelRatio;
     const height = this.canvas.height / window.devicePixelRatio;
     
-    // 清空画布
     ctx.fillStyle = this.colors.bg;
     ctx.fillRect(0, 0, width, height);
     
-    // 绘制网格背景
     this.drawGrid(ctx, width, height);
     
-    // 应用变换
     ctx.save();
     ctx.translate(this.transform.x, this.transform.y);
     ctx.scale(this.transform.scale, this.transform.scale);
     
-    // 绘制连线
     this.drawLinks(ctx);
-    
-    // 绘制粒子
     this.drawParticles(ctx);
-    
-    // 绘制节点
     this.drawNodes(ctx);
     
     ctx.restore();
     
-    // 绘制性能信息
     this.drawPerformanceInfo(ctx, width, height);
   },
   
@@ -544,7 +481,6 @@ const GraphViz = {
       ctx.lineTo(x, height);
       ctx.stroke();
     }
-    
     for (let y = offsetY; y < height; y += gridSize) {
       ctx.beginPath();
       ctx.moveTo(0, y);
@@ -555,7 +491,6 @@ const GraphViz = {
   
   drawLinks(ctx) {
     ctx.lineWidth = 0.8;
-    
     this.links.forEach(link => {
       const source = this.nodeMap[link.source];
       const target = this.nodeMap[link.target];
@@ -578,14 +513,12 @@ const GraphViz = {
     this.nodes.forEach(node => {
       const isHovered = this.hoveredNode && node.id === this.hoveredNode.id;
       const isSelected = this.selectedNode && node.id === this.selectedNode.id;
-      
       const size = isHovered ? node.size * 1.3 : node.size;
       
       if (isHovered || isSelected) {
         const gradient = ctx.createRadialGradient(node.x, node.y, 0, node.x, node.y, size * 3);
         gradient.addColorStop(0, node.color.replace(')', ', 0.3)').replace('hsl', 'hsla'));
         gradient.addColorStop(1, 'transparent');
-        
         ctx.fillStyle = gradient;
         ctx.beginPath();
         ctx.arc(node.x, node.y, size * 3, 0, Math.PI * 2);
@@ -643,18 +576,13 @@ const GraphViz = {
   addParticlesForNode(node) {
     this.links.forEach(link => {
       if (link.source === node.id || link.target === node.id) {
-        this.particles.push({
-          source: link.source,
-          target: link.target,
-          progress: 0
-        });
+        this.particles.push({ source: link.source, target: link.target, progress: 0 });
       }
     });
   },
   
   drawPerformanceInfo(ctx, width, height) {
     const status = this.getConvergenceStatus();
-    
     ctx.fillStyle = 'rgba(100, 116, 139, 0.7)';
     ctx.font = '10px monospace';
     ctx.textAlign = 'right';
@@ -689,7 +617,6 @@ const GraphViz = {
     };
   },
   
-  // 鼠标事件
   onMouseDown(e) {
     const rect = this.canvas.getBoundingClientRect();
     const x = (e.clientX - rect.left - this.transform.x) / this.transform.scale;
@@ -719,21 +646,18 @@ const GraphViz = {
     const x = (e.clientX - rect.left - this.transform.x) / this.transform.scale;
     const y = (e.clientY - rect.top - this.transform.y) / this.transform.scale;
     
-    // 悬停检测
     const hoveredNode = this.findNodeAt(x, y);
     if (hoveredNode !== this.hoveredNode) {
       this.hoveredNode = hoveredNode;
       this.canvas.style.cursor = hoveredNode ? 'pointer' : 'default';
     }
     
-    // 拖拽
     if (this.isDragging) {
       const dx = e.clientX - this.dragStartPos.x;
       const dy = e.clientY - this.dragStartPos.y;
       const dragDist = Math.sqrt(dx * dx + dy * dy);
       
       if (this.draggedNode && dragDist > 5) {
-        // 拖拽节点
         this.isDraggedNode = true;
         this.draggedNode.x = x;
         this.draggedNode.y = y;
@@ -741,7 +665,6 @@ const GraphViz = {
         this.draggedNode.vy = 0;
         this.resetConvergence();
       } else if (!this.draggedNode) {
-        // 拖拽视图（平移）
         this.transform.x += e.clientX - this.lastMouse.x;
         this.transform.y += e.clientY - this.lastMouse.y;
       }
@@ -759,7 +682,6 @@ const GraphViz = {
   
   onWheel(e) {
     e.preventDefault();
-    
     const rect = this.canvas.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
@@ -767,7 +689,6 @@ const GraphViz = {
     const delta = e.deltaY > 0 ? 0.9 : 1.1;
     const newScale = Math.max(0.05, Math.min(5, this.transform.scale * delta));
     
-    // 以鼠标位置为中心缩放
     const scaleRatio = newScale / this.transform.scale;
     this.transform.x = mouseX - (mouseX - this.transform.x) * scaleRatio;
     this.transform.y = mouseY - (mouseY - this.transform.y) * scaleRatio;
@@ -775,14 +696,12 @@ const GraphViz = {
   },
   
   onDblClick(e) {
-    // 双击重置视图到所有节点的中心
     this.fitView();
   },
   
   fitView() {
     if (this.nodes.length === 0) return;
     
-    // 计算所有节点的包围盒
     let minX = Infinity, maxX = -Infinity;
     let minY = Infinity, maxY = -Infinity;
     
@@ -802,7 +721,7 @@ const GraphViz = {
     
     const scaleX = (width - padding * 2) / graphWidth;
     const scaleY = (height - padding * 2) / graphHeight;
-    const scale = Math.min(scaleX, scaleY, 2); // 最大缩放 2
+    const scale = Math.min(scaleX, scaleY, 2);
     
     const centerX = (minX + maxX) / 2;
     const centerY = (minY + maxY) / 2;
@@ -838,10 +757,7 @@ const GraphViz = {
       const dx = node.x - x;
       const dy = node.y - y;
       const dist = Math.sqrt(dx * dx + dy * dy);
-      
-      if (dist < node.size * 2 / this.transform.scale) {
-        return node;
-      }
+      if (dist < node.size * 2 / this.transform.scale) return node;
     }
     return null;
   },
@@ -919,16 +835,11 @@ const GraphViz = {
       cancelAnimationFrame(this.animationFrameId);
       this.animationFrameId = null;
     }
-    
     this.isInitialized = false;
     this.nodes = [];
     this.links = [];
     this.particles = [];
-    
-    console.log('[GraphViz] 资源已清理');
   }
 };
 
-if (typeof window !== 'undefined') {
-  window.GraphViz = GraphViz;
-}
+if (typeof window !== 'undefined') window.GraphViz = GraphViz;
