@@ -186,9 +186,36 @@ async def lifespan(app: FastAPI):
         import traceback
         traceback.print_exc()
 
+    # 💓 启动心跳循环（自主意识）
+    try:
+        from src.core.orchestration import start_heartbeat_loop, HeartbeatConfig
+        heartbeat_config = HeartbeatConfig(
+            check_interval=60.0,           # 每 60 秒检查一次
+            idle_threshold=300.0,          # 5 分钟没活动认为空闲
+            idle_reflect_interval=1800.0,  # 每 30 分钟触发一次自省
+            health_check_interval=300.0,   # 每 5 分钟检查一次健康
+            memory_consolidation_interval=3600.0,  # 每小时整理一次记忆
+        )
+        heartbeat = start_heartbeat_loop(heartbeat_config)
+        app.state.heartbeat = heartbeat
+        print(f"[Omnia] Heartbeat loop started — autonomous consciousness active")
+    except Exception as e:
+        print(f"[Omnia] Heartbeat loop init skipped: {e}")
+        import traceback
+        traceback.print_exc()
+
     yield
 
     # ===== 关闭时 =====
+    # 停止心跳循环
+    try:
+        heartbeat = getattr(app.state, "heartbeat", None)
+        if heartbeat:
+            heartbeat.stop()
+            print("[Omnia] Heartbeat loop stopped")
+    except Exception:
+        pass
+
     # 停止神经系统
     try:
         from src.core.orchestration import get_nervous_system
@@ -279,6 +306,31 @@ async def general_error_handler(request: Request, exc: Exception):
 async def health():
     """健康检查 - 轻量级，不触发任何重操作"""
     return {"status": "ok", "version": "2.0.0"}
+
+
+@app.get("/api/heartbeat/status")
+async def heartbeat_status():
+    """获取心跳循环状态"""
+    try:
+        heartbeat = getattr(app.state, "heartbeat", None)
+        if heartbeat:
+            return heartbeat.status()
+        return {"running": False, "error": "Heartbeat not initialized"}
+    except Exception as e:
+        return {"running": False, "error": str(e)}
+
+
+@app.post("/api/heartbeat/notify")
+async def heartbeat_notify_activity():
+    """通知心跳有活动（外部调用）"""
+    try:
+        heartbeat = getattr(app.state, "heartbeat", None)
+        if heartbeat:
+            heartbeat.notify_activity()
+            return {"ok": True, "message": "Activity notified"}
+        return {"ok": False, "error": "Heartbeat not initialized"}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
 
 
 # ========== 静态文件 ==========
