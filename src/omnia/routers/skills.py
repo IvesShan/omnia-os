@@ -362,3 +362,60 @@ async def delete_skill(skill_id: str):
     del _generated_skills[skill_id]
     
     return {"ok": True, "message": f"Skill {skill_id} deleted"}
+
+
+# ============== 自进化闭环 API ==============
+
+@router.get("/evolution/status")
+async def get_evolution_status():
+    """获取自进化闭环状态"""
+    try:
+        from src.core.orchestration.nervous_system import get_evolution_status
+        ns_status = get_evolution_status()
+    except ImportError:
+        ns_status = {"started": False, "error": "NervousSystem not available"}
+
+    return {
+        "available": SKILL_FORGE_AVAILABLE,
+        "nervous_system": ns_status,
+        "stats": _evolution_stats,
+        "feature_flag": "CORE_SELF_EVOLUTION",
+    }
+
+
+@router.post("/evolution/trigger")
+async def trigger_evolution():
+    """手动触发自进化周期"""
+    if not SKILL_FORGE_AVAILABLE:
+        raise HTTPException(status_code=503, detail="SkillForge module not available")
+
+    try:
+        from src.core.orchestration.event_bus import EventBus
+        bus = EventBus.get()
+        bus.emit("evolution.check", {
+            "trigger": "manual",
+        }, source="api")
+
+        return {
+            "ok": True,
+            "message": "Evolution cycle triggered via EventBus",
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to trigger evolution: {str(e)}")
+
+
+@router.get("/evolution/history")
+async def get_evolution_history():
+    """获取进化历史"""
+    try:
+        import json
+        from pathlib import Path
+
+        history_file = Path.home() / ".openclaw" / "workspace" / "omnia-os" / ".omnia" / "evolution_history.json"
+        if history_file.exists():
+            data = json.loads(history_file.read_text(encoding="utf-8"))
+            return {"ok": True, "history": data}
+        else:
+            return {"ok": True, "history": None, "message": "No evolution history found"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to read evolution history: {str(e)}")

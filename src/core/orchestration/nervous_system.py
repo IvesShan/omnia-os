@@ -50,6 +50,7 @@ class NervousSystem:
         self._register_memory_reactions()
         self._register_graph_reactions()
         self._register_idle_watcher()
+        self._register_evolution_reactions()  # 新增：自进化反应
 
         self._started = True
         self.bus.emit("system.startup", source="nervous_system")
@@ -185,6 +186,92 @@ class NervousSystem:
             except Exception as e:
                 logger.debug(f"[NervousSystem] Self-reflection skipped: {e}")
 
+    # ─── 5. 自进化反应 ──────────────────────────────────────────────
+
+    def _register_evolution_reactions(self):
+        """连接 SkillForge 到 EventBus，实现自进化闭环"""
+
+        self._evolution_signal_count = 0
+        self._last_evolution_run = 0.0
+
+        @self.bus.on("chat.completed", priority=10)
+        def accumulate_evolution_signal(event: Event):
+            """每次对话完成 → 累积进化信号"""
+            self._evolution_signal_count += 1
+
+            # 每 20 次对话触发一次进化检查
+            if self._evolution_signal_count >= 20:
+                now = time.time()
+                # 至少间隔 1 小时
+                if now - self._last_evolution_run >= 3600:
+                    self.bus.emit("evolution.check", {
+                        "signal_count": self._evolution_signal_count,
+                    }, source="nervous_system")
+                    self._evolution_signal_count = 0
+
+        @self.bus.on("system.idle", priority=10)
+        def idle_evolution_check(event: Event):
+            """系统空闲 → 触发进化检查"""
+            now = time.time()
+            # 至少间隔 2 小时
+            if now - self._last_evolution_run >= 7200:
+                idle_seconds = event.data.get("idle_seconds", 0)
+                if idle_seconds >= 600:  # 空闲 10 分钟以上
+                    self.bus.emit("evolution.check", {
+                        "trigger": "idle",
+                        "idle_seconds": idle_seconds,
+                    }, source="nervous_system")
+
+        @self.bus.on("evolution.check", priority=50)
+        def run_evolution_cycle(event: Event):
+            """进化检查 → 运行 SelfEvolutionEngine"""
+            try:
+                from ..feature.flags import FeatureFlags as FF
+                if not FF.is_enabled("CORE_SELF_EVOLUTION"):
+                    logger.debug("[NervousSystem] Self-evolution disabled")
+                    return
+
+                from ..skill_forge import SelfEvolutionEngine
+                import asyncio
+
+                engine = SelfEvolutionEngine()
+
+                # 在后台线程中运行进化循环
+                def _run():
+                    try:
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                        result = loop.run_until_complete(
+                            engine.run_evolution_cycle()
+                        )
+                        self._last_evolution_run = time.time()
+
+                        # 发布进化完成事件
+                        self.bus.emit("evolution.completed", {
+                            "cycle_id": result.cycle_id,
+                            "patterns_found": len(result.patterns_found),
+                            "skills_approved": len(result.skills_approved),
+                            "skills_rejected": len(result.skills_rejected),
+                        }, source="nervous_system")
+
+                        logger.info(
+                            f"[NervousSystem] Evolution cycle completed: "
+                            f"{len(result.skills_approved)} skills approved"
+                        )
+                    except Exception as e:
+                        logger.error(f"[NervousSystem] Evolution failed: {e}")
+                    finally:
+                        loop.close()
+
+                import threading
+                thread = threading.Thread(target=_run, daemon=True)
+                thread.start()
+
+                logger.info("[NervousSystem] Evolution cycle started in background")
+
+            except Exception as e:
+                logger.error(f"[NervousSystem] Evolution trigger failed: {e}")
+
 
 # ─── 模块级单例 ─────────────────────────────────────────────────
 
@@ -202,3 +289,12 @@ def start_nervous_system():
     ns = get_nervous_system()
     ns.start()
     return ns
+
+def get_evolution_status() -> dict:
+    """获取自进化状态"""
+    ns = get_nervous_system()
+    return {
+        "started": ns._started,
+        "evolution_signal_count": getattr(ns, '_evolution_signal_count', 0),
+        "last_evolution_run": getattr(ns, '_last_evolution_run', 0),
+    }

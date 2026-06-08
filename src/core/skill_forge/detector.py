@@ -1,19 +1,24 @@
 """Skill Forge — Pattern Detector
 
-Scans memory markdown files for repeated task patterns.
+Scans memory markdown files AND MemoryPalace SQLite for repeated task patterns.
 Uses lightweight keyword bucketing instead of heavy NLP.
+
+v0.2: 增强版 — 读取 MemoryPalace 关系记忆 + NeuralGraph 图谱
 """
 
 from __future__ import annotations
 
 import json
+import logging
 import re
+import sqlite3
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
+logger = logging.getLogger(__name__)
 
 ACTION_VERBS = [
     "创建了", "修复了", "部署了", "更新了", "生成了", "转换了",
@@ -72,18 +77,20 @@ class DetectedPattern:
 
 
 class PatternDetector:
-    """Lightweight pattern scanner for memory markdown files."""
+    """Lightweight pattern scanner for memory markdown files + MemoryPalace SQLite."""
 
     def __init__(
         self,
         memory_dir: str | Path = "memory",
         lookback_days: int = 14,
         min_evidence: int = 3,
+        memory_db: Optional[str] = None,  # MemoryPalace SQLite path
     ):
         self.memory_dir = Path(memory_dir)
         self.lookback_days = lookback_days
         self.min_evidence = min_evidence
         self.cutoff = datetime.now() - timedelta(days=lookback_days)
+        self.memory_db = memory_db
 
     def _list_files(self) -> List[Path]:
         """List memory markdown files within the lookback window."""
@@ -125,7 +132,8 @@ class PatternDetector:
         return None
 
     def detect(self) -> List[DetectedPattern]:
-        """Scan memory and return patterns with sufficient evidence."""
+        """Scan memory markdown files AND MemoryPalace SQLite for patterns."""
+        # 1. 扫描 markdown 文件（原有逻辑）
         files = self._list_files()
         bucket_evidence: Dict[str, List[str]] = defaultdict(list)
 
@@ -135,6 +143,9 @@ class PatternDetector:
                 bucket_id = self._classify_line(line)
                 if bucket_id:
                     bucket_evidence[bucket_id].append(line)
+
+        # 2. 扫描 MemoryPalace SQLite（新增）
+        self._scan_memory_palace(bucket_evidence)
 
         results: List[DetectedPattern] = []
         for bucket_id, bucket_name, keywords in BUCKETS:
@@ -177,6 +188,184 @@ class PatternDetector:
             ensure_ascii=False,
             indent=2,
         )
+
+    # ─── MemoryPalace 增强 ─────────────────────────────────────────
+
+    def _scan_memory_palace(self, bucket_evidence: Dict[str, List[str]]):
+        """从 MemoryPalace SQLite 中提取行为模式证据。
+
+        读取 facts + relations + conversation_logs 表，提取用户的行为模式。
+        """
+        db_path = self._find_memory_db()
+        if not db_path:
+            logger.debug("[PatternDetector] MemoryPalace DB not found, skipping")
+            return
+
+        try:
+            conn = sqlite3.connect(str(db_path))
+            cursor = conn.cursor()
+
+            # 检查有哪些表
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+            tables = {row[0] for row in cursor.fetchall()}
+
+            # 1. 从 facts 表提取（key/value 结构）
+            if "facts" in tables:
+                cutoff_iso = self.cutoff.isoformat()
+                cursor.execute(
+                    """
+                    SELECT key, value, category, created_at
+                    FROM facts
+                    WHERE created_at >= ?
+                    ORDER BY created_at DESC
+                    LIMIT 200
+                    """,
+                    (cutoff_iso,),
+                )
+
+                rows = cursor.fetchall()
+                for key, value, category, created_at in rows:
+                    if not value:
+                        continue
+
+                    # 从 value 中提取行动线索
+                    for line in value.split("\n"):
+                        line = line.strip()
+                        if not line:
+                            continue
+
+                        # 清理 markdown 标记
+                        line = re.sub(r"^[-*#\s]+", "", line).strip()
+
+                        # 检查是否匹配已知模式
+                        bucket_id = self._classify_line(line)
+                        if bucket_id:
+                            bucket_evidence[bucket_id].append(
+                                f"[MemoryPalace:facts:{category}] {line}"
+                            )
+
+                    # 也检查 key
+                    bucket_id = self._classify_line(key)
+                    if bucket_id:
+                        bucket_evidence[bucket_id].append(
+                            f"[MemoryPalace:facts:key] {key}"
+                        )
+
+                logger.info(f"[PatternDetector] Scanned {len(rows)} facts entries")
+
+            # 2. 从 relations 表提取（subject/predicate/object 结构）
+            if "relations" in tables:
+                cutoff_iso = self.cutoff.isoformat()
+                cursor.execute(
+                    """
+                    SELECT subject, predicate, object, context, created_at
+                    FROM relations
+                    WHERE created_at >= ?
+                    ORDER BY created_at DESC
+                    LIMIT 200
+                    """,
+                    (cutoff_iso,),
+                )
+
+                rows = cursor.fetchall()
+                for subject, predicate, obj, context, created_at in rows:
+                    # 从 subject + predicate + object 中提取行动线索
+                    relation_text = f"{subject} {predicate} {obj}"
+                    bucket_id = self._classify_line(relation_text)
+                    if bucket_id:
+                        bucket_evidence[bucket_id].append(
+                            f"[MemoryPalace:relation] {relation_text}"
+                        )
+
+                    # 也检查 context
+                    if context:
+                        bucket_id = self._classify_line(context)
+                        if bucket_id:
+                            bucket_evidence[bucket_id].append(
+                                f"[MemoryPalace:relation:context] {context}"
+                            )
+
+                logger.info(f"[PatternDetector] Scanned {len(rows)} relations entries")
+
+            # 3. 从 conversation_logs 表提取
+            if "conversation_logs" in tables:
+                cutoff_iso = self.cutoff.isoformat()
+                cursor.execute(
+                    """
+                    SELECT content, metadata, created_at
+                    FROM conversation_logs
+                    WHERE created_at >= ?
+                    ORDER BY created_at DESC
+                    LIMIT 300
+                    """,
+                    (cutoff_iso,),
+                )
+
+                rows = cursor.fetchall()
+                for content, metadata_json, created_at in rows:
+                    if not content:
+                        continue
+
+                    # 尝试解析 JSON
+                    try:
+                        meta = json.loads(metadata_json) if metadata_json else {}
+                    except (json.JSONDecodeError, TypeError):
+                        meta = {}
+
+                    # 从 content 中提取行动线索
+                    for line in content.split("\n"):
+                        line = line.strip()
+                        if not line:
+                            continue
+
+                        line = re.sub(r"^[-*#\s]+", "", line).strip()
+                        bucket_id = self._classify_line(line)
+                        if bucket_id:
+                            bucket_evidence[bucket_id].append(
+                                f"[MemoryPalace:conv] {line}"
+                            )
+
+                    # 从 metadata 中提取工具调用模式
+                    tool_calls = meta.get("tool_calls", [])
+                    if isinstance(tool_calls, list):
+                        for tc in tool_calls:
+                            if isinstance(tc, dict):
+                                tool_name = tc.get("name", "")
+                                if tool_name:
+                                    bucket_id = self._classify_line(tool_name)
+                                    if bucket_id:
+                                        bucket_evidence[bucket_id].append(
+                                            f"[ToolCall] {tool_name}"
+                                        )
+
+                logger.info(f"[PatternDetector] Scanned {len(rows)} conversation_logs entries")
+
+            conn.close()
+
+        except Exception as e:
+            logger.warning(f"[PatternDetector] MemoryPalace scan failed: {e}")
+
+    def _find_memory_db(self) -> Optional[Path]:
+        """查找 MemoryPalace SQLite 数据库文件"""
+        if self.memory_db:
+            return Path(self.memory_db)
+
+        # 常见位置
+        candidates = [
+            Path.home() / ".openclaw" / "workspace" / "omnia-os" / ".omnia" / "memory.db",
+            Path.home() / ".openclaw" / "workspace" / "omnia-os" / "memory.db",
+            Path("memory.db"),
+            Path(".omnia/memory.db"),
+            # MemoryPalace 数据库
+            Path.home() / ".openclaw" / "workspace" / "omnia-os" / "data" / "memory_palace.db",
+            Path("data/memory_palace.db"),
+        ]
+
+        for candidate in candidates:
+            if candidate.exists():
+                return candidate
+
+        return None
 
 
 if __name__ == "__main__":

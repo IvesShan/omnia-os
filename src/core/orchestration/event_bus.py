@@ -138,6 +138,11 @@ class EventBus:
             # 用户
             "user.active",
             "user.idle",
+            # 自进化
+            "evolution.check",
+            "evolution.completed",
+            "evolution.skill_approved",
+            "evolution.skill_rejected",
     }
 
     @classmethod
