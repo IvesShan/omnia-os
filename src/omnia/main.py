@@ -176,9 +176,28 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"[Omnia] Auto memory init skipped: {e}")
 
+    # 🧠 启动神经系统（EventBus + 自主行为引擎）
+    try:
+        from src.core.orchestration import start_nervous_system
+        ns = start_nervous_system()
+        print(f"[Omnia] Nervous system started — autonomous reflexes active")
+    except Exception as e:
+        print(f"[Omnia] Nervous system init skipped: {e}")
+        import traceback
+        traceback.print_exc()
+
     yield
 
     # ===== 关闭时 =====
+    # 停止神经系统
+    try:
+        from src.core.orchestration import get_nervous_system
+        ns = get_nervous_system()
+        ns.stop()
+        print("[Omnia] Nervous system stopped")
+    except Exception:
+        pass
+
     # 清理 MCP 子进程
     try:
         mcp_manager = getattr(app.state, "mcp_manager", None)

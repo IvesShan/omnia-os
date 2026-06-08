@@ -23,6 +23,7 @@ from omnia.tool_optimizer import ToolExecutionOptimizer, ParallelToolExecutor
 from src.core.actuator.tool_executor import ToolCallExecutor
 from src.core.actuator.tool_registry import TOOLS_SCHEMA
 from src.core.memory_palace.memory_palace import MemoryPalace
+from src.core.orchestration.event_bus import EventBus
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 MAX_TOOL_ITERATIONS = 50  # 提高上限，长任务由 LongTaskHandler 处理
@@ -138,6 +139,14 @@ async def stream_chat(message: str, history: list = None, provider: str = None) 
     # 记录用户消息
     import uuid
     session_id = str(uuid.uuid4())
+    
+    # 🔌 发布对话开始事件
+    bus = EventBus.get()
+    bus.emit("chat.started", {
+        "message": message,
+        "session_id": session_id,
+    }, source="stream_chat")
+    
     try:
         mp = MemoryPalace(db_path=str(settings.memory_palace_db))
         mp.initialize()
@@ -267,6 +276,13 @@ async def _stream_chat_unified(
                     yield "data: " + json.dumps({'type': 'status', 'message': '⚠️ 检测到循环: {} 重复调用'.format(last['name'])}) + "\n\n"
                     yield "data: " + json.dumps({'type': 'error', 'message': loop_msg}) + "\n\n"
                     done_msg = full_content + "\n\n⚠️ 执行中断：{}。建议换用其他方法解决问题。".format(loop_msg)
+                    # 🔌 发布对话完成事件（循环中断）
+                    EventBus.get().emit("chat.completed", {
+                        "message": message,
+                        "response": done_msg,
+                        "session_id": session_id,
+                        "status": "loop_detected",
+                    }, source="stream_chat")
                     yield "data: " + json.dumps({'type': 'done', 'full_content': done_msg}) + "\n\n"
                     return
             
@@ -555,6 +571,15 @@ async def _stream_chat_unified(
                         mp.log_conversation(session_id, 1, "assistant", full_content)
                     except Exception as e:
                         print(f"[stream_chat] Failed to log assistant reply: {e}")
+                # 🔌 发布对话完成事件（正常完成）
+                EventBus.get().emit("chat.completed", {
+                    "message": message,
+                    "response": full_content,
+                    "session_id": session_id,
+                    "status": "completed",
+                    "iterations": iteration,
+                    "tool_calls_count": len(execution_history),
+                }, source="stream_chat")
                 yield f"data: {json.dumps({'type': 'done', 'full_content': full_content})}\n\n"
                 return
             
@@ -575,6 +600,14 @@ async def _stream_chat_unified(
                         mp.log_conversation(session_id, 1, "assistant", full_content)
                     except Exception as e:
                         print(f"[stream_chat] Failed to log assistant reply: {e}")
+                # 🔌 发布对话完成事件（纯文本回复）
+                EventBus.get().emit("chat.completed", {
+                    "message": message,
+                    "response": full_content,
+                    "session_id": session_id,
+                    "status": "completed",
+                    "iterations": iteration,
+                }, source="stream_chat")
                 yield f"data: {json.dumps({'type': 'done', 'full_content': full_content})}\n\n"
                 return
             
@@ -655,4 +688,14 @@ async def _stream_chat_unified(
         assistant_reply = ""
     
     # 达到最大迭代次数
-    yield f"data: {json.dumps({'type': 'done', 'full_content': full_content + '\n\n⚠️ 已达到最大迭代次数，任务可能未完全完成。'})}\n\n"
+    timeout_msg = full_content + '\n\n⚠️ 已达到最大迭代次数，任务可能未完全完成。'
+    # 🔌 发布对话完成事件（超时）
+    EventBus.get().emit("chat.completed", {
+        "message": message,
+        "response": timeout_msg,
+        "session_id": session_id,
+        "status": "max_iterations",
+        "iterations": iteration,
+        "tool_calls_count": len(execution_history),
+    }, source="stream_chat")
+    yield f"data: {json.dumps({'type': 'done', 'full_content': timeout_msg})}\n\n"
