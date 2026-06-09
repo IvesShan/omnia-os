@@ -93,11 +93,7 @@ class EvolutionBridge:
         self._running = False
         self._evolution_lock = threading.Lock()
         
-        # 反馈记录
-        self._feedback: Dict[str, EvolutionFeedback] = {}
-        self._load_feedback()
-        
-        # 统计
+        # 统计（必须在 _load_feedback 之前，因为 _load_feedback 会更新 stats）
         self.stats = {
             "total_cycles": 0,
             "total_patterns_detected": 0,
@@ -105,6 +101,10 @@ class EvolutionBridge:
             "total_skills_approved": 0,
             "total_signals_received": 0,
         }
+        
+        # 反馈记录
+        self._feedback: Dict[str, EvolutionFeedback] = {}
+        self._load_feedback()
     
     def start(self):
         """启动进化桥梁，注册事件监听"""
@@ -402,3 +402,26 @@ def start_evolution_bridge(
     )
     _evolution_bridge.start()
     return _evolution_bridge
+
+
+def sync_memory():
+    """同步 Skill Forge 状态到 Memory Palace"""
+    import json
+    from pathlib import Path
+    from datetime import datetime
+    
+    bridge = get_evolution_bridge()
+    stats = bridge.stats
+    
+    # Save stats to .ommia directory
+    omnia_dir = Path(__file__).parent.parent.parent.parent / "skills" / ".ommia"
+    omnia_dir.mkdir(parents=True, exist_ok=True)
+    
+    stats_file = omnia_dir / "forge_stats.json"
+    stats_file.write_text(json.dumps(stats, indent=2, ensure_ascii=False, default=str))
+    
+    return {
+        "ok": True,
+        "stats": stats,
+        "timestamp": datetime.now().isoformat(),
+    }

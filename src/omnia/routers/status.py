@@ -77,18 +77,44 @@ def _memory_counts() -> dict:
 
 
 def _skills_summary() -> dict:
-    """递归统计所有技能"""
+    """统计所有技能（按目录分层，避免重复计数）"""
+    skills_path = settings.project_root / "skills"
+    if not skills_path.exists():
+        return {"total": 0, "auto_forged": 0}
+
+    exclude_dirs = {
+        "imported", "auto-forge", ".omnia", ".git", "__pycache__",
+        "node_modules", "auto-forge-miaoxiujiang-dev", "auto-forge-system-fix",
+    }
     total = 0
     auto_forged = 0
-    
-    for base_dir in [settings.project_root / "skills", settings.project_root / ".tmp_skills"]:
-        if base_dir.exists():
-            for skill_md in base_dir.rglob("SKILL.md"):
-                skill_dir = skill_md.parent
+
+    # 1) imported 技能
+    imported_dir = skills_path / "imported"
+    if imported_dir.exists():
+        for d in imported_dir.iterdir():
+            if d.is_dir() and (d / "SKILL.md").exists():
                 total += 1
-                if "auto-forge" in skill_dir.name or skill_dir.name.startswith("auto-forge"):
-                    auto_forged += 1
-    
+
+    # 2) auto-forge 技能（标记为自动锻造）
+    forge_dir = skills_path / "auto-forge"
+    if forge_dir.exists():
+        for d in forge_dir.iterdir():
+            if d.is_dir() and (d / "SKILL.md").exists():
+                total += 1
+                auto_forged += 1
+
+    # 3) 根级技能（排除 imported/auto-forge 等系统目录）
+    for d in skills_path.iterdir():
+        if d.is_dir() and d.name not in exclude_dirs and (d / "SKILL.md").exists():
+            total += 1
+
+    # 4) .tmp_skills 临时技能
+    tmp_dir = settings.project_root / ".tmp_skills"
+    if tmp_dir.exists():
+        for skill_md in tmp_dir.rglob("SKILL.md"):
+            total += 1
+
     return {"total": total, "auto_forged": auto_forged}
 
 

@@ -27,6 +27,8 @@ from .evolution_bridge import (
     EvolutionFeedback,
     get_evolution_bridge,
     start_evolution_bridge,
+    sync_memory,
+    sync_memory,
 )
 
 __all__ = [
@@ -47,6 +49,7 @@ __all__ = [
     "EvolutionFeedback",
     "get_evolution_bridge",
     "start_evolution_bridge",
+    "sync_memory",
 ]
 
 # Export EvolutionScheduler
