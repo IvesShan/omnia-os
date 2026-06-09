@@ -102,33 +102,65 @@ def get_memory_stats() -> Dict[str, int]:
     return stats
 
 def scan_skills() -> List[Dict]:
-    """扫描已安装技能"""
+    """扫描已安装技能（精确统计）"""
     skills = []
+    seen_ids = set()
     
-    # 扫描 imported
-    imported_path = SKILLS_PATH / "imported"
-    if imported_path.exists():
-        for skill_dir in imported_path.iterdir():
-            if skill_dir.is_dir():
-                skill_file = skill_dir / "SKILL.md"
-                skills.append({
-                    "name": skill_dir.name,
-                    "path": str(skill_dir),
-                    "type": "imported",
-                    "enabled": True
-                })
+    # 1. 加载 active_skills.json 获取真实状态
+    active_skills_config = load_json_file(SKILLS_PATH / ".omnia" / "active_skills.json")
+    active_ids = {s["id"] for s in active_skills_config.get("active_skills", [])}
+    inactive_ids = {s["id"] for s in active_skills_config.get("inactive_skills", [])}
+    on_demand_ids = {s["id"] for s in active_skills_config.get("on_demand_skills", [])}
     
-    # 扫描 auto-forge
-    auto_forge_path = SKILLS_PATH / "auto-forge"
-    if auto_forge_path.exists():
-        for skill_dir in auto_forge_path.iterdir():
-            if skill_dir.is_dir():
-                skills.append({
-                    "name": skill_dir.name,
-                    "path": str(skill_dir),
-                    "type": "auto-forge",
-                    "enabled": True
-                })
+    def _scan_dir(base_path: Path, skill_type: str):
+        """扫描目录中的技能"""
+        if not base_path.exists():
+            return
+        for skill_dir in base_path.iterdir():
+            if not skill_dir.is_dir():
+                continue
+            skill_id = skill_dir.name
+            if skill_id in seen_ids:
+                continue
+            
+            # 检查是否有 SKILL.md
+            has_skill_md = (skill_dir / "SKILL.md").exists()
+            
+            # 确定状态
+            if skill_id in active_ids:
+                status = "active"
+            elif skill_id in inactive_ids:
+                status = "inactive"
+            elif skill_id in on_demand_ids:
+                status = "on_demand"
+            elif has_skill_md:
+                status = "unregistered"  # 有 SKILL.md 但未注册
+            else:
+                status = "incomplete"  # 没有 SKILL.md
+            
+            seen_ids.add(skill_id)
+            skills.append({
+                "id": skill_id,
+                "name": skill_id.replace("-", " ").replace("_", " ").title(),
+                "path": str(skill_dir),
+                "type": skill_type,
+                "status": status,
+                "has_skill_md": has_skill_md,
+                "enabled": status == "active"
+            })
+    
+    # 2. 扫描 imported/
+    _scan_dir(SKILLS_PATH / "imported", "imported")
+    
+    # 3. 扫描 auto-forge/
+    _scan_dir(SKILLS_PATH / "auto-forge", "auto-forge")
+    
+    # 4. 扫描 skills/ 根目录下的散落目录（排除 imported/ auto-forge/ .ommia/）
+    exclude_dirs = {"imported", "auto-forge", ".ommia", ".git", "__pycache__", "node_modules"}
+    if SKILLS_PATH.exists():
+        for item in SKILLS_PATH.iterdir():
+            if item.is_dir() and item.name not in exclude_dirs:
+                _scan_dir(item, "local")
     
     return skills
 
@@ -140,10 +172,14 @@ async def get_status():
     stats = get_memory_stats()
     skills = scan_skills()
     
+    # 精确统计：只计算真正的技能（排除 incomplete）
+    valid_skills = [s for s in skills if s["status"] != "incomplete"]
+    active_skills = [s for s in skills if s["status"] == "active"]
+    
     return SystemStatus(
         status="running",
         memory_count=sum(stats.values()),
-        skills_count=len(skills),
+        skills_count=len(active_skills),  # 只显示已激活的技能数
         last_activity=datetime.now().isoformat()
     )
 
@@ -331,8 +367,27 @@ async def delete_memory(layer: str, key: str, source: str = "default"):
 
 @app.get("/api/skills")
 async def get_skills():
-    """获取所有技能"""
-    return {"skills": scan_skills()}
+    """获取所有技能（精确统计）"""
+    skills = scan_skills()
+    
+    # 分类统计
+    by_status = {}
+    for s in skills:
+        status = s["status"]
+        by_status[status] = by_status.get(status, 0) + 1
+    
+    return {
+        "skills": skills,
+        "total": len(skills),
+        "by_status": by_status,
+        "summary": {
+            "active": by_status.get("active", 0),
+            "inactive": by_status.get("inactive", 0),
+            "on_demand": by_status.get("on_demand", 0),
+            "unregistered": by_status.get("unregistered", 0),
+            "incomplete": by_status.get("incomplete", 0)
+        }
+    }
 
 @app.get("/api/logs")
 async def get_logs(lines: int = 100):
