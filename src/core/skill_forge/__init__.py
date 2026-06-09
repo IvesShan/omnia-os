@@ -22,6 +22,12 @@ from .auto_evolution import (
     run_background_evolution,
     start_evolution_daemon,
 )
+from .evolution_bridge import (
+    EvolutionBridge,
+    EvolutionFeedback,
+    get_evolution_bridge,
+    start_evolution_bridge,
+)
 
 __all__ = [
     # Core components
@@ -36,6 +42,11 @@ __all__ = [
     "EvolutionResult",
     "run_background_evolution",
     "start_evolution_daemon",
+    # Evolution bridge
+    "EvolutionBridge",
+    "EvolutionFeedback",
+    "get_evolution_bridge",
+    "start_evolution_bridge",
 ]
 
 # Export EvolutionScheduler

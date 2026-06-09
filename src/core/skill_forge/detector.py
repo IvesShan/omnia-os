@@ -350,19 +350,23 @@ class PatternDetector:
         if self.memory_db:
             return Path(self.memory_db)
 
-        # 常见位置
+        # 按优先级查找：生产数据库 > 项目数据库 > 旧数据库
         candidates = [
-            Path.home() / ".openclaw" / "workspace" / "omnia-os" / ".omnia" / "memory.db",
-            Path.home() / ".openclaw" / "workspace" / "omnia-os" / "memory.db",
+            # 生产数据库（最高优先级）
+            Path.home() / ".omnia" / "memory_palace.db",
+            # 项目数据库
+            Path("data/memory_palace.db"),
             Path("memory.db"),
             Path(".omnia/memory.db"),
-            # MemoryPalace 数据库
+            # 旧数据库
+            Path.home() / ".openclaw" / "workspace" / "omnia-os" / ".omnia" / "memory.db",
+            Path.home() / ".openclaw" / "workspace" / "omnia-os" / "memory.db",
             Path.home() / ".openclaw" / "workspace" / "omnia-os" / "data" / "memory_palace.db",
-            Path("data/memory_palace.db"),
         ]
 
         for candidate in candidates:
             if candidate.exists():
+                logger.info(f"[PatternDetector] Found memory DB: {candidate}")
                 return candidate
 
         return None

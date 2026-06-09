@@ -204,9 +204,33 @@ async def lifespan(app: FastAPI):
         import traceback
         traceback.print_exc()
 
+    # 🧬 启动自进化闭环（EvolutionBridge）
+    try:
+        from src.core.skill_forge import start_evolution_bridge
+        memory_db = str(Path.home() / ".omnia" / "memory_palace.db")
+        evolution_bridge = start_evolution_bridge(
+            event_bus=None,  # 使用全局 EventBus
+            memory_db=memory_db,
+        )
+        app.state.evolution_bridge = evolution_bridge
+        print(f"[Omnia] Evolution bridge started — self-evolution loop active")
+    except Exception as e:
+        print(f"[Omnia] Evolution bridge init skipped: {e}")
+        import traceback
+        traceback.print_exc()
+
     yield
 
     # ===== 关闭时 =====
+    # 停止进化桥梁
+    try:
+        bridge = getattr(app.state, "evolution_bridge", None)
+        if bridge:
+            bridge.stop()
+            print("[Omnia] Evolution bridge stopped")
+    except Exception:
+        pass
+
     # 停止心跳循环
     try:
         heartbeat = getattr(app.state, "heartbeat", None)
@@ -346,6 +370,7 @@ if static_dir.exists():
 
 from src.omnia.routers import provider, chat, memory, graph, status, workflow, feishu
 from src.omnia.routers import swarm, scheduler, skills
+from src.omnia.routers import evolution  # 新增：自进化 API
 from src.omnia.routers import computer, interrupt, wake
 from src.omnia.routers import confirm, ide, model_status
 from src.omnia.routers import discuss, long_task, fts
@@ -412,6 +437,7 @@ app.include_router(scheduler.router, tags=["scheduler"])
 
 # SkillForge 技能锻造
 app.include_router(skills.router, tags=["skills"])
+app.include_router(evolution.router, tags=["evolution"])  # 自进化 API
 
 # AutoLearner 自动学习
 app.include_router(learner.router, tags=["learner"])
