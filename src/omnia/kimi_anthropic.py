@@ -10,7 +10,7 @@ def call_kimi_anthropic(
     api_key: str, 
     messages: List[Dict[str, Any]], 
     tools: Optional[List[Dict]] = None, 
-    model: str = "kimi-code",
+    model: str = "k3",
     enable_caching: bool = True
 ) -> Dict[str, Any]:
     """使用 Anthropic Messages API 格式调用 Kimi，支持 Prompt Caching

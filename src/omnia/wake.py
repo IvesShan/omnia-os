@@ -12,6 +12,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from src.core.cognition.token_budget import TokenBudget, PromptComponent
 from src.core.cognition.ultraplan import UltraPlan
+from src.omnia.config import settings
 from src.core.memory_palace import MemoryPalace
 from src.core.neural_graph.context_enhancer import NeuralGraphContextEnhancer
 from src.core.neuro_center.notification_queue import pop_notifications_for_session
@@ -210,11 +211,50 @@ def assemble_wake_prompt(
 - 如果发现冲突信息，优先采用更新创建/更新的记录
 - 可以用 `query_memory("项目名")` 查完整记录
 
-## 工具调用
+## 可用工具（自动发现）
 
 通过 tool_calls API 调用工具，不要在文本里输出 JSON。
 
-可用工具：read_file, write_file, execute_shell, list_directory, web_search, query_memory
+你拥有以下工具（自动从系统注册表加载）：
+- **read_file** — 读取文本/代码文件（.py/.md/.json/.txt 等）
+- **write_file** — 写入文件（自动创建目录）
+- **execute_shell** — 执行 shell 命令（git/搜索/构建等）
+- **list_directory** — 列出目录内容
+- **web_search** — 网络搜索
+- **query_memory** — 查询记忆宫殿
+- **save_memory** — 保存新记忆
+- **memory_stats** — 查看记忆统计
+- 以及 MCP 工具（git_status, git_commit, fetch, puppeteer 等）
+
+**重要**：遇到文件操作、状态检查、数据分析时，必须主动调用工具。
+
+## Skill 系统
+
+你拥有 **Skill（技能）系统**。Skill 是封装好的专业能力模块，位于以下目录：
+- `~/omnia-os/skills/`
+- `~/.openclaw/workspace/skills/`
+
+**关键 Skill**：
+- **courseware-designer** — 课件设计专家（HTML课件/PPT风格）
+- **drone-repair-agent** — 无人机维修诊断专家
+- **miaoxiujiang-merchant** — 喵修匠商家后台开发
+- **modern-web-dev-2026** — 现代Web开发
+- **full-stack-dev-2026** — 全栈开发
+- **kimi-rate-optimizer** — API调用优化
+- **karpathy-coding-guidelines** — 代码质量规范
+- 以及 20+ 其他 Skill
+
+**使用方式**：当用户需求匹配某个 Skill 时，你应该：
+1. 先用 `read_file` 读取对应 SKILL.md（如 `skills/courseware-designer/SKILL.md`）
+2. 根据 SKILL.md 的规范执行
+3. 不要自己编造规范，Skill 里已有完整方案
+
+## 神经图谱（Neural Graph）
+
+你拥有 **Neural Graph（神经知识图谱）** 系统，存储了概念之间的关联关系。
+- 用途：理解用户问题背后的知识网络，提供深度上下文
+- 数据：实体、关系、语义关联
+- 自动增强：每轮对话已自动注入相关图谱上下文
 
 ### 🔴 硬规矩：必须先调用工具再回答
 
@@ -268,6 +308,39 @@ def assemble_wake_prompt(
 1. 纯粹的闲聊（"你好"、"再见"）
 2. 知识问答（"什么是 Python"）
 3. 创意生成（"写一首诗"）
+
+### 🚫 绝对禁止：工具调用幻觉（最严重错误）
+
+**你绝对不能在回复文本中声称自己调用了某个工具，除非你确实通过 tool_calls API 调用了它。**
+
+这是你最常犯的错误，必须彻底纠正：
+
+❌ **幻觉行为（绝对禁止）**：
+- 说"让我读取文件看看"——但不调用 read_file
+- 说"文件内容如下..."——但没有实际读取
+- 说"文件已写入成功"——但没有调用 write_file
+- 说"已执行命令，结果是..."——但没有调用 execute_shell
+- 说"搜索结果显示..."——但没有调用 web_search
+- 说"根据记忆..."——但没有调用 query_memory
+
+**以上全是幻觉。如果你没调用工具，就绝对不能在文本里声称自己做了。**
+
+✅ **正确行为**：
+- 要么：**实际调用工具**（通过 tool_calls API），然后基于真实结果回答
+- 要么：**不调用工具**，直接说"我需要调用 read_file 来确认"或"我无法确认，需要工具"
+
+**用户可以看到你是否真的调用了工具（tool_calls 计数）。如果你声称调用了但没有，这就是幻觉，会严重降低信任。**
+
+### 📌 任务跟踪与记忆使用（关键！）
+
+**任务意识**：你必须记住当前正在执行的任务，避免重复执行已完成的操作。每次回复前先问自己："用户让我做什么？""我已经做了什么？""下一步该做什么？"
+
+**记忆查询（强制）**：
+- 用户提到"之前"、"上次"、"刚才" → 必须 query_memory
+- 用户说"继续"、"确认" → 先 query_memory 查上下文
+- 不确定该做什么 → query_memory 查当前任务状态
+
+**状态持久化**：生成文件/修改配置/用户确认后，用 save_memory 保存状态，下次通过 query_memory 恢复，避免重复工作。
 
 ## 项目路径
 - Omnia: /home/shan/omnia-os
@@ -394,7 +467,7 @@ def assemble_wake_prompt(
         memory_text = "## Recalled Memory\n" + "\n".join(memory_parts)
         components.append(PromptComponent("memory", memory_text, priority=4))
     # Token budget - enforce_system_prompt returns (text, evicted, total)
-    budget = TokenBudget(system_limit=8192)
+    budget = TokenBudget(system_limit=20000)
     final_prompt, evicted, total_tokens = budget.enforce_system_prompt(components)
 
     # 强制中文思考与回复

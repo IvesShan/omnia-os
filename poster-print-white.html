@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>喵修盾 印刷版</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #e8e8e0;
+  font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  padding: 20px;
+}
+.poster {
+  width: 600px;
+  background: #f5f5f0;
+  border: 2px solid #000;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 8px 8px 0px rgba(0,0,0,0.15);
+}
+.geo-area {
+  position: relative;
+  height: 280px;
+  background: #f5f5f0;
+  border-bottom: 2px solid #000;
+}
+.svg-deco {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+}
+.brand-tag {
+  position: absolute;
+  top: 24px; left: 24px;
+  font-size: 11px;
+  color: #000;
+  letter-spacing: 4px;
+  border: 2px solid #000;
+  padding: 4px 12px;
+  background: #f5f5f0;
+  font-weight: 900;
+}
+.main-title {
+  position: absolute;
+  bottom: 40px; left: 24px;
+  font-size: 56px;
+  font-weight: 900;
+  color: #000;
+  line-height: 1.1;
+  letter-spacing: -2px;
+}
+.main-title span {
+  color: #c41e3a;
+  font-size: 22px;
+  display: block;
+  margin-top: 6px;
+  letter-spacing: 6px;
+  font-weight: 700;
+}
+.content {
+  padding: 32px 24px;
+}
+.pain-block {
+  border-left: 4px solid #c41e3a;
+  padding-left: 16px;
+  margin-bottom: 32px;
+}
+.pain-block h3 {
+  font-size: 16px;
+  color: #000;
+  font-weight: 900;
+  margin-bottom: 8px;
+  letter-spacing: 1px;
+}
+.pain-block p {
+  font-size: 13px;
+  color: #333;
+  line-height: 1.8;
+}
+.grid-header {
+  display: flex;
+  border-bottom: 2px solid #000;
+  padding-bottom: 8px;
+  margin-bottom: 16px;
+}
+.grid-header div {
+  flex: 1;
+  font-size: 11px;
+  color: #666;
+  letter-spacing: 2px;
+  font-weight: 900;
+}
+.grid-header div:nth-child(2) { text-align: center; }
+.grid-header div:nth-child(3) { text-align: center; color: #c41e3a; }
+.grid-header div:nth-child(4) { text-align: right; }
+
+.row {
+  display: flex;
+  align-items: baseline;
+  padding: 16px 0;
+  border-bottom: 1px solid #ccc;
+}
+.row .name { flex: 1; font-size: 15px; color: #000; font-weight: 900; }
+.row .price { flex: 1; text-align: center; font-size: 13px; color: #555; }
+.row .highlight { flex: 1; text-align: center; font-size: 22px; color: #c41e3a; font-weight: 900; }
+.row .desc { flex: 1; text-align: right; font-size: 12px; color: #666; }
+
+.cta-zone {
+  margin-top: 32px;
+  border-top: 2px solid #000;
+  padding-top: 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.cta-text {
+  font-size: 12px;
+  color: #666;
+  letter-spacing: 1px;
+  font-weight: 700;
+}
+.cta-btn {
+  background: #000;
+  color: #fff;
+  border: none;
+  padding: 14px 36px;
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  cursor: pointer;
+}
+</style>
+</head>
+<body>
+<div class="poster">
+  <div class="geo-area">
+    <svg class="svg-deco" viewBox="0 0 600 280" xmlns="http://www.w3.org/2000/svg">
+      <!-- 印刷网格线 -->
+      <line x1="0" y1="70" x2="600" y2="70" stroke="#ddd" stroke-width="1"/>
+      <line x1="0" y1="140" x2="600" y2="140" stroke="#ddd" stroke-width="1"/>
+      <line x1="0" y1="210" x2="600" y2="210" stroke="#ddd" stroke-width="1"/>
+      <line x1="150" y1="0" x2="150" y2="280" stroke="#ddd" stroke-width="1"/>
+      <line x1="300" y1="0" x2="300" y2="280" stroke="#ddd" stroke-width="1"/>
+      <line x1="450" y1="0" x2="450" y2="280" stroke="#ddd" stroke-width="1"/>
+      <!-- 抽象几何 -->
+      <circle cx="300" cy="140" r="50" fill="none" stroke="#000" stroke-width="2"/>
+      <circle cx="300" cy="140" r="30" fill="none" stroke="#c41e3a" stroke-width="2"/>
+      <rect x="270" y="110" width="60" height="60" fill="none" stroke="#000" stroke-width="2" transform="rotate(45 300 140)"/>
+      <line x1="300" y1="90" x2="300" y2="190" stroke="#000" stroke-width="1.5"/>
+      <line x1="250" y1="140" x2="350" y2="140" stroke="#000" stroke-width="1.5"/>
+      <!-- 角落装饰 -->
+      <rect x="30" y="30" width="60" height="60" fill="none" stroke="#000" stroke-width="1.5"/>
+      <line x1="30" y1="30" x2="90" y2="90" stroke="#000" stroke-width="1.5"/>
+      <line x1="90" y1="30" x2="30" y2="90" stroke="#000" stroke-width="1.5"/>
+      
+      <rect x="510" y="190" width="60" height="60" fill="none" stroke="#c41e3a" stroke-width="1.5"/>
+      <line x1="510" y1="190" x2="570" y2="250" stroke="#c41e3a" stroke-width="1.5"/>
+      <line x1="570" y1="190" x2="510" y2="250" stroke="#c41e3a" stroke-width="1.5"/>
+    </svg>
+    <div class="brand-tag">MAOXIAOJIANG</div>
+    <div class="main-title">喵修盾<br><span>维修额度保障</span></div>
+  </div>
+
+  <div class="content">
+    <div class="pain-block">
+      <h3>客户问得最多：坏了怎么办？</h3>
+      <p>销售二手无人机或租赁时，无质保则成交率大打折扣。喵修匠将维修能力产品化，为数码店主提供可销售的保障卡。</p>
+    </div>
+
+    <div class="grid-header">
+      <div>产品</div>
+      <div>售价</div>
+      <div>维修额度</div>
+      <div>折扣</div>
+    </div>
+
+    <div class="row">
+      <div class="name">基础版</div>
+      <div class="price">99元</div>
+      <div class="highlight">800</div>
+      <div class="desc">7折 / 6个月</div>
+    </div>
+    <div class="row">
+      <div class="name">标准版</div>
+      <div class="price">199元</div>
+      <div class="highlight">1800</div>
+      <div class="desc">6折 / 12个月</div>
+    </div>
+    <div class="row">
+      <div class="name">尊享版</div>
+      <div class="price">299元</div>
+      <div class="highlight">3000</div>
+      <div class="desc">5折 / 12个月</div>
+    </div>
+
+    <div class="cta-zone">
+      <div class="cta-text">CONTACT FOR PARTNERSHIP</div>
+      <div class="cta-btn">立即合作</div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

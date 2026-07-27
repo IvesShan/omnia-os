@@ -32,6 +32,7 @@ from src.omnia.services.context_manager import (
     extract_topic,
     extract_next_steps,
 )
+from src.core.topic_recognizer import TopicRecognizer
 
 from src.omnia.interrupt_manager import check_interrupt
 from src.omnia.services.auto_memory import auto_memory
@@ -121,28 +122,47 @@ class AgentEngine:
         return ide_prompt
 
     def inject_system_prompt(self, messages: List[dict]) -> List[dict]:
-        """将工具系统提示注入到 system message 中"""
+        """将工具系统提示 + wake prompt 注入到 system message 中"""
         if not self.tool_injection_enabled:
             return messages
 
+        # 确保工具注册表已初始化（单例可能未自动初始化）
         schemas = tool_registry.get_all_schemas()
+        if not schemas:
+            try:
+                import asyncio
+                asyncio.run(tool_registry.initialize_default_tools())
+                schemas = tool_registry.get_all_schemas()
+            except Exception as e:
+                print(f"[AgentEngine] Tool registry init failed: {e}")
+        
         if not schemas:
             return messages
 
+        # 1. 工具提示
         tool_prompt = tool_registry.get_system_prompt()
+
+        # 2. Wake prompt（核心身份、技能系统、记忆、任务跟踪等）
+        try:
+            from src.omnia.wake import assemble_wake_prompt
+            wake_prompt = assemble_wake_prompt()
+            # Wake prompt 完整保留（TokenBudget 在 wake.py 中控制总长度）
+            if len(wake_prompt) > 20000:
+                wake_prompt = wake_prompt[:20000] + "\n... [wake prompt truncated]"
+        except Exception as e:
+            print(f"[AgentEngine] Wake prompt failed: {e}")
+            wake_prompt = ""
+
+        # 3. 组合系统提示词（wake 在前，工具在后）
+        combined_prompt = ""
+        if wake_prompt:
+            combined_prompt += wake_prompt + "\n\n"
+        combined_prompt += tool_prompt
 
         # ===== 注入 IDE 上下文（Phase 1） =====
         ide_prompt = self._build_ide_context_prompt()
         if ide_prompt:
-            tool_prompt += ide_prompt
-
-        # NOTE: 已移除 last_ctx 注入，防止上下文污染
-        # 上次会话上下文不应自动注入到每次新对话中
-        # 如需关联上下文，应通过前端显式传入 messages
-        # 
-        # last_ctx = load_last_context()
-        # if last_ctx:
-        #     ...
+            combined_prompt += ide_prompt
 
         has_system = any(m.get("role") == "system" for m in messages)
 
@@ -152,14 +172,14 @@ class AgentEngine:
                 if m.get("role") == "system":
                     enhanced = {
                         "role": "system",
-                        "content": m["content"] + "\n\n" + tool_prompt,
+                        "content": m["content"] + "\n\n" + combined_prompt,
                     }
                     new_messages.append(enhanced)
                 else:
                     new_messages.append(m)
             return new_messages
         else:
-            return [{"role": "system", "content": tool_prompt}] + messages
+            return [{"role": "system", "content": combined_prompt}] + messages
 
     async def process_with_tools(
         self,
@@ -309,13 +329,13 @@ class AgentEngine:
                 raw_result = exec_result.get("result", exec_result)
                 if isinstance(raw_result, dict) and "content" in raw_result:
                     raw_content = raw_result["content"]
-                    if isinstance(raw_content, str) and len(raw_content) > 2000000:
+                    if isinstance(raw_content, str) and len(raw_content) > 100000:
                         # 仅当超过200万字符才截断（Kimi支持200万上下文）
                         total_lines = raw_content.count(chr(10))
                         raw_result = dict(raw_result)
-                        raw_result["content"] = raw_content[:2000000] + (
+                        raw_result["content"] = raw_content[:100000] + (
                             "\n\n[文件过大已截断：共 " + str(len(raw_content)) + " 字符，" + str(total_lines) + " 行。"
-                            "当前显示前 200 万字符。如需查看特定范围，请使用 offset 和 limit 参数]"
+                            "当前显示前 10 万字符。如需查看特定范围，请使用 offset 和 limit 参数]"
                         )
                 result_content = json.dumps(raw_result, ensure_ascii=False)
                 error = exec_result.get("error")
@@ -424,6 +444,9 @@ class AgentEngine:
         rounds = 0
         total_tokens = 0
         self._steps = []
+        self._thinking_mode_active = False  # 重置思考模式
+        self._reasoning_buffer = ""  # 清空推理缓冲
+        self._timeout_asked = False  # 重置超时标志
         validation_retry_count = 0  # 验证失败重试计数器
         original_user_message = ""
         original_system_content = ""
@@ -473,6 +496,28 @@ class AgentEngine:
 
         current_messages = self.inject_system_prompt(messages)
         
+        # ===== 话题切换检测：新任务时清空旧历史 =====
+        try:
+            tr = TopicRecognizer()
+            # 用原始 messages（注入前）检测话题切换
+            shift = tr.detect_topic_shift(messages, window_size=2)
+            if shift and shift.shift_detected:
+                print(f"[AgentEngine] Topic shift detected: {shift.old_topic} -> {shift.new_topic}")
+                # 截断旧历史：保留 system prompt 和最近 4 轮（更保守）
+                system_msgs = [m for m in current_messages if m.get("role") == "system"]
+                dialog_msgs = [m for m in current_messages if m.get("role") != "system"]
+                # 保留最后 8 条对话消息（约 4 轮），确保关键上下文不丢失
+                kept_dialog = dialog_msgs[-8:] if len(dialog_msgs) > 8 else dialog_msgs
+                current_messages = system_msgs + kept_dialog
+                print(f"[AgentEngine] Topic shift: truncated to last {len(kept_dialog)} dialog messages")
+                # 重置所有状态
+                self._steps = []
+                self._thinking_mode_active = False
+                self._reasoning_buffer = ""
+                self._timeout_asked = False
+        except Exception as e:
+            print(f"[AgentEngine] Topic detection failed: {e}")
+        
         for i, m in enumerate(current_messages):
             if m.get("role") == "system":
                 original_system_content = m["content"]
@@ -503,6 +548,7 @@ class AgentEngine:
             pending_tool_calls = []
             has_api_tool_call = False
             round_usage = {}
+            self._timeout_asked = False  # 每轮重置弹性超时标志
 
             # [FIXED] Removed: yield {"type": "status", "message": "正在思考..."}
             
@@ -518,11 +564,26 @@ class AgentEngine:
             ):
                 event_type = event.get("type")
 
-                # 检查是否超时
-                if time.time() - round_start > 300:
-                    print(f"[AgentEngine] Round {rounds} timed out after 300s")
-                    yield {"type": "status", "message": "⏱️ 请求超时（5分钟），正在结束..."}
-                    timeout_msg = full_content + "\n\n[请求超时：本轮处理超过5分钟]"
+                # 弹性超时检查：第一次5分钟询问是否继续，第二次5分钟才真正终止
+                elapsed = time.time() - round_start
+                if elapsed > 300 and not getattr(self, '_timeout_asked', False):
+                    # 第一次超时：询问用户是否继续，重置计时器
+                    self._timeout_asked = True
+                    print(f"[AgentEngine] Round {rounds} reached 300s, asking user to continue")
+                    yield {
+                        "type": "confirm", 
+                        "message": "⏳ 本轮处理已超过5分钟，任务较复杂。是否继续？",
+                        "action": "continue",
+                        "hint": "回复继续可再延长5分钟，或直接回复你的指令"
+                    }
+                    round_start = time.time()  # 重置计时器，再给5分钟
+                    continue
+                
+                elif elapsed > 300 and getattr(self, '_timeout_asked', False):
+                    # 第二次超时（总超过10分钟）：真正终止
+                    print(f"[AgentEngine] Round {rounds} total timeout after 600s")
+                    yield {"type": "status", "message": "⏱️ 请求超时（10分钟），正在结束..."}
+                    timeout_msg = full_content + "\n\n[请求超时：处理超过10分钟，已自动结束]"
                     yield {"type": "done", "full_content": timeout_msg}
                     return
                 
@@ -724,13 +785,13 @@ class AgentEngine:
                 raw_result = exec_result.get("result", exec_result)
                 if isinstance(raw_result, dict) and "content" in raw_result:
                     raw_content = raw_result["content"]
-                    if isinstance(raw_content, str) and len(raw_content) > 2000000:
+                    if isinstance(raw_content, str) and len(raw_content) > 100000:
                         # 仅当超过200万字符才截断（Kimi支持200万上下文）
                         total_lines = raw_content.count(chr(10))
                         raw_result = dict(raw_result)
-                        raw_result["content"] = raw_content[:2000000] + (
+                        raw_result["content"] = raw_content[:100000] + (
                             "\n\n[文件过大已截断：共 " + str(len(raw_content)) + " 字符，" + str(total_lines) + " 行。"
-                            "当前显示前 200 万字符。如需查看特定范围，请使用 offset 和 limit 参数]"
+                            "当前显示前 10 万字符。如需查看特定范围，请使用 offset 和 limit 参数]"
                         )
                 result_content = json.dumps(raw_result, ensure_ascii=False)
                 error = exec_result.get("error")

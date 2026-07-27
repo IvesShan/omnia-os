@@ -38,7 +38,7 @@ KILL_PATTERNS=(
     "src.backend.main"
     "web_server.py"
     "uvicorn.*8765"
-    "uvicorn.*5001"
+    "core.vector_ipc"
 )
 
 for pattern in "${KILL_PATTERNS[@]}"; do
@@ -63,9 +63,46 @@ echo -e "${GREEN}  ✓ 清理完成${NC}"
 echo ""
 
 # ============================================================
-# 第二步：启动 FastAPI 主应用 (端口 8765)
+# 第二步：启动向量服务守护进程
 # ============================================================
-echo -e "${BLUE}[2/3] 启动 FastAPI 主应用 (端口 8765)...${NC}"
+echo -e "${BLUE}[2/4] 启动向量服务守护进程...${NC}"
+
+cd "$PROJECT_ROOT"
+nohup python3 -c "
+from core.vector_ipc import VectorIPCServer
+from core.shared_vector_service import get_vector_service
+import time
+
+svc = get_vector_service()
+svc.enable_semantic()
+server = VectorIPCServer(svc)
+server.start()
+
+print('[VectorIPC] Daemon running')
+while True:
+    time.sleep(3600)
+" > "$LOG_DIR/vector-service.log" 2>&1 &
+
+VECTOR_PID=$!
+echo "$VECTOR_PID" > "$OMNIA_HOME/vector-service.pid"
+echo -e "  → 向量服务 PID: ${GREEN}$VECTOR_PID${NC}"
+echo -e "  → 日志文件: ${GREEN}$LOG_DIR/vector-service.log${NC}"
+
+# 等待模型加载
+sleep 5
+
+if kill -0 $VECTOR_PID 2>/dev/null; then
+    echo -e "${GREEN}  ✓ 向量服务启动成功${NC}"
+else
+    echo -e "${RED}  ✗ 向量服务启动失败，请查看日志: $LOG_DIR/vector-service.log${NC}"
+fi
+
+echo ""
+
+# ============================================================
+# 第三步：启动 FastAPI 主应用 (端口 8765)
+# ============================================================
+echo -e "${BLUE}[3/4] 启动 FastAPI 主应用 (端口 8765)...${NC}"
 
 cd "$PROJECT_ROOT"
 nohup python3 -m uvicorn src.omnia.main:app \
@@ -91,9 +128,9 @@ else
 fi
 
 # ============================================================
-# 第三步：启动管理后端 (端口 5001)
+# 第四步：启动管理后端 (端口 5001)
 # ============================================================
-echo -e "${BLUE}[3/3] 启动管理后端 (端口 5001)...${NC}"
+echo -e "${BLUE}[4/4] 启动管理后端 (端口 5001)...${NC}"
 
 nohup python3 -m uvicorn src.backend.main:app \
     --host 0.0.0.0 \
@@ -122,7 +159,7 @@ echo -e "${GREEN}║           Omnia FastAPI 版本启动完成!                
 echo -e "${GREEN}╚══════════════════════════════════════════════════════════╝${NC}"
 echo ""
 echo -e "  ${BLUE}主应用:${NC}    http://127.0.0.1:8765"
-echo -e "  ${BLUE}管理后端:${NC}  http://127.0.0.1:5001"
+echo -e "  ${BLUE}向量服务:${NC}  $OMNIA_HOME/vector_service.sock (Unix Socket)"
 echo ""
 echo -e "  ${YELLOW}停止服务:${NC}  bash stop-fastapi.sh"
 echo -e "  ${YELLOW}查看日志:${NC}  tail -f $LOG_DIR/omnia-main.log"

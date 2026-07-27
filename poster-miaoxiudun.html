@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>喵修匠 × 数码店主 | 维修质保产品化方案</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&display=swap');
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --deep-space: #0a192f;
+  --slate: #112240;
+  --light-slate: #233554;
+  --cyan: #64ffda;
+  --amber: #ffb800;
+  --white: #e6f1ff;
+  --muted: #8892b0;
+}
+
+body {
+  font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: linear-gradient(135deg, #0a192f 0%, #112240 50%, #0a192f 100%);
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+  color: var(--white);
+}
+
+.poster {
+  width: 100%;
+  max-width: 600px;
+  background: linear-gradient(180deg, rgba(17,34,64,0.95) 0%, rgba(10,25,47,0.98) 100%);
+  border: 1px solid rgba(100,255,218,0.15);
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow: 0 25px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(100,255,218,0.1);
+  position: relative;
+}
+
+.poster::before {
+  content: '';
+  position: absolute;
+  top: -50%; left: -50%;
+  width: 200%; height: 200%;
+  background: radial-gradient(circle, rgba(100,255,218,0.03) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+/* Header */
+.header {
+  padding: 40px 36px 30px;
+  text-align: center;
+  position: relative;
+  border-bottom: 1px solid rgba(100,255,218,0.1);
+}
+
+.badge {
+  display: inline-block;
+  padding: 6px 16px;
+  background: rgba(100,255,218,0.1);
+  border: 1px solid rgba(100,255,218,0.3);
+  border-radius: 100px;
+  font-size: 13px;
+  color: var(--cyan);
+  letter-spacing: 2px;
+  margin-bottom: 20px;
+  font-weight: 500;
+}
+
+h1 {
+  font-size: 32px;
+  font-weight: 900;
+  line-height: 1.3;
+  margin-bottom: 12px;
+  background: linear-gradient(135deg, var(--white) 0%, var(--cyan) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.subtitle {
+  font-size: 16px;
+  color: var(--muted);
+  font-weight: 400;
+  line-height: 1.6;
+}
+
+/* Pain Point */
+.pain-point {
+  padding: 28px 36px;
+  background: rgba(255,184,0,0.05);
+  border-left: 4px solid var(--amber);
+  margin: 0 36px 24px;
+  border-radius: 0 12px 12px 0;
+  position: relative;
+}
+
+.pain-point::before {
+  content: '“';
+  position: absolute;
+  top: 10px; left: 12px;
+  font-size: 60px;
+  color: rgba(255,184,0,0.2);
+  font-family: Georgia, serif;
+  line-height: 1;
+}
+
+.pain-point p {
+  font-size: 15px;
+  color: var(--white);
+  line-height: 1.7;
+  padding-left: 20px;
+}
+
+.pain-point .highlight {
+  color: var(--amber);
+  font-weight: 700;
+}
+
+/* Product Cards */
+.products {
+  padding: 0 36px 30px;
+}
+
+.section-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--white);
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.section-title::before {
+  content: '';
+  display: block;
+  width: 4px;
+  height: 22px;
+  background: var(--cyan);
+  border-radius: 2px;
+}
+
+.cards {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.card {
+  background: linear-gradient(135deg, rgba(35,53,84,0.6) 0%, rgba(17,34,64,0.8) 100%);
+  border: 1px solid rgba(100,255,218,0.15);
+  border-radius: 16px;
+  padding: 24px;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 40px rgba(100,255,218,0.1);
+}
+
+.card.featured {
+  border-color: var(--amber);
+  background: linear-gradient(135deg, rgba(255,184,0,0.08) 0%, rgba(17,34,64,0.9) 100%);
+}
+
+.card.featured::after {
+  content: '店主首选';
+  position: absolute;
+  top: 12px; right: -28px;
+  background: var(--amber);
+  color: var(--deep-space);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 28px;
+  transform: rotate(45deg);
+  box-shadow: 0 2px 8px rgba(255,184,0,0.3);
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+
+.card-name {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--white);
+}
+
+.card-name span {
+  display: block;
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 400;
+  margin-top: 4px;
+}
+
+.price-tag {
+  text-align: right;
+}
+
+.price {
+  font-size: 28px;
+  font-weight: 900;
+  color: var(--amber);
+  line-height: 1;
+}
+
+.price-unit {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.card-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.metric {
+  background: rgba(10,25,47,0.5);
+  padding: 12px 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(100,255,218,0.08);
+}
+
+.metric-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--cyan);
+  margin-bottom: 4px;
+}
+
+.metric-label {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* Benefits */
+.benefits {
+  padding: 0 36px 30px;
+}
+
+.benefit-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.benefit-item {
+  background: rgba(100,255,218,0.05);
+  border: 1px solid rgba(100,255,218,0.1);
+  border-radius: 12px;
+  padding: 18px;
+  text-align: center;
+}
+
+.benefit-icon {
+  font-size: 28px;
+  margin-bottom: 10px;
+  display: block;
+}
+
+.benefit-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--white);
+  margin-bottom: 6px;
+}
+
+.benefit-desc {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+/* CTA */
+.cta {
+  padding: 0 36px 40px;
+  text-align: center;
+}
+
+.btn {
+  display: inline-block;
+  width: 100%;
+  padding: 18px;
+  background: linear-gradient(135deg, var(--cyan) 0%, #00b4d8 100%);
+  color: var(--deep-space);
+  font-size: 18px;
+  font-weight: 900;
+  border: none;
+  border-radius: 14px;
+  cursor: pointer;
+  letter-spacing: 2px;
+  box-shadow: 0 10px 40px rgba(100,255,218,0.25);
+  position: relative;
+  overflow: hidden;
+}
+
+.btn::after {
+  content: '';
+  position: absolute;
+  top: 0; left: -100%;
+  width: 100%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+  transition: left 0.5s;
+}
+
+.btn:hover::after {
+  left: 100%;
+}
+
+.btn-sub {
+  margin-top: 14px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* Footer */
+.footer {
+  padding: 20px 36px;
+  border-top: 1px solid rgba(100,255,218,0.1);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.brand {
+  font-weight: 700;
+  color: var(--cyan);
+  font-size: 14px;
+}
+
+/* Print & Mobile */
+@media print {
+  body { background: white; }
+  .poster { box-shadow: none; border: 1px solid #ddd; }
+}
+
+@media (max-width: 480px) {
+  h1 { font-size: 26px; }
+  .card-body { grid-template-columns: 1fr; }
+  .benefit-grid { grid-template-columns: 1fr; }
+  .header, .pain-point, .products, .benefits, .cta { padding-left: 24px; padding-right: 24px; }
+  .pain-point { margin: 0 24px 24px; }
+}
+
+/* Decorative Elements */
+.tech-line {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+  margin: 0 36px 24px;
+  opacity: 0.3;
+}
+
+</style>
+</head>
+<body>
+
+<div class="poster">
+  
+  <!-- Header -->
+  <div class="header">
+    <div class="badge">B2B 合作方案</div>
+    <h1>维修质保产品化</h1>
+    <p class="subtitle">喵修匠 × 数码店主<br>让每一台二手无人机都有售后保障</p>
+  </div>
+
+  <!-- Pain Point -->
+  <div class="pain-point">
+    <p>客户问得最多的问题：<br><span class="highlight">"万一坏了怎么办？修起来贵不贵？"</span><br>没有质保，成交率大打折扣。</p>
+  </div>
+
+  <div class="tech-line"></div>
+
+  <!-- Products -->
+  <div class="products">
+    <div class="section-title">喵修盾 · 维修保障卡</div>
+    
+    <div class="cards">
+      <!-- Basic -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-name">基础版<span>小型维修 / 保养检测</span></div>
+          <div class="price-tag">
+            <div class="price">¥99</div>
+            <div class="price-unit">6个月有效期</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="metric">
+            <div class="metric-value">¥800</div>
+            <div class="metric-label">维修额度</div>
+          </div>
+          <div class="metric">
+            <div class="metric-value">7折</div>
+            <div class="metric-label">服务费折扣</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Standard (Featured) -->
+      <div class="card featured">
+        <div class="card-header">
+          <div class="card-name">标准版<span>中型维修 / 日常保障</span></div>
+          <div class="price-tag">
+            <div class="price">¥199</div>
+            <div class="price-unit">12个月有效期</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="metric">
+            <div class="metric-value">¥1800</div>
+            <div class="metric-label">维修额度</div>
+          </div>
+          <div class="metric">
+            <div class="metric-value">6折</div>
+            <div class="metric-label">服务费折扣</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Premium -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-name">尊享版<span>全面保障 / 重度用户</span></div>
+          <div class="price-tag">
+            <div class="price">¥299</div>
+            <div class="price-unit">12个月有效期</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="metric">
+            <div class="metric-value">¥3000</div>
+            <div class="metric-label">维修额度</div>
+          </div>
+          <div class="metric">
+            <div class="metric-value">5折</div>
+            <div class="metric-label">服务费折扣</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tech-line"></div>
+
+  <!-- Benefits for Shop Owners -->
+  <div class="benefits">
+    <div class="section-title">对店主的价值</div>
+    <div class="benefit-grid">
+      <div class="benefit-item">
+        <span class="benefit-icon">📈</span>
+        <div class="benefit-title">成交率提升</div>
+        <div class="benefit-desc">有质保的机器更好卖<br>客户敢于下单</div>
+      </div>
+      <div class="benefit-item">
+        <span class="benefit-icon">💰</span>
+        <div class="benefit-title">多一条收入线</div>
+        <div class="benefit-desc">卖喵修盾赚佣金<br>不占库存</div>
+      </div>
+      <div class="benefit-item">
+        <span class="benefit-icon">🔒</span>
+        <div class="benefit-title">锁定客户回流</div>
+        <div class="benefit-desc">维修需求回流<br>持续赚分成</div>
+      </div>
+      <div class="benefit-item">
+        <span class="benefit-icon">🏆</span>
+        <div class="benefit-title">差异化竞争</div>
+        <div class="benefit-desc">同行卖裸机<br>你卖裸机+质保</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CTA -->
+  <div class="cta">
+    <button class="btn">立即申请合作渠道</button>
+    <p class="btn-sub">额度制预付费 · 按月/按年结算 · 20%-30%销售佣金</p>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <span class="brand">喵修匠</span>
+    <span>维修能力产品化 · 质保即锁客</span>
+  </div>
+
+</div>
+
+</body>
+</html>

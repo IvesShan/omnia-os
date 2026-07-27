@@ -28,9 +28,9 @@ echo -e "${BLUE}║           Omnia 一键重启脚本                          
 echo -e "${BLUE}║           关闭 → 清理 → 重启                           ║${NC}"
 echo -e "${BLUE}╚══════════════════════════════════════════════════════════╝${NC}"
 echo ""
-echo -e "${YELLOW}项目目录:${NC} $PROJECT_ROOT"
-echo -e "${YELLOW}数据目录:${NC} $OMNIA_HOME"
-echo -e "${YELLOW}系统:${NC}     $OS_TYPE"
+echo -e "${YELLOW}项目目录:${NC}PROJECT_ROOT"
+echo -e "${YELLOW}数据目录:${NC}OMNIA_HOME"
+echo -e "${YELLOW}系统:${NC}    OS_TYPE"
 echo ""
 
 # ============================================================
@@ -56,7 +56,7 @@ for pid_file in "${PID_FILES[@]}"; do
     if [ -f "$pid_file" ]; then
         pid=$(cat "$pid_file" 2>/dev/null | tr -d ' \n')
         if [ -n "$pid" ] && [ "$pid" -gt 0 ] 2>/dev/null; then
-            echo -e "  → 杀死 PID ${YELLOW}$pid${NC} (来自 $pid_file)"
+            echo -e "  → 杀死 PID{YELLOW}$pid${NC} (来自 $pid_file)"
             kill "$pid" 2>/dev/null || true
             sleep 0.5
             kill -9 "$pid" 2>/dev/null || true
@@ -81,7 +81,7 @@ KILL_PATTERNS=(
 for pattern in "${KILL_PATTERNS[@]}"; do
     pids=$(pgrep -f "$pattern" 2>/dev/null || true)
     if [ -n "$pids" ]; then
-        echo -e "  → 匹配模式 '${YELLOW}$pattern${NC}': PID(s) $pids"
+        echo -e "  → 匹配模式 '${YELLOW}$pattern${NC}': PID(s)pids"
         pkill -f "$pattern" 2>/dev/null || true
         sleep 0.3
         pkill -9 -f "$pattern" 2>/dev/null || true
@@ -89,13 +89,13 @@ for pattern in "${KILL_PATTERNS[@]}"; do
 done
 
 # 1.3 释放端口 8765（兼容 Linux + macOS）
-echo -e "  → 释放端口 ${YELLOW}8765${NC}..."
+echo -e "  → 释放端口{YELLOW}8765${NC}..."
 if [ "$OS_TYPE" = "macos" ]; then
     # macOS: 使用 lsof
     lsof_pid=$(lsof -ti :8765 2>/dev/null || true)
     if [ -n "$lsof_pid" ]; then
-        echo -e "  → 端口 8765 被 PID $lsof_pid 占用"
-        kill -9 $lsof_pid 2>/dev/null || true
+        echo -e "  → 端口 8765 被 PIDlsof_pid 占用"
+        kill -9lsof_pid 2>/dev/null || true
     fi
 else
     # Linux: 使用 fuser
@@ -108,21 +108,21 @@ sleep 1
 # 验证端口 8765 是否释放
 if [ "$OS_TYPE" = "macos" ]; then
     if lsof -i :8765 >/dev/null 2>&1; then
-        echo -e "  ${RED}⚠ 端口 8765 仍有残留，强制释放...${NC}"
+        echo -e " {RED}⚠ 端口 8765 仍有残留，强制释放...${NC}"
         kill -9 $(lsof -ti :8765) 2>/dev/null || true
     else
         echo -e "  ✓ 端口 8765 已释放"
     fi
 else
     if ss -tlnp | grep -q ":8765 " 2>/dev/null; then
-        echo -e "  ${RED}⚠ 端口 8765 仍有残留，强制释放...${NC}"
+        echo -e " {RED}⚠ 端口 8765 仍有残留，强制释放...${NC}"
         fuser -k -9 8765/tcp 2>/dev/null || true
     else
         echo -e "  ✓ 端口 8765 已释放"
     fi
 fi
 
-echo -e "  ${GREEN}✓ 进程清理完成${NC}"
+echo -e " {GREEN}✓ 进程清理完成${NC}"
 echo ""
 
 # ============================================================
@@ -138,7 +138,7 @@ echo -e "  ✓ 已清理 __pycache__"
 find "$PROJECT_ROOT/src" -type f -name "*.pyc" -delete 2>/dev/null || true
 echo -e "  ✓ 已清理 .pyc 文件"
 
-echo -e "  ${GREEN}✓ 清理完成${NC}"
+echo -e " {GREEN}✓ 清理完成${NC}"
 echo ""
 
 # ============================================================
@@ -153,32 +153,32 @@ if command -v python3 &>/dev/null; then
 elif command -v python &>/dev/null; then
     USE_PYTHON="python"
 else
-    echo -e "  ${RED}✗ 未找到 Python，请先安装 Python 3.8+${NC}"
+    echo -e " {RED}✗ 未找到 Python，请先安装 Python 3.8+${NC}"
     exit 1
 fi
 
 PY_VERSION=$($USE_PYTHON --version 2>&1 | grep -oP '\d+\.\d+')
-echo -e "  → Python: ${GREEN}$USE_PYTHON ($PY_VERSION)${NC}"
+echo -e "  → Python:{GREEN}$USE_PYTHON ($PY_VERSION)${NC}"
 
 # 检测 uvicorn
-if ! $USE_PYTHON -c "import uvicorn" 2>/dev/null; then
-    echo -e "  ${YELLOW}⚠ uvicorn 未安装，正在安装...${NC}"
-    $USE_PYTHON -m pip install uvicorn[standard] fastapi pydantic-settings sse-starlette httpx -q
+if !USE_PYTHON -c "import uvicorn" 2>/dev/null; then
+    echo -e " {YELLOW}⚠ uvicorn 未安装，正在安装...${NC}"
+   USE_PYTHON -m pip install uvicorn[standard] fastapi pydantic-settings sse-starlette httpx -q
 fi
-echo -e "  → uvicorn: ${GREEN}✓${NC}"
+echo -e "  → uvicorn:{GREEN}✓${NC}"
 
 # 检测 httpx
-if ! $USE_PYTHON -c "import httpx" 2>/dev/null; then
-    echo -e "  ${YELLOW}⚠ httpx 未安装，正在安装...${NC}"
-    $USE_PYTHON -m pip install httpx -q
+if !USE_PYTHON -c "import httpx" 2>/dev/null; then
+    echo -e " {YELLOW}⚠ httpx 未安装，正在安装...${NC}"
+   USE_PYTHON -m pip install httpx -q
 fi
-echo -e "  → httpx: ${GREEN}✓${NC}"
+echo -e "  → httpx:{GREEN}✓${NC}"
 
 # 检查 .env 文件
 if [ ! -f "$PROJECT_ROOT/.env" ]; then
-    echo -e "  ${YELLOW}⚠ 未找到 .env 文件，请确保已配置 API Keys${NC}"
+    echo -e " {YELLOW}⚠ 未找到 .env 文件，请确保已配置 API Keys${NC}"
 else
-    echo -e "  → .env: ${GREEN}✓${NC}"
+    echo -e "  → .env:{GREEN}✓${NC}"
 fi
 
 echo ""
@@ -190,19 +190,19 @@ echo -e "${BLUE}[4/4] 启动 Omnia 服务...${NC}"
 echo ""
 
 # 4.1 启动 FastAPI Server（端口 8765）
-echo -e "  ┌─ ${YELLOW}FastAPI Server${NC} (http://localhost:8765)"
+echo -e "  ┌─{YELLOW}FastAPI Server${NC} (http://localhost:8765)"
 echo -e "  │  端口: 8765"
 cd "$PROJECT_ROOT"
-nohup $USE_PYTHON -m uvicorn src.omnia.main:app \
+nohupUSE_PYTHON -m uvicorn src.omnia.main:app \
     --host 0.0.0.0 \
     --port 8765 \
-    --reload \
+    \
     > "$OMNIA_HOME/fastapi_server.log" 2>&1 &
 FASTAPI_PID=$!
 echo "$FASTAPI_PID" > "$OMNIA_HOME/fastapi_server.pid"
-echo -e "  │  PID: ${GREEN}$FASTAPI_PID${NC}"
-echo -e "  │  日志: $OMNIA_HOME/fastapi_server.log"
-echo -e "  └─ ${GREEN}✓ 已启动${NC}"
+echo -e "  │  PID:{GREEN}$FASTAPI_PID${NC}"
+echo -e "  │  日志:OMNIA_HOME/fastapi_server.log"
+echo -e "  └─{GREEN}✓ 已启动${NC}"
 echo ""
 
 # 等待 FastAPI Server 就绪
@@ -220,20 +220,20 @@ echo -e "${GREEN}╔════════════════════
 echo -e "${GREEN}║              Omnia 重启完成！                           ║${NC}"
 echo -e "${GREEN}╚══════════════════════════════════════════════════════════╝${NC}"
 echo ""
-echo -e "  ${BLUE}FastAPI Server:${NC}  http://localhost:8765"
-echo -e "  ${BLUE}健康检查:${NC}      http://localhost:8765/health"
-echo -e "  ${BLUE}API 文档:${NC}      http://localhost:8765/docs"
+echo -e " {BLUE}FastAPI Server:${NC}  http://localhost:8765"
+echo -e " {BLUE}健康检查:${NC}      http://localhost:8765/health"
+echo -e " {BLUE}API 文档:${NC}      http://localhost:8765/docs"
 echo ""
-echo -e "  ${BLUE}进程列表:${NC}"
-echo -e "    FastAPI Server: $(cat $OMNIA_HOME/fastapi_server.pid 2>/dev/null || echo 'N/A')"
+echo -e " {BLUE}进程列表:${NC}"
+echo -e "    FastAPI Server:(cat $OMNIA_HOME/fastapi_server.pid 2>/dev/null || echo 'N/A')"
 echo ""
-echo -e "  ${BLUE}日志文件:${NC}"
-echo -e "    FastAPI:       $OMNIA_HOME/fastapi_server.log"
+echo -e " {BLUE}日志文件:${NC}"
+echo -e "    FastAPI:      OMNIA_HOME/fastapi_server.log"
 echo ""
 
 # 如果服务未就绪，给出提示
 if ! curl -s http://localhost:8765/health >/dev/null 2>&1; then
     echo -e "${YELLOW}  ⚠ 服务仍在启动中，请稍后刷新页面...${NC}"
-    echo -e "  ${YELLOW}  查看启动日志: tail -f $OMNIA_HOME/fastapi_server.log${NC}"
+    echo -e " {YELLOW}  查看启动日志: tail -f $OMNIA_HOME/fastapi_server.log${NC}"
 fi
 echo ""

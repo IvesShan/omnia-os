@@ -45,6 +45,22 @@ if [ -f "$MAIN_PID_FILE" ]; then
     rm -f "$MAIN_PID_FILE"
 fi
 
+# 停止向量服务
+VECTOR_PID_FILE="$PID_DIR/vector-service.pid"
+if [ -f "$VECTOR_PID_FILE" ]; then
+    vector_pid=$(cat "$VECTOR_PID_FILE")
+    if kill -0 "$vector_pid" 2>/dev/null; then
+        echo -e "  → 停止向量服务 (PID: ${YELLOW}$vector_pid${NC})"
+        kill -15 "$vector_pid" 2>/dev/null || true
+        sleep 1
+        if kill -0 "$vector_pid" 2>/dev/null; then
+            echo -e "  → 强制终止向量服务 (PID: ${YELLOW}$vector_pid${NC})"
+            kill -9 "$vector_pid" 2>/dev/null || true
+        fi
+    fi
+    rm -f "$VECTOR_PID_FILE"
+fi
+
 # 停止管理后端
 if [ -f "$BACKEND_PID_FILE" ]; then
     backend_pid=$(cat "$BACKEND_PID_FILE")
@@ -73,7 +89,7 @@ KILL_PATTERNS=(
     "src.backend.main"
     "web_server.py"
     "uvicorn.*8765"
-    "uvicorn.*5001"
+    "core.vector_ipc"
 )
 
 for pattern in "${KILL_PATTERNS[@]}"; do

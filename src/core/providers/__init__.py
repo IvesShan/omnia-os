@@ -139,18 +139,18 @@ MODEL_REGISTRY: dict[str, ModelConfig] = {
     # === Moonshot / Kimi ===
     "moonshot/kimi-code": ModelConfig(
         provider=ProviderType.MOONSHOT,
-        model_id="kimi-code",
+        model_id="k3",
         display_name="Kimi Code",
-        context_window=128_000,
+        context_window=1_048_576,
         max_output=8_192,
         supports_tools=True,
         base_url="https://api.moonshot.cn/v1",
     ),
     "kimi/kimi-code": ModelConfig(
         provider=ProviderType.KIMI,
-        model_id="kimi-code",
+        model_id="k3",
         display_name="Kimi Code",
-        context_window=128_000,
+        context_window=1_048_576,
         max_output=8_192,
         supports_tools=True,
         base_url="https://api.kimi.com/coding/v1",

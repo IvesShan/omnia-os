@@ -17,7 +17,7 @@ def call_via_openclaw(message: str, history: List[Dict] = None, tools: Optional[
     messages.append({"role": "user", "content": message})
     
     payload = {
-        "model": "kimi/kimi-code",
+        "model": "kimi/k3",
         "messages": messages,
         "max_tokens": 4096,
         "temperature": 0.7,

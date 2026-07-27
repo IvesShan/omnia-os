@@ -336,7 +336,7 @@ async def _stream_chat_unified(
             
             # [FIXED] 将同步 requests.post 包装到线程中，防止阻塞 uvicorn 事件循环
             response = await asyncio.to_thread(
-                requests.post, url, headers=headers, json=payload, stream=True, timeout=120
+                requests.post, url, headers=headers, json=payload, stream=True, timeout=300
             )
         except ImportError:
             yield f"data: {json.dumps({'type': 'error', 'message': 'requests module not available'})}\n\n"

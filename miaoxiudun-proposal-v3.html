@@ -1,0 +1,951 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>喵修盾 · 维修额度保障体系 产品落地方案</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans+SC:wght@400;500;700;900&family=Noto+Serif+SC:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg-deep: #0a0a0a;
+  --bg-card: #111111;
+  --bg-elevated: #1a1a1a;
+  --border-subtle: rgba(255,255,255,0.06);
+  --border-strong: rgba(255,255,255,0.12);
+  --text-primary: #f5f5f5;
+  --text-secondary: rgba(245,245,245,0.5);
+  --text-muted: rgba(245,245,245,0.35);
+  --accent-gold: #d4a853;
+  --accent-gold-dim: rgba(212,168,83,0.15);
+  --accent-gold-glow: rgba(212,168,83,0.08);
+  --accent-cyan: #64d2ff;
+  --accent-cyan-dim: rgba(100,210,255,0.12);
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+html { scroll-behavior:smooth; }
+
+body {
+  font-family: "Noto Sans SC", "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-weight: 400;
+  font-size: 16px;
+  line-height: 1.8;
+  color: var(--text-primary);
+  background: var(--bg-deep);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* ======== FONT HIERARCHY SYSTEM ======== */
+.font-display {
+  font-family: "Noto Serif SC", "Noto Sans SC", serif;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+.font-heading {
+  font-family: "Inter", "Noto Sans SC", sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.font-body {
+  font-family: "Noto Sans SC", -apple-system, sans-serif;
+  font-weight: 400;
+}
+.font-mono {
+  font-family: "JetBrains Mono", "SF Mono", "Courier New", monospace;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+.font-label {
+  font-family: "Inter", "Noto Sans SC", sans-serif;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* ======== SECTION SYSTEM ======== */
+section {
+  padding: 120px 72px;
+  max-width: 1000px;
+  margin: 0 auto;
+  position: relative;
+}
+
+.section-header {
+  margin-bottom: 64px;
+}
+
+.section-number {
+  font-family: "JetBrains Mono", monospace;
+  font-weight: 400;
+  font-size: 12px;
+  color: var(--accent-gold);
+  letter-spacing: 0.1em;
+  margin-bottom: 20px;
+  display: block;
+}
+
+.section-number::after {
+  content: "";
+  display: block;
+  width: 40px;
+  height: 1px;
+  background: var(--accent-gold);
+  margin-top: 16px;
+  opacity: 0.4;
+}
+
+.section-title {
+  font-family: "Noto Serif SC", serif;
+  font-weight: 900;
+  font-size: 36px;
+  line-height: 1.3;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+  margin-bottom: 20px;
+}
+
+.section-subtitle {
+  font-family: "Noto Sans SC", sans-serif;
+  font-size: 18px;
+  font-weight: 400;
+  color: var(--text-secondary);
+  line-height: 1.7;
+  max-width: 560px;
+}
+
+/* ======== HERO ======== */
+.hero {
+  padding: 160px 72px 120px;
+  max-width: 1000px;
+  margin: 0 auto;
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.hero-badge {
+  font-family: "JetBrains Mono", monospace;
+  font-weight: 400;
+  font-size: 11px;
+  color: var(--accent-gold);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  margin-bottom: 40px;
+  opacity: 0.7;
+}
+
+.hero-title {
+  font-family: "Noto Serif SC", serif;
+  font-weight: 900;
+  font-size: 64px;
+  line-height: 1.1;
+  color: var(--text-primary);
+  letter-spacing: -0.03em;
+  margin-bottom: 32px;
+}
+
+.hero-title-accent {
+  color: var(--accent-gold);
+  position: relative;
+}
+
+.hero-desc {
+  font-family: "Noto Sans SC", sans-serif;
+  font-size: 20px;
+  font-weight: 400;
+  color: var(--text-secondary);
+  line-height: 1.8;
+  max-width: 520px;
+  margin-bottom: 56px;
+}
+
+.hero-meta {
+  display: flex;
+  gap: 48px;
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 32px;
+}
+
+.meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.meta-value {
+  font-family: "JetBrains Mono", monospace;
+  font-weight: 700;
+  font-size: 28px;
+  color: var(--accent-gold);
+  font-variant-numeric: tabular-nums;
+}
+
+.meta-label {
+  font-family: "Inter", "Noto Sans SC", sans-serif;
+  font-weight: 500;
+  font-size: 11px;
+  color: var(--text-muted);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.hero-geo {
+  position: absolute;
+  right: 72px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 280px;
+  height: 280px;
+  opacity: 0.04;
+  pointer-events: none;
+}
+
+/* ======== CARD SYSTEM ======== */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  padding: 40px 32px;
+  transition: all 0.3s ease;
+}
+
+.card:hover {
+  border-color: var(--border-strong);
+  transform: translateY(-2px);
+}
+
+.card-featured {
+  border-color: var(--accent-gold);
+  background: linear-gradient(135deg, var(--bg-card) 0%, var(--accent-gold-glow) 100%);
+}
+
+.card-tag {
+  font-family: "Inter", sans-serif;
+  font-weight: 500;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent-gold);
+  margin-bottom: 20px;
+  display: block;
+}
+
+.card-title {
+  font-family: "Noto Serif SC", serif;
+  font-weight: 700;
+  font-size: 22px;
+  line-height: 1.4;
+  margin-bottom: 16px;
+  letter-spacing: -0.01em;
+}
+
+.card-price {
+  font-family: "JetBrains Mono", monospace;
+  font-weight: 700;
+  font-size: 36px;
+  color: var(--accent-gold);
+  margin-bottom: 4px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.card-price-unit {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 14px;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.card-price-note {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 24px;
+  font-family: "Noto Sans SC", sans-serif;
+}
+
+.card-list {
+  list-style: none;
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 2.2;
+}
+
+.card-list li {
+  padding-left: 16px;
+  position: relative;
+}
+
+.card-list li::before {
+  content: "—";
+  position: absolute;
+  left: 0;
+  color: var(--accent-gold);
+  opacity: 0.5;
+  font-family: "JetBrains Mono", monospace;
+  font-weight: 400;
+}
+
+/* ======== GRID SYSTEM ======== */
+.grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 40px;
+}
+
+.grid-2-wide {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 40px;
+}
+
+/* ======== TABLE SYSTEM ======== */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 40px;
+  font-size: 14px;
+}
+
+.data-table thead th {
+  font-family: "Inter", sans-serif;
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 16px 20px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-strong);
+  background: var(--bg-elevated);
+}
+
+.data-table tbody td {
+  padding: 20px;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  vertical-align: top;
+  line-height: 1.7;
+}
+
+.data-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.data-table .cell-highlight {
+  font-family: "JetBrains Mono", monospace;
+  font-weight: 700;
+  font-size: 16px;
+  color: var(--accent-gold);
+  font-variant-numeric: tabular-nums;
+}
+
+.data-table .cell-label {
+  font-family: "Noto Serif SC", serif;
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--text-primary);
+}
+
+/* ======== SCENE CARDS ======== */
+.scene-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  padding: 36px;
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.scene-card:hover {
+  border-color: var(--border-strong);
+}
+
+.scene-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--accent-gold);
+  opacity: 0.4;
+  transition: opacity 0.3s ease;
+}
+
+.scene-card:hover::before {
+  opacity: 1;
+}
+
+.scene-label {
+  font-family: "Inter", sans-serif;
+  font-weight: 500;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent-gold);
+  margin-bottom: 16px;
+  opacity: 0.7;
+}
+
+.scene-title {
+  font-family: "Noto Serif SC", serif;
+  font-weight: 700;
+  font-size: 18px;
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+
+.scene-desc {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.8;
+}
+
+/* ======== REVENUE CALC ======== */
+.calc-block {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  padding: 40px 48px;
+}
+
+.calc-formula {
+  font-family: "JetBrains Mono", monospace;
+  font-weight: 400;
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 2.4;
+  margin-bottom: 32px;
+}
+
+.calc-formula .calc-num {
+  color: var(--accent-gold);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.calc-result {
+  border-top: 1px solid var(--border-strong);
+  padding-top: 28px;
+}
+
+.calc-result-label {
+  font-family: "Inter", sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+
+.calc-result-value {
+  font-family: "JetBrains Mono", monospace;
+  font-weight: 700;
+  font-size: 40px;
+  color: var(--accent-gold);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.calc-result-note {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 8px;
+  font-family: "Noto Sans SC", sans-serif;
+}
+
+/* ======== RISK ITEMS ======== */
+.risk-item {
+  padding: 28px 0;
+  border-bottom: 1px solid var(--border-subtle);
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  gap: 32px;
+  align-items: start;
+}
+
+.risk-item:last-child {
+  border-bottom: none;
+}
+
+.risk-title {
+  font-family: "Noto Serif SC", serif;
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--text-primary);
+  line-height: 1.6;
+}
+
+.risk-desc {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.9;
+}
+
+/* ======== CTA ======== */
+.cta {
+  padding: 100px 72px;
+  text-align: center;
+  background: var(--bg-card);
+  border-top: 1px solid var(--border-subtle);
+  margin-top: 40px;
+}
+
+.cta-title {
+  font-family: "Noto Serif SC", serif;
+  font-weight: 900;
+  font-size: 42px;
+  letter-spacing: -0.02em;
+  margin-bottom: 20px;
+}
+
+.cta-subtitle {
+  font-size: 18px;
+  color: var(--text-secondary);
+  margin-bottom: 48px;
+  font-weight: 400;
+}
+
+.cta-button {
+  display: inline-block;
+  background: var(--accent-gold);
+  color: var(--bg-deep);
+  font-family: "Inter", "Noto Sans SC", sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.04em;
+  padding: 18px 48px;
+  text-decoration: none;
+  transition: all 0.3s ease;
+  border: none;
+  cursor: pointer;
+}
+
+.cta-button:hover {
+  background: var(--text-primary);
+  transform: translateY(-2px);
+}
+
+.cta-geo {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 400px;
+  height: 400px;
+  opacity: 0.02;
+  pointer-events: none;
+}
+
+/* ======== UTILS ======== */
+.divider {
+  height: 1px;
+  background: var(--border-subtle);
+  margin: 0 72px;
+  max-width: 1000px;
+}
+
+.highlight-gold {
+  color: var(--accent-gold);
+}
+
+.text-muted {
+  color: var(--text-muted);
+}
+
+@media (max-width: 768px) {
+  section, .hero { padding: 80px 24px; }
+  .grid-3, .grid-2, .grid-2-wide { grid-template-columns: 1fr; gap: 16px; }
+  .hero-title { font-size: 42px; }
+  .section-title { font-size: 28px; }
+  .hero-meta { flex-direction: column; gap: 24px; }
+  .hero-geo { display: none; }
+  .risk-item { grid-template-columns: 1fr; gap: 12px; }
+  .calc-block { padding: 28px 24px; }
+}
+
+@media print {
+  @page {
+    margin: 0;
+    size: auto;
+  }
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .hero, section, .cta {
+    padding: 60px 48px !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    page-break-inside: avoid;
+  }
+  .divider {
+    margin: 0 48px !important;
+  }
+  .hero-geo, .cta-geo {
+    display: none !important;
+  }
+  body::before, body::after {
+    display: none !important;
+  }
+  .cta-button {
+    border: 2px solid var(--accent-gold) !important;
+    background: transparent !important;
+    color: var(--accent-gold) !important;
+  }
+}
+</style>
+</head>
+<body>
+
+<!-- HERO -->
+<div class="hero">
+  <svg class="hero-geo" viewBox="0 0 200 200">
+    <defs>
+      <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+        <path d="M 20 0 L 0 0 0 20" fill="none" stroke="currentColor" stroke-width="0.5"/>
+      </pattern>
+    </defs>
+    <rect width="200" height="200" fill="url(#grid)"/>
+    <circle cx="100" cy="100" r="60" fill="none" stroke="currentColor" stroke-width="0.5"/>
+    <circle cx="100" cy="100" r="90" fill="none" stroke="currentColor" stroke-width="0.3"/>
+    <line x1="100" y1="10" x2="100" y2="190" stroke="currentColor" stroke-width="0.5"/>
+    <line x1="10" y1="100" x2="190" y2="100" stroke="currentColor" stroke-width="0.5"/>
+  </svg>
+
+  <div class="hero-badge">Product Launch Proposal / 2026</div>
+  <h1 class="hero-title">喵修盾<br><span class="hero-title-accent">维修额度保障体系</span></h1>
+  <p class="hero-desc">将维修能力产品化为可销售的额度保障。让数码店主多一份成交工具，让客户多一份安心，让喵修匠锁定长期服务关系。</p>
+  <div class="hero-meta">
+    <div class="meta-item">
+      <span class="meta-value">3</span>
+      <span class="meta-label">产品档位</span>
+    </div>
+    <div class="meta-item">
+      <span class="meta-value">5.6K</span>
+      <span class="meta-label">最高保障额度</span>
+    </div>
+    <div class="meta-item">
+      <span class="meta-value">30%</span>
+      <span class="meta-label">店主佣金比例</span>
+    </div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- 01 PROBLEM -->
+<section>
+  <div class="section-header">
+    <span class="section-number">01 / 问题</span>
+    <h2 class="section-title">客户顾虑正在吃掉成交率</h2>
+    <p class="section-subtitle">二手无人机和租赁业务的增长，被"售后无门"的心理门槛卡住了。</p>
+  </div>
+  <div class="grid-2-wide">
+    <div class="scene-card" style="padding: 48px;">
+      <div class="scene-label">Customer Objection</div>
+      <div class="scene-title" style="font-size: 28px; font-family: 'Noto Serif SC', serif; margin-bottom: 24px; line-height: 1.5;">"万一坏了怎么办？<br>修起来贵不贵？"</div>
+      <p style="font-size: 16px; color: var(--text-secondary); line-height: 1.9; margin-bottom: 32px;">这是数码店主在成交环节被问到最多的问题。没有明确答案，客户就会犹豫，犹豫就会流失。</p>
+      <div style="display: flex; gap: 32px; padding-top: 32px; border-top: 1px solid var(--border-subtle);">
+        <div>
+          <div style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 32px; color: var(--accent-gold); font-variant-numeric: tabular-nums;">-40%</div>
+          <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">无质保场景成交率降幅</div>
+        </div>
+        <div>
+          <div style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 32px; color: var(--accent-gold); font-variant-numeric: tabular-nums;">3x</div>
+          <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">有质保客户决策周期</div>
+        </div>
+      </div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 20px;">
+      <div class="card" style="padding: 32px;">
+        <div class="scene-label">The Pain Point</div>
+        <div class="scene-title" style="font-size: 16px;">店主无法自建维修能力</div>
+        <p style="font-size: 14px; color: var(--text-secondary); line-height: 1.8; margin-top: 12px;">维修技师、配件渠道、检测标准——每一项都是重资产投入，个体店主无力承担。</p>
+      </div>
+      <div class="card" style="padding: 32px; border-color: var(--accent-gold);">
+        <div class="scene-label" style="color: var(--accent-gold);">The Opportunity</div>
+        <div class="scene-title" style="font-size: 16px;">喵修匠的技术切入点</div>
+        <p style="font-size: 14px; color: var(--text-secondary); line-height: 1.8; margin-top: 12px;">将维修能力包装为"可前置销售的产品"，在成交节点提供保障承诺。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- 02 PRODUCT -->
+<section>
+  <div class="section-header">
+    <span class="section-number">02 / 产品</span>
+    <h2 class="section-title">三档额度，覆盖不同保障深度</h2>
+    <p class="section-subtitle">"喵修盾"是一款预付费维修额度产品。购买后获得有效期内可消费的维修额度，享受 5-7 折服务费。</p>
+  </div>
+  <div class="grid-3">
+    <div class="card">
+      <span class="card-tag">Basic</span>
+      <div class="card-title">基础版</div>
+      <div class="card-price">99<span class="card-price-unit">元</span></div>
+      <div class="card-price-note">6 个月有效</div>
+      <ul class="card-list">
+        <li><strong>800 元</strong> 维修额度</li>
+        <li>服务费 <strong>7 折</strong></li>
+        <li>适用：小型维修、保养检测</li>
+        <li>单次抵扣 ≤ 480 元</li>
+      </ul>
+    </div>
+    <div class="card card-featured">
+      <span class="card-tag" style="color: var(--accent-gold);">Standard · 推荐</span>
+      <div class="card-title">标准版</div>
+      <div class="card-price">199<span class="card-price-unit">元</span></div>
+      <div class="card-price-note">12 个月有效</div>
+      <ul class="card-list">
+        <li><strong>1,800 元</strong> 维修额度</li>
+        <li>服务费 <strong>6 折</strong></li>
+        <li>适用：中型维修、日常保障</li>
+        <li>单次抵扣 ≤ 1,080 元</li>
+      </ul>
+    </div>
+    <div class="card">
+      <span class="card-tag">Premium</span>
+      <div class="card-title">尊享版</div>
+      <div class="card-price">299<span class="card-price-unit">元</span></div>
+      <div class="card-price-note">12 个月有效</div>
+      <ul class="card-list">
+        <li><strong>3,000 元</strong> 维修额度</li>
+        <li>服务费 <strong>5 折</strong></li>
+        <li>适用：全面保障、重度用户</li>
+        <li>单次抵扣 ≤ 1,800 元</li>
+      </ul>
+    </div>
+  </div>
+
+  <div style="margin-top: 48px; padding: 32px 40px; background: var(--bg-elevated); border: 1px solid var(--border-subtle);">
+    <div style="font-family: 'Inter', sans-serif; font-weight: 600; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 20px;">Usage Rules</div>
+    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px 40px; font-size: 14px; color: var(--text-secondary); line-height: 2;">
+      <div><strong style="color: var(--text-primary);">额度范围</strong> — 仅限服务费抵扣，不含配件、运费</div>
+      <div><strong style="color: var(--text-primary);">折扣叠加</strong> — 先打折，再从额度扣除</div>
+      <div><strong style="color: var(--text-primary);">单次上限</strong> — 单次抵扣不超过额度 60%</div>
+      <div><strong style="color: var(--text-primary);">额度用尽</strong> — 可续费或按折扣价现金支付</div>
+      <div><strong style="color: var(--text-primary);">不设找零</strong> — 按次扣除，不退差额</div>
+      <div><strong style="color: var(--text-primary);">绑定规则</strong> — 绑定设备或客户 ID，不可转让</div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- 03 SCENES -->
+<section>
+  <div class="section-header">
+    <span class="section-number">03 / 落地场景</span>
+    <h2 class="section-title">三种切入方式，店主零库存启动</h2>
+    <p class="section-subtitle">喵修盾可以随机器赠送、加价搭售，或作为会员权益升级工具。</p>
+  </div>
+  <div class="grid-2">
+    <div class="scene-card">
+      <div class="scene-label">Scenario A</div>
+      <div class="scene-title">随机器赠送 / 搭售</div>
+      <div class="scene-desc">
+        <p style="margin-bottom: 16px;">卖出一台二手无人机，附赠基础版喵修盾，客户购机即有保障。</p>
+        <p style="margin-bottom: 16px;">或加价 99 元升级标准版——客户感觉占了便宜，店主多赚一笔。</p>
+        <p>裸机 vs 裸机+质保，成交率差异显著。</p>
+      </div>
+    </div>
+    <div class="scene-card">
+      <div class="scene-label">Scenario B</div>
+      <div class="scene-title">老客户到店单独购买</div>
+      <div class="scene-desc">
+        <p style="margin-bottom: 16px;">已有无人机的用户到店，可单独购买喵修盾锁定未来维修需求。</p>
+        <p>将一次性散客转化为有预付费关系的长期客户。</p>
+      </div>
+    </div>
+    <div class="scene-card">
+      <div class="scene-label">Scenario C</div>
+      <div class="scene-title">会员权益升级</div>
+      <div class="scene-desc">
+        <p style="margin-bottom: 16px;">标准会员续费（999 元/年）赠送标准版喵修盾（价值 199 元）。</p>
+        <p>高级会员（2999 元/年）每年自动获得尊享版 2 张。</p>
+      </div>
+    </div>
+    <div class="scene-card">
+      <div class="scene-label">Scenario D</div>
+      <div class="scene-title">店主自购展示</div>
+      <div class="scene-desc">
+        <p style="margin-bottom: 16px;">店主购买喵修盾放置于店内展示，作为专业形象背书。</p>
+        <p>客户感知"这家店有官方保障"，未消费已建立信任。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- 04 MEMBERSHIP -->
+<section>
+  <div class="section-header">
+    <span class="section-number">04 / 会员体系</span>
+    <h2 class="section-title">会员层级与维修权益挂钩</h2>
+    <p class="section-subtitle">将维修保障与会员体系深度绑定，提升续费率和升级率。</p>
+  </div>
+
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>会员层级</th>
+        <th>年费</th>
+        <th>维修折扣</th>
+        <th>年度赠送喵修盾</th>
+        <th>适用场景</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="cell-label">体验会员</span></td>
+        <td><span class="cell-highlight">0</span></td>
+        <td>无折扣</td>
+        <td>无</td>
+        <td>可单独购买喵修盾</td>
+      </tr>
+      <tr>
+        <td><span class="cell-label">标准会员</span></td>
+        <td><span class="cell-highlight">999</span> <span style="color: var(--text-muted); font-size: 12px;">元/年</span></td>
+        <td>服务费 9 折</td>
+        <td>基础版 × 1 张</td>
+        <td>店主可自用或转赠客户</td>
+      </tr>
+      <tr>
+        <td><span class="cell-label">高级会员</span></td>
+        <td><span class="cell-highlight">2,999</span> <span style="color: var(--text-muted); font-size: 12px;">元/年</span></td>
+        <td>服务费 7 折</td>
+        <td>尊享版 × 2 张</td>
+        <td>店内展示、随机器赠送、客户福利</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<div class="divider"></div>
+
+<!-- 05 REVENUE -->
+<section>
+  <div class="section-header">
+    <span class="section-number">05 / 收益测算</span>
+    <h2 class="section-title">店主的三份收入来源</h2>
+    <p class="section-subtitle">喵修盾不是成本项，而是利润工具。</p>
+  </div>
+  <div class="grid-3" style="margin-bottom: 48px;">
+    <div class="card" style="text-align: center; padding: 48px 32px;">
+      <div style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 48px; color: var(--accent-gold); margin-bottom: 16px; font-variant-numeric: tabular-nums;">20-30%</div>
+      <div style="font-family: 'Noto Serif SC', serif; font-weight: 700; font-size: 18px; margin-bottom: 8px;">销售佣金</div>
+      <p style="font-size: 14px; color: var(--text-secondary); line-height: 1.7;">每售出一张喵修盾，店主获得售价 20%-30% 佣金</p>
+    </div>
+    <div class="card" style="text-align: center; padding: 48px 32px;">
+      <div style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 48px; color: var(--accent-gold); margin-bottom: 16px; font-variant-numeric: tabular-nums;">+15%</div>
+      <div style="font-family: 'Noto Serif SC', serif; font-weight: 700; font-size: 18px; margin-bottom: 8px;">整机成交率</div>
+      <p style="font-size: 14px; color: var(--text-secondary); line-height: 1.7;">有质保背书的机器更容易成交，裸机竞争力下降</p>
+    </div>
+    <div class="card" style="text-align: center; padding: 48px 32px;">
+      <div style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 48px; color: var(--accent-gold); margin-bottom: 16px; font-variant-numeric: tabular-nums;">∞</div>
+      <div style="font-family: 'Noto Serif SC', serif; font-weight: 700; font-size: 18px; margin-bottom: 8px;">维修回流</div>
+      <p style="font-size: 14px; color: var(--text-secondary); line-height: 1.7;">客户后续维修大概率回流，店主持续赚维修分成</p>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="calc-block">
+      <div class="scene-label" style="margin-bottom: 24px;">Revenue Example</div>
+      <div class="calc-formula">
+        <div>标准版售价 <span class="calc-num">199</span> 元</div>
+        <div>店主佣金 <span class="calc-num">25%</span> = <span class="calc-num">49.75</span> 元</div>
+        <div>客户维修原价 <span class="calc-num">500</span> 元</div>
+        <div>6折后服务费 <span class="calc-num">300</span> 元（从额度扣除）</div>
+      </div>
+      <div class="calc-result">
+        <div class="calc-result-label">店主单张卡总收益</div>
+        <div class="calc-result-value">74.75 元</div>
+        <div class="calc-result-note">佣金 49.75 + 维修分成 25 元（假设）</div>
+      </div>
+    </div>
+    <div class="calc-block" style="border-color: var(--accent-gold);">
+      <div class="scene-label" style="margin-bottom: 24px; color: var(--accent-gold);">Annual Projection</div>
+      <div class="calc-formula">
+        <div>月均售出 <span class="calc-num">50</span> 张（标准版）</div>
+        <div>店主佣金 <span class="calc-num">50</span> × <span class="calc-num">49.75</span></div>
+        <div>月均维修回流 <span class="calc-num">30</span> 单</div>
+        <div>维修分成 <span class="calc-num">30</span> × <span class="calc-num">25</span></div>
+      </div>
+      <div class="calc-result">
+        <div class="calc-result-label">年度预估附加收入</div>
+        <div class="calc-result-value">38,850 元</div>
+        <div class="calc-result-note">佣金 29,850 + 维修分成 9,000（假设）</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- 06 RISK -->
+<section>
+  <div class="section-header">
+    <span class="section-number">06 / 风险控制</span>
+    <h2 class="section-title">四层机制，将风险锁在可控区间</h2>
+    <p class="section-subtitle">额度制天然优于全包制，预收+折扣+上限+等待期构成完整风控。</p>
+  </div>
+
+  <div class="risk-item">
+    <div class="risk-title">恶意故障制造</div>
+    <div class="risk-desc">维修前视频/照片确认故障状态；标准检测流程，非自然损坏不在保障范围；单次抵扣上限防止一次大修耗尽额度。</div>
+  </div>
+  <div class="risk-item">
+    <div class="risk-title">配件成本失控</div>
+    <div class="risk-desc">额度仅抵扣服务费，配件费另计；店主无需承担配件成本，喵修匠按标准报价结算。</div>
+  </div>
+  <div class="risk-item">
+    <div class="risk-title">逆选择（带病投保）</div>
+    <div class="risk-desc">设置购买后 7 天等待期，等待期内故障不享受额度抵扣；长期客户优先推荐，降低逆选择概率。</div>
+  </div>
+  <div class="risk-item">
+    <div class="risk-title">渠道商套利</div>
+    <div class="risk-desc">异常销售监控（如某店单月销售 200 张但零维修），触发人工审核；分级结算，达标后提升佣金比例。</div>
+  </div>
+  <div class="risk-item">
+    <div class="risk-title">额度集中兑付</div>
+    <div class="risk-desc">单日/单店兑付预警线；历史数据精算定价，确保兑付率安全；喵修匠体系内多维修点分散产能。</div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- CTA -->
+<div class="cta" style="position: relative;">
+  <svg class="cta-geo" viewBox="0 0 200 200">
+    <defs><pattern id="cta-grid" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M 10 0 L 0 0 0 10" fill="none" stroke="currentColor" stroke-width="0.3"/></pattern></defs>
+    <rect width="200" height="200" fill="url(#cta-grid)"/>
+    <circle cx="100" cy="100" r="50" fill="none" stroke="currentColor" stroke-width="0.5"/>
+  </svg>
+  <div class="cta-title">立即启动合作</div>
+  <div class="cta-subtitle">喵修盾正在面向首批 100 家数码店开放合作<br>锁定区域，优先排期</div>
+  <a href="#" class="cta-button">申请合作资格</a>
+  <div style="margin-top: 40px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-muted); letter-spacing: 0.05em; line-height: 2;">
+    <div>官网：mxd.miaoxiujiang.com</div>
+    <div>邮箱：business@miaoxiujiang.com</div>
+  </div>
+</div>
+
+</body>
+</html>

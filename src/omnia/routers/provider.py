@@ -17,7 +17,7 @@ PROVIDER_CONFIG = {
     "xiaomi": ("MIMO_API_KEY", "小米 MiMo", "mimo-v2.5-pro"),
     "deepseek": ("DEEPSEEK_API_KEY", "DeepSeek", "deepseek-v4-pro"),
     "qianfan": ("QIANFAN_API_KEY", "百度千帆", "qianfan-code-latest"),
-    "kimi": ("MOONSHOT_API_KEY", "Moonshot", "kimi-code"),
+    "kimi": ("MOONSHOT_API_KEY", "Moonshot", "k3"),
     "openai": ("OPENAI_API_KEY", "OpenAI", "gpt-4o"),
     "anthropic": ("ANTHROPIC_API_KEY", "Anthropic", "claude-3-5-sonnet-20241022"),
 }

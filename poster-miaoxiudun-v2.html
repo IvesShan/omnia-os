@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>喵修盾</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700;900&family=Inter:wght@400;700;900&display=swap');
+  
+  :root {
+    --bg: #0B0F19;
+    --surface: #151B2B;
+    --text: #E8ECF1;
+    --muted: #8B94A5;
+    --accent: #00F0FF;
+    --accent-dim: #00A8B5;
+    --gold: #FFB800;
+    --danger: #FF4D6D;
+  }
+  
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  
+  body {
+    background: #0a0c10;
+    font-family: 'Noto Sans SC', 'Inter', system-ui, sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    padding: 40px 20px;
+  }
+  
+  .poster {
+    width: 600px;
+    background: var(--bg);
+    color: var(--text);
+    position: relative;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+  
+  /* 顶部几何装饰 */
+  .poster::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 8px;
+    background: var(--accent);
+  }
+  
+  .top-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 28px 40px 20px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+  
+  .brand {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    color: var(--accent);
+    text-transform: uppercase;
+  }
+  
+  .tag {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--bg);
+    background: var(--gold);
+    padding: 4px 10px;
+    letter-spacing: 0.05em;
+  }
+  
+  /* 主标题区 */
+  .hero {
+    padding: 48px 40px 36px;
+  }
+  
+  .hero-label {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.25em;
+    color: var(--muted);
+    margin-bottom: 16px;
+    display: block;
+  }
+  
+  .hero-title {
+    font-size: 52px;
+    font-weight: 900;
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+    margin-bottom: 20px;
+  }
+  
+  .hero-title span {
+    color: var(--accent);
+  }
+  
+  .hero-sub {
+    font-size: 16px;
+    line-height: 1.6;
+    color: var(--muted);
+    max-width: 420px;
+  }
+  
+  /* 痛点陈述 */
+  .pain-block {
+    background: var(--surface);
+    margin: 0 40px 40px;
+    padding: 28px 32px;
+    border-left: 4px solid var(--gold);
+  }
+  
+  .pain-block p {
+    font-size: 15px;
+    line-height: 1.7;
+    color: var(--text);
+  }
+  
+  .pain-block strong {
+    color: var(--gold);
+  }
+  
+  /* 产品区 */
+  .products {
+    padding: 0 40px 48px;
+  }
+  
+  .section-title {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    color: var(--muted);
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  
+  .section-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: rgba(255,255,255,0.08);
+  }
+  
+  .product-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background: rgba(255,255,255,0.08);
+  }
+  
+  .product-card {
+    background: var(--bg);
+    padding: 32px 24px;
+    text-align: center;
+    position: relative;
+  }
+  
+  .product-card.featured {
+    background: var(--surface);
+  }
+  
+  .product-card.featured::before {
+    content: '店主首选';
+    position: absolute;
+    top: 0; right: 0;
+    background: var(--gold);
+    color: var(--bg);
+    font-size: 10px;
+    font-weight: 700;
+    padding: 4px 10px;
+    letter-spacing: 0.05em;
+  }
+  
+  .card-name {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    margin-bottom: 8px;
+  }
+  
+  .card-price {
+    font-size: 42px;
+    font-weight: 900;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+  
+  .card-price span {
+    font-size: 16px;
+    font-weight: 400;
+    color: var(--muted);
+  }
+  
+  .card-value {
+    font-size: 14px;
+    color: var(--accent);
+    font-weight: 700;
+    margin-bottom: 16px;
+  }
+  
+  .card-discount {
+    display: inline-block;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--bg);
+    background: var(--accent);
+    padding: 4px 12px;
+    margin-bottom: 20px;
+  }
+  
+  .card-detail {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.8;
+  }
+  
+  /* 底部价值 */
+  .value-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1px;
+    background: rgba(255,255,255,0.08);
+    margin: 0 40px 40px;
+  }
+  
+  .value-cell {
+    background: var(--bg);
+    padding: 28px;
+  }
+  
+  .value-num {
+    font-size: 32px;
+    font-weight: 900;
+    color: var(--accent);
+    margin-bottom: 8px;
+    line-height: 1;
+  }
+  
+  .value-label {
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+  
+  .value-desc {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+  
+  /* CTA */
+  .cta-zone {
+    padding: 0 40px 48px;
+  }
+  
+  .cta-btn {
+    display: block;
+    width: 100%;
+    background: var(--accent);
+    color: var(--bg);
+    font-size: 16px;
+    font-weight: 900;
+    letter-spacing: 0.15em;
+    text-align: center;
+    padding: 20px 0;
+    border: none;
+    cursor: pointer;
+    text-transform: uppercase;
+  }
+  
+  .cta-btn:hover {
+    background: var(--accent-dim);
+  }
+  
+  /* 底部 */
+  .footer-line {
+    height: 6px;
+    background: var(--gold);
+  }
+  
+  .footer-info {
+    padding: 20px 40px;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+    display: flex;
+    justify-content: space-between;
+  }
+  
+  /* 响应式 */
+  @media (max-width: 640px) {
+    .poster { width: 100%; }
+    .hero-title { font-size: 36px; }
+    .product-grid { grid-template-columns: 1fr; }
+    .value-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="poster">
+  <div class="top-bar">
+    <div class="brand">MIAOXIUJIANG</div>
+    <div class="tag">2026 NEW</div>
+  </div>
+  
+  <div class="hero">
+    <span class="hero-label">REPAIR GUARANTEE PRODUCT</span>
+    <h1 class="hero-title">喵修盾<br><span>维修保障卡</span></h1>
+    <p class="hero-sub">将维修能力转化为可销售的标准化产品。让每一台售出的无人机都有质保底气。</p>
+  </div>
+  
+  <div class="pain-block">
+    <p>客户问得最多的问题：<strong>“万一坏了怎么办？修起来贵不贵？”</strong><br>没有质保，成交率大打折扣。喵修盾让店主多一个赚钱工具，让客户多一份安心保障。</p>
+  </div>
+  
+  <div class="products">
+    <div class="section-title">PRICING PLANS</div>
+    <div class="product-grid">
+      <div class="product-card">
+        <div class="card-name">基础版</div>
+        <div class="card-price">99<span>元</span></div>
+        <div class="card-value">800元额度</div>
+        <div class="card-discount">7折维修</div>
+        <div class="card-detail">有效期6个月<br>小型维修 / 保养检测</div>
+      </div>
+      <div class="product-card featured">
+        <div class="card-name">标准版</div>
+        <div class="card-price">199<span>元</span></div>
+        <div class="card-value">1800元额度</div>
+        <div class="card-discount">6折维修</div>
+        <div class="card-detail">有效期12个月<br>中型维修 / 日常保障</div>
+      </div>
+      <div class="product-card">
+        <div class="card-name">尊享版</div>
+        <div class="card-price">299<span>元</span></div>
+        <div class="card-value">3000元额度</div>
+        <div class="card-discount">5折维修</div>
+        <div class="card-detail">有效期12个月<br>全面保障 / 重度用户</div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="value-grid">
+    <div class="value-cell">
+      <div class="value-num">+30%</div>
+      <div class="value-label">成交率提升</div>
+      <div class="value-desc">有质保的二手无人机更好卖，客户敢于下单</div>
+    </div>
+    <div class="value-cell">
+      <div class="value-num">25%</div>
+      <div class="value-label">销售佣金</div>
+      <div class="value-desc">店主卖卡即得佣金，不占库存，多一条收入线</div>
+    </div>
+    <div class="value-cell">
+      <div class="value-num">闭环</div>
+      <div class="value-label">客户锁定</div>
+      <div class="value-desc">买了额度的客户，后续维修大概率回流</div>
+    </div>
+    <div class="value-cell">
+      <div class="value-num">0风险</div>
+      <div class="value-label">额度控制</div>
+      <div class="value-desc">单次抵扣上限60%，配件费另计，成本可控</div>
+    </div>
+  </div>
+  
+  <div class="cta-zone">
+    <button class="cta-btn">立即合作</button>
+  </div>
+  
+  <div class="footer-line"></div>
+  <div class="footer-info">
+    <span>喵修匠</span>
+    <span>让维修成为竞争力</span>
+  </div>
+</div>
+
+</body>
+</html>

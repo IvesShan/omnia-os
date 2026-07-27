@@ -1,11 +1,11 @@
 {
   "stats": {
-    "total_patterns_detected": 6,
-    "total_skills_generated": 6,
-    "total_skills_approved": 2,
-    "total_skills_rejected": 6,
-    "last_evolution_run": "2026-06-09 11:28:56.564069",
-    "evolution_cycles": 4
+    "total_patterns_detected": 122,
+    "total_skills_generated": 122,
+    "total_skills_approved": 3,
+    "total_skills_rejected": 121,
+    "last_evolution_run": "2026-07-27 17:11:15.633526",
+    "evolution_cycles": 2466
   },
-  "updated_at": "2026-06-09 11:28:56.564092"
+  "updated_at": "2026-07-27 17:11:15.633554"
 }

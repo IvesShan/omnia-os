@@ -204,6 +204,32 @@ def _resolve_path(path: str) -> Path:
     return p.resolve()
 
 
+def _read_excel_as_text(path):
+    try:
+        import openpyxl
+        wb = openpyxl.load_workbook(str(path), data_only=True, read_only=True)
+        lines = ["EXCEL: " + path.name + " | Sheets: " + ", ".join(wb.sheetnames), ""]
+        for sheet_name in wb.sheetnames[:3]:
+            ws = wb[sheet_name]
+            lines.append("--- Sheet: " + sheet_name + " ---")
+            row_count = 0
+            for row in ws.iter_rows(values_only=True):
+                row_count += 1
+                if row_count > 100:
+                    lines.append("[...truncated at 100 rows...]")
+                    break
+                row_str = [str(cell) if cell is not None else "" for cell in row]
+                if any(cell.strip() for cell in row_str):
+                    lines.append(" | ".join(row_str[:15]))
+            lines.append("")
+        wb.close()
+        return "\n".join(lines)
+    except ImportError:
+        return "[Error] openpyxl not installed"
+    except Exception as e:
+        return "[Error] Failed to parse Excel: " + str(e)
+
+
 def tool_read_file(path: str) -> Dict[str, Any]:
     safety = classify_file_read(path)
     if not safety.allowed:
@@ -213,8 +239,24 @@ def tool_read_file(path: str) -> Dict[str, Any]:
         p = _resolve_path(path)
         if not p.exists():
             return {"error": f"File not found: {p}"}
-        text = p.read_text(encoding="utf-8", errors="replace")
-        # Truncate very large files
+        
+        suffix = p.suffix.lower()
+        
+        if suffix in ('.xlsx', '.xls'):
+            text = _read_excel_as_text(p)
+        elif suffix in ('.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp'):
+            return {
+                "path": str(p), 
+                "content": "[Image file: " + path.name + ", size=" + str(p.stat().st_size) + " bytes. Cannot read as text.]"
+            }
+        elif suffix in ('.zip', '.tar', '.gz', '.rar', '.7z'):
+            return {
+                "path": str(p),
+                "content": "[Archive file: " + path.name + ". Use execute_shell to inspect contents.]"
+            }
+        else:
+            text = p.read_text(encoding="utf-8", errors="replace")
+        
         if len(text) > 50_000:
             text = text[:50_000] + "\n\n[...truncated at 50KB...]"
         return {"path": str(p), "content": text}

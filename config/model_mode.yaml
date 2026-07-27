@@ -14,12 +14,12 @@ local:
 cloud:
   enabled: true
   provider: kimi
-  model: "kimi-code"
+  model: "k3"
 
 # Kimi 配置 (Coding Plan)
 kimi:
   enabled: true
   provider: kimi
-  model: "kimi-code"
+  model: "k3"
   api_key_env: "MOONSHOT_API_KEY"
   api_url: "https://api.kimi.com/coding/v1/messages"

@@ -283,10 +283,10 @@ def _build_model_config(provider: str) -> tuple[str, str]:
         print(f"[_build_model_config] Using Qianfan Coding: url={url}, model={model}")
     elif provider == "kimi":
         # Kimi Coding Plan - OpenAI 兼容端点
-        # 参考: https://www.kimi.com/code/docs/third-party-tools/other-coding-agents.html
-        # Roo Code 配置: Base URL=https://api.kimi.com/coding/v1, Model=kimi-for-coding
+        # 参考: https://www.kimi.com/code/docs/kimi-code/models.html
+        # K3: Model=k3 (Kimi 迄今最强旗舰模型，支持 1M 上下文，需保持 thinking 开启)
         url = "https://api.kimi.com/coding/v1/chat/completions"
-        model = "kimi-for-coding"
+        model = "k3"
         print(f"[_build_model_config] Using Kimi Coding (OpenAI compatible): url={url}, model={model}")
     elif provider == "deepseek":
         # DeepSeek API

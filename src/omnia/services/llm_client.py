@@ -26,7 +26,7 @@ class LLMClient:
     
     PROVIDER_MODELS = {
         "deepseek": "deepseek-v4-pro",
-        "kimi": "kimi-for-coding",
+        "kimi": "k3",
         "xiaomi": "mimo-v2.5-pro",
         "openai": "gpt-4o",
         "qianfan": "qianfan-code-latest",
@@ -36,13 +36,13 @@ class LLMClient:
     API_TOOL_PROVIDERS = {"deepseek", "openai", "xiaomi", "qianfan", "kimi"}
     
     def __init__(self):
-        timeout = httpx.Timeout(connect=5.0, read=90.0, write=10.0, pool=5.0)
+        timeout = httpx.Timeout(connect=10.0, read=600.0, write=30.0, pool=30.0)
         self.client = httpx.AsyncClient(
             timeout=timeout,
             limits=httpx.Limits(
                 max_connections=50,
                 max_keepalive_connections=10,
-                keepalive_expiry=30.0,  # 30秒后关闭空闲连接
+                keepalive_expiry=300.0,  # 30秒后关闭空闲连接
             ),
         )
     
@@ -50,6 +50,99 @@ class LLMClient:
         """关闭客户端"""
         await self.client.aclose()
     
+    def _estimate_tokens(self, text: str) -> int:
+        """估算 token 数（中文约1.5字/token，英文约4字/token）"""
+        if not text:
+            return 0
+        # 混合文本用更准确的估算（中文为主时 len/1.5，英文为主时 len/4）
+        # 这里用 len/1.8 作为混合文本的折中估计
+        return max(1, int(len(text) / 1.8))
+    
+    def _truncate_messages(self, messages: List[dict], max_total_tokens: int = 80000) -> List[dict]:
+        """
+        截断消息列表，确保总 token 数不超过限制。
+        策略：
+        1. 保留 system prompt（最高优先级）
+        2. 始终保留最近至少 2 轮对话（防止完全失忆）
+        3. 对旧轮次的 tool 结果进行截断，而非丢弃整轮
+        """
+        if not messages:
+            return messages
+        
+        total = sum(self._estimate_tokens(m.get("content", "")) for m in messages)
+        if total <= max_total_tokens:
+            return messages
+        
+        # 分离 system prompt 和对话消息
+        system_msgs = [m for m in messages if m.get("role") == "system"]
+        dialog_msgs = [m for m in messages if m.get("role") != "system"]
+        
+        system_tokens = self._estimate_tokens(system_msgs[0].get("content", "")) if system_msgs else 0
+        current_tokens = system_tokens
+        kept_dialog = []
+        rounds_kept = 0
+        
+        i = len(dialog_msgs) - 1
+        while i >= 0:
+            # 收集当前"轮"的所有消息（从后往前，到 user 为止）
+            round_msgs = []
+            round_tokens = 0
+            
+            while i >= 0:
+                m = dialog_msgs[i]
+                round_msgs.insert(0, m)
+                round_tokens += self._estimate_tokens(m.get("content", ""))
+                i -= 1
+                if m.get("role") == "user":
+                    break
+            
+            # 始终保留最近 2 轮（防止完全失忆）
+            if rounds_kept < 2:
+                # 即使超预算，也保留这轮，但截断过长的 tool 结果
+                round_msgs = self._truncate_round_tools(round_msgs)
+                round_tokens = sum(self._estimate_tokens(m.get("content", "")) for m in round_msgs)
+                kept_dialog = round_msgs + kept_dialog
+                current_tokens += round_tokens
+                rounds_kept += 1
+                continue
+            
+            # 第 3 轮及以后：如果预算还够就保留，否则截断 tool 结果后保留
+            if current_tokens + round_tokens <= max_total_tokens * 0.9:
+                kept_dialog = round_msgs + kept_dialog
+                current_tokens += round_tokens
+                rounds_kept += 1
+            else:
+                # 预算不够：截断 tool 结果后尝试保留
+                truncated_round = self._truncate_round_tools(round_msgs)
+                truncated_tokens = sum(self._estimate_tokens(m.get("content", "")) for m in truncated_round)
+                if current_tokens + truncated_tokens <= max_total_tokens * 0.95:
+                    kept_dialog = truncated_round + kept_dialog
+                    current_tokens += truncated_tokens
+                    rounds_kept += 1
+                else:
+                    # 真的装不下了，停止
+                    break
+        
+        result = (system_msgs[:1] if system_msgs else []) + kept_dialog
+        
+        if len(result) < len(messages):
+            print(f"[LLMClient] Truncated: {len(messages)} -> {len(result)} msgs, kept {rounds_kept} recent rounds")
+        
+        return result
+    
+    def _truncate_round_tools(self, round_msgs: List[dict]) -> List[dict]:
+        """截断轮次中过长的 tool 结果，保留 user/assistant 完整"""
+        result = []
+        for m in round_msgs:
+            if m.get("role") == "tool":
+                content = m.get("content", "") or ""
+                if len(content) > 8000:
+                    # 截断 tool 结果，保留前后部分
+                    m = dict(m)
+                    m["content"] = content[:4000] + "\n\n[...中间内容已截断...]\n\n" + content[-2000:]
+    
+                result.append(m)
+        return result
     def _load_api_key(self, provider: str) -> str | None:
         """加载 API Key"""
         env_keys = {
@@ -249,6 +342,9 @@ class LLMClient:
             yield {"type": "error", "message": f"不支持的 Provider: {provider}"}
             return
         
+        # 截断过长的消息列表，防止上下文爆炸
+        messages = self._truncate_messages(messages, max_total_tokens=100000)
+        
         body = {
             "model": model,
             "messages": messages,
@@ -266,13 +362,13 @@ class LLMClient:
         
         headers = self._build_headers(api_key, provider)
         
-        # Provider 特定的流式超时：小米模型推理较慢，需要更多时间
+        # Provider 特定的流式超时：支持环境变量覆盖（如 KIMI_TIMEOUT=600）
         provider_timeout = {
-            "xiaomi": 300.0,    # 小米模型推理慢，给 5 分钟
-            "deepseek": 180.0,  # DeepSeek 思考模式可能较长
-            "kimi": 120.0,
-            "qianfan": 120.0,
-            "openai": 120.0,
+            "xiaomi": float(os.environ.get("XIAOMI_TIMEOUT", "300")),
+            "deepseek": float(os.environ.get("DEEPSEEK_TIMEOUT", "180")),
+            "kimi": float(os.environ.get("KIMI_TIMEOUT", "300")),
+            "qianfan": float(os.environ.get("QIANFAN_TIMEOUT", "120")),
+            "openai": float(os.environ.get("OPENAI_TIMEOUT", "120")),
         }
         total_timeout = provider_timeout.get(provider, 120.0)
         
@@ -291,8 +387,8 @@ class LLMClient:
                 pass
             yield {"type": "error", "message": error_msg}
         except asyncio.TimeoutError:
-            error_msg = f"请求超时: {provider} API 未在120秒内响应，已自动断开"
-            print(f"[LLMClient] TIMEOUT: stream request to {provider} exceeded 120s")
+            error_msg = f"请求超时: {provider} API 未在300秒内响应，已自动断开"
+            print(f"[LLMClient] TIMEOUT: stream request to {provider} exceeded total_timeout")
             yield {"type": "error", "message": error_msg}
         except Exception as e:
             error_msg = f"请求异常: {str(e)}"
