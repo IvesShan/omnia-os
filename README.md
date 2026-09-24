@@ -16,7 +16,26 @@
 
 ## 📦 快速开始（全平台）
 
-### 方式一：Docker（推荐）⭐
+### 方式零：pip 一行安装（推荐）⭐
+
+**跨平台原生支持**：Windows / macOS / Linux，无需 Docker。
+
+```bash
+# 安装最新版
+pip install git+https://github.com/IvesShan/omnia-os.git
+
+# 或指定版本
+pip install git+https://github.com/IvesShan/omnia-os.git@v0.1.0
+
+# 推荐使用 pipx（隔离环境，更干净）
+pipx install git+https://github.com/IvesShan/omnia-os.git
+
+# 验证
+omnia --help
+omnia doctor
+```
+
+### 方式一：Docker（适合服务器部署）
 
 **支持 Linux / macOS (Intel + Apple Silicon) / Windows**
 

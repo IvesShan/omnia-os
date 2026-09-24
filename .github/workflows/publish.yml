@@ -2,8 +2,12 @@ name: Build Python Package
 
 on:
   push:
-    branches: [main]
+    tags:
+      - 'v*.*.*'
   workflow_dispatch:
+
+permissions:
+  contents: write  # 用于创建 GitHub Release
 
 jobs:
   build-wheel:
@@ -70,23 +74,76 @@ jobs:
           omnia --help
           omnia doctor --help || true
 
-  # 发布到 PyPI：仅当打 tag v*.*.* 时触发，需要配置 Trusted Publishing
-  publish-pypi:
-    name: Publish to PyPI
+  github-release:
+    name: Create GitHub Release with wheel
     needs: [build-wheel, test-install]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
-    environment:
-      name: pypi
-      url: https://pypi.org/p/omnia-ai
-    permissions:
-      id-token: write  # 用于 PyPI Trusted Publishing
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
           name: omnia-dist
           path: dist/
 
-      - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+      - name: Generate release notes
+        id: notes
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          cat > release_notes.md <<EOF
+          # Omnia ${VERSION}
+
+          ## 安装方式
+
+          ### 方式 1：pip 直接从 GitHub 安装（推荐）
+
+          \`\`\`bash
+          pip install git+https://github.com/IvesShan/omnia-os.git@${VERSION}
+          \`\`\`
+
+          或使用 pipx（隔离环境，更干净）：
+
+          \`\`\`bash
+          pipx install git+https://github.com/IvesShan/omnia-os.git@${VERSION}
+          \`\`\`
+
+          ### 方式 2：下载 wheel 文件安装
+
+          从下方 Assets 下载 \`omnia_ai-*.whl\`，然后：
+
+          \`\`\`bash
+          pip install omnia_ai-*.whl
+          \`\`\`
+
+          ## 验证安装
+
+          \`\`\`bash
+          omnia --help
+          omnia doctor
+          \`\`\`
+
+          ## 全平台支持
+
+          | 平台 | 状态 |
+          |------|------|
+          | Windows (10/11) | ✅ 已在 CI 测试 |
+          | macOS (Intel/M 系列) | ✅ 已在 CI 测试 |
+          | Linux (Ubuntu/Debian 等) | ✅ 已在 CI 测试 |
+
+          Python 3.10 / 3.11 / 3.12 均已通过测试。
+          EOF
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Omnia ${{ github.ref_name }}
+          body_path: release_notes.md
+          files: |
+            dist/*.whl
+            dist/*.tar.gz
+          draft: false
+          prerelease: false
+          generate_release_notes: true
