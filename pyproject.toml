@@ -1,0 +1,65 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "omnia-ai"
+version = "0.1.0"
+description = "Omnia — 一个伴随你成长的 AI 操作系统"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "IvesShan"},
+]
+keywords = ["ai", "assistant", "agent", "memory", "llm", "cli"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: OS Independent",
+]
+
+# 依赖从 requirements.txt 同步（保持单一来源）
+dependencies = [
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
+    "pydantic-settings>=2.1.0",
+    "sse-starlette>=1.8.0",
+    "openai>=1.0.0",
+    "anthropic>=0.18.0",
+    "requests>=2.31.0",
+    "pydantic>=2.0.0",
+    "python-dotenv>=1.0.0",
+    "pyyaml>=6.0",
+    "numpy>=1.24.0",
+    "httpx>=0.25.0",
+    "websockets>=12.0",
+    "python-dateutil>=2.8.0",
+    "tiktoken>=0.5.0",
+    "croniter>=2.0.0",
+    "chromadb>=1.5.0",
+    "sentence-transformers>=2.2.0",
+]
+
+[project.scripts]
+omnia = "omnia.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/IvesShan/omnia-os"
+Repository = "https://github.com/IvesShan/omnia-os"
+Issues = "https://github.com/IvesShan/omnia-os/issues"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["omnia*", "core*"]
+
+[tool.setuptools.package-data]
+"*" = ["*.yaml", "*.yml", "*.json", "*.md"]
