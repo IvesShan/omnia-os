@@ -1,0 +1,187 @@
+# Omnia 统一配置文件
+# 版本: 1.0.0
+# 说明: 本文件是 Omnia 的唯一配置源，替代旧的 .env + 多 YAML 分散配置
+# 用法: omnia config validate 校验配置 | omnia config doctor 诊断问题
+
+version: "1.0"
+
+# ============ 核心路径配置 ============
+paths:
+  # Omnia 数据目录（记忆、日志、数据库）
+  omnia_home: "~/.omnia"
+  # 项目根目录（自动检测，也可手动指定）
+  project_root: null  # null = 自动检测
+  # 记忆宫殿数据库
+  memory_palace_db: "${paths.omnia_home}/memory_palace.db"
+  # 神经图谱数据库
+  neural_graph_db: "${paths.omnia_home}/neural_graph.db"
+  # 待确认操作记录
+  pending_conf_path: "${paths.omnia_home}/pending_confirmations.json"
+
+# ============ 服务配置 ============
+server:
+  host: "0.0.0.0"
+  port: 8765
+  debug: true
+  # 最大并发请求数
+  max_concurrent_requests: 100
+  # 请求超时（秒）
+  request_timeout: 120
+
+# ============ LLM 提供商配置 ============
+llm:
+  # 当前激活的提供商
+  current: "kimi"
+  # 当前模式: cloud | local
+  mode: "cloud"
+
+  providers:
+    kimi:
+      enabled: true
+      api_key: "${env.MOONSHOT_API_KEY}"
+      model: "k3"
+      api_url: "https://api.kimi.com/coding/v1/messages"
+      # 速率限制（可选）
+      rate_limit:
+        requests_per_minute: 60
+        tokens_per_minute: 100000
+
+    deepseek:
+      enabled: false
+      api_key: "${env.DEEPSEEK_API_KEY}"
+      model: "deepseek-chat"
+      api_url: "https://api.deepseek.com/v1"
+
+    openai:
+      enabled: false
+      api_key: "${env.OPENAI_API_KEY}"
+      model: "gpt-4o"
+      api_url: "https://api.openai.com/v1"
+
+    anthropic:
+      enabled: false
+      api_key: "${env.ANTHROPIC_API_KEY}"
+      model: "claude-3-5-sonnet-20241022"
+      api_url: "https://api.anthropic.com/v1"
+
+    zhipu:
+      enabled: false
+      api_key: "${env.ZHIPU_API_KEY}"
+      model: "glm-4"
+      api_url: "https://open.bigmodel.cn/api/paas/v4"
+
+    qianfan:
+      enabled: false
+      api_key: "${env.QIANFAN_API_KEY}"
+      model: "baiduqianfancodingplan/qianfan-code-latest"
+      api_url: "https://qianfan.baidubce.com/v2"
+
+    mimo:
+      enabled: false
+      api_key: "${env.MIMO_API_KEY}"
+      model: "mimo-v1"
+      api_url: "https://api.xiaomimimo.com/v1"
+
+  # 本地模型配置（当 mode = local 时生效）
+  local:
+    enabled: false
+    backend: "transformers"  # transformers | vllm | llama.cpp | ollama
+    model: "qwen3-8b"
+    model_path: "~/models/Qwen3-8B"
+    base_url: "http://localhost:11434"  # ollama 默认地址
+
+# ============ 集成配置 ============
+integrations:
+  feishu:
+    enabled: false
+    app_id: "${env.FEISHU_APP_ID}"
+    app_secret: "${env.FEISHU_APP_SECRET}"
+    verify_token: "${env.FEISHU_VERIFY_TOKEN}"
+
+  # 通知配置
+  notifications:
+    enabled: false
+    # 系统通知
+    system: true
+    # 钉钉 webhook
+    dingtalk_webhook: "${env.DINGTALK_WEBHOOK}"
+    # 企业微信 webhook
+    wecom_webhook: "${env.WECOM_WEBHOOK}"
+    # 飞书 webhook
+    feishu_webhook: "${env.FEISHU_WEBHOOK}"
+
+# ============ 记忆系统配置 ============
+memory:
+  # 记忆宫殿
+  palace:
+    enabled: true
+    auto_save: true
+    # 记忆保留策略（天）
+    retention_days: 365
+  # 神经图谱
+  neural_graph:
+    enabled: true
+    auto_enhance: true
+    # 图谱可视化
+    visualization: true
+
+# ============ Persona 配置 ============
+personas:
+  # 默认激活的 persona
+  default: "无限"
+  # 可用 personas 列表
+  available:
+    - "无限"
+    - "Omnia"
+  # 自定义 personas 目录
+  custom_dir: "~/.omnia/personas"
+
+# ============ Skill 配置 ============
+skills:
+  # 自动发现 skills 的目录
+  directories:
+    - "~/omnia-os/skills"
+    - "~/.openclaw/workspace/skills"
+  # 启用的 skills（空列表 = 全部启用）
+  enabled: []
+  # 禁用的 skills
+  disabled: []
+
+# ============ 日志配置 ============
+logging:
+  level: "INFO"  # DEBUG | INFO | WARNING | ERROR
+  # 日志文件路径
+  file: "${paths.omnia_home}/omnia.log"
+  # 最大日志文件大小（MB）
+  max_size_mb: 100
+  # 保留日志文件数量
+  backup_count: 5
+  # 是否输出到控制台
+  console: true
+
+# ============ 高级配置 ============
+advanced:
+  # 守护进程配置
+  daemon:
+    enabled: true
+    # 自动重启
+    auto_restart: true
+    # 最大重启次数
+    max_restarts: 3
+    # 重启间隔（秒）
+    restart_interval: 5
+
+  # 健康检查
+  health_check:
+    enabled: true
+    interval: 30  # 秒
+    endpoint: "/health"
+
+  # 性能监控
+  metrics:
+    enabled: false
+    endpoint: "/metrics"
+
+# ============ 环境变量映射（自动从 .env 加载）============
+# 以下变量会从 .env 文件自动读取，无需在此配置
+# MOONSHOT_API_KEY, DEEPSEEK_API_KEY, OPENAI_API_KEY, etc.
