@@ -54,7 +54,7 @@ ENV PATH="/opt/venv/bin:$PATH"
 COPY --chown=omnia:omnia src/omnia /app/omnia
 COPY --chown=omnia:omnia config /app/config
 COPY --chown=omnia:omnia skills /app/skills
-COPY --chown=omnia:omnia personas /app/personas
+COPY --chown=omnia:omnia src/core/personas /app/personas
 COPY --chown=omnia:omnia scripts /app/scripts
 COPY --chown=omnia:omnia omnia.yaml.example /app/omnia.yaml.example
 
